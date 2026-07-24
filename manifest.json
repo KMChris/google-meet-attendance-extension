@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Google Meet Attendance Tracker",
-  "version": "1.0.1",
-  "description": "Track participant attendance in Google Meet meetings with local storage and optional Google Sheets sync",
+  "short_name": "GM Attendance",
+  "version": "1.2.0",
+  "description": "Track Google Meet attendance on a presence timeline: meetings, meeting series, late & absent detection, PDF reports, dark mode, optional Google Sheets sync.",
   "permissions": [
     "storage",
     "identity",
@@ -12,7 +13,7 @@
     "https://meet.google.com/*"
   ],
   "oauth2": {
-    "client_id": "644377475596-l3usq6v5ev0t5ethifpjsggfftncars3.apps.googleusercontent.com",
+    "client_id": "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/spreadsheets"
     ]

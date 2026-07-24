@@ -2,7 +2,7 @@
 
 **Google Meet Attendance Tracker**
 
-Last updated: 2026-02-15
+Last updated: 2026-07-24
 
 ## Data Collection
 
@@ -38,4 +38,4 @@ If the user enables Google Sheets sync, attendance data is sent **only** to the 
 ## Contact
 
 If you have questions about this privacy policy, please open an issue at:
-https://github.com/starone99/google-meet-attendance-extension/issues
+https://github.com/KMChris/google-meet-attendance-extension/issues

@@ -1,72 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - Meet Attendance Tracker</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1 { margin-bottom: 5px; }
-        .updated { color: #666; margin-bottom: 30px; }
-        h2 { margin-top: 25px; margin-bottom: 10px; }
-        p, ul { margin-bottom: 15px; }
-        ul { padding-left: 20px; }
-        li { margin-bottom: 4px; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
-        th { background: #f5f5f5; }
-        a { color: #1a73e8; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .back { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Google Meet Attendance Tracker</title>
+  <style>
+    @font-face{font-family:'Space Grotesk';font-weight:700;font-display:swap;src:url('src/lib/fonts/space-grotesk-700-latin.woff2') format('woff2')}
+    @font-face{font-family:'IBM Plex Sans';font-weight:400;font-display:swap;src:url('src/lib/fonts/ibm-plex-sans-400-latin.woff2') format('woff2')}
+    @font-face{font-family:'IBM Plex Mono';font-weight:500;font-display:swap;src:url('src/lib/fonts/ibm-plex-mono-500-latin.woff2') format('woff2')}
+    :root{--ink:#1a2320;--ink-2:#55635c;--ink-3:#8b978f;--surface:#f4f6f4;--panel:#fff;--line:#e4e8e4;--line-2:#cfd6d0;--present:#1e7a4e;
+      --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;--disp:'Space Grotesk',var(--sans);--mono:'IBM Plex Mono',ui-monospace,monospace}
+    @media (prefers-color-scheme:dark){:root{--ink:#e7ede9;--ink-2:#9fb0a7;--ink-3:#6f8078;--surface:#0f1512;--panel:#161d19;--line:#26302b;--line-2:#37443d;--present:#4cbb84}}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--sans);line-height:1.6;color:var(--ink);background:var(--surface);max-width:760px;margin:0 auto;padding:56px 24px 80px}
+    .eyebrow{font-family:var(--mono);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--present)}
+    h1{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:-.02em;margin:10px 0 4px}
+    .updated{color:var(--ink-3);font-family:var(--mono);font-size:12px;margin-bottom:30px}
+    h2{font-family:var(--disp);font-weight:700;font-size:16px;margin:28px 0 10px}
+    p,ul{margin-bottom:14px} ul{padding-left:20px} li{margin-bottom:5px}
+    code{font-family:var(--mono);font-size:.88em;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+    table{border-collapse:collapse;width:100%;margin-bottom:14px}
+    th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;font-size:14px}
+    th{background:var(--panel);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3)}
+    a{color:var(--present)}
+    strong{font-weight:600}
+    .back{margin-top:32px;padding-top:22px;border-top:1.5px solid var(--line)}
+  </style>
 </head>
 <body>
-    <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: 2026-02-15</p>
+  <div class="eyebrow">Google Meet Attendance Tracker</div>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: 2026-07-24</p>
 
-    <h2>Data Collection</h2>
-    <p>This extension does <strong>not</strong> collect, transmit, or store any user data on external servers. All data (participant names, timestamps, meeting records) is stored <strong>locally</strong> on the user's device using Chrome's <code>chrome.storage.local</code> API.</p>
+  <h2>Data collection</h2>
+  <p>This extension does <strong>not</strong> collect, transmit, or store any user data on external servers.
+    All data (participant names, timestamps, meeting records) is stored <strong>locally</strong> on your device
+    using Chrome's <code>chrome.storage.local</code> API.</p>
 
-    <h2>Google Sheets Sync (Optional)</h2>
-    <p>If the user enables Google Sheets sync, attendance data is sent <strong>only</strong> to the user's own Google Spreadsheet. The extension does not have access to any other user's data.</p>
+  <h2>Google Sheets sync (optional)</h2>
+  <p>If you enable Google Sheets sync, attendance data is sent <strong>only</strong> to your own Google
+    Spreadsheet. The extension has no access to anyone else's data.</p>
 
-    <h2>Data Sharing</h2>
-    <ul>
-        <li>We do <strong>not</strong> collect any user data.</li>
-        <li>We do <strong>not</strong> sell, share, or transfer any data to third parties.</li>
-        <li>We do <strong>not</strong> use any data for advertising or analytics.</li>
-    </ul>
+  <h2>Data sharing</h2>
+  <ul>
+    <li>We do <strong>not</strong> collect any user data.</li>
+    <li>We do <strong>not</strong> sell, share, or transfer any data to third parties.</li>
+    <li>We do <strong>not</strong> use any data for advertising or analytics.</li>
+  </ul>
 
-    <h2>User Control</h2>
-    <ul>
-        <li>All data is stored locally on the user's device.</li>
-        <li>Users can delete individual or all meeting records from the extension.</li>
-        <li>Uninstalling the extension removes all locally stored data.</li>
-    </ul>
+  <h2>Your control</h2>
+  <ul>
+    <li>All data is stored locally on your device.</li>
+    <li>You can delete individual meetings or all records from the extension.</li>
+    <li>Uninstalling the extension removes all locally stored data.</li>
+  </ul>
 
-    <h2>Permissions</h2>
-    <table>
-        <tr><th>Permission</th><th>Reason</th></tr>
-        <tr><td><code>storage</code></td><td>Store attendance records and settings locally on the user's device</td></tr>
-        <tr><td><code>activeTab</code></td><td>Communicate with the Google Meet tab to detect participants</td></tr>
-        <tr><td><code>host_permissions (meet.google.com)</code></td><td>Run content script on Google Meet pages</td></tr>
-        <tr><td><code>identity</code></td><td>Google OAuth2 authentication for optional Sheets sync to the user's own spreadsheet</td></tr>
-    </table>
+  <h2>Permissions</h2>
+  <table>
+    <tr><th>Permission</th><th>Reason</th></tr>
+    <tr><td><code>storage</code></td><td>Store attendance records and settings locally on your device</td></tr>
+    <tr><td><code>activeTab</code></td><td>Communicate with the Google Meet tab to detect participants</td></tr>
+    <tr><td><code>host_permissions (meet.google.com)</code></td><td>Run the content script on Google Meet pages</td></tr>
+    <tr><td><code>identity</code></td><td>Google OAuth2 authentication for optional Sheets sync to your own spreadsheet</td></tr>
+  </table>
 
-    <h2>Contact</h2>
-    <p>If you have questions about this privacy policy, please open an issue at:<br>
-    <a href="https://github.com/starone99/google-meet-attendance-extension/issues">GitHub Issues</a></p>
+  <h2>Contact</h2>
+  <p>Questions about this policy? Open an issue at
+    <a href="https://github.com/KMChris/google-meet-attendance-extension/issues">GitHub Issues</a>.</p>
 
-    <div class="back">
-        <a href="index.html">Back to Home</a>
-    </div>
+  <div class="back"><a href="readme.html">← Back to home</a></div>
 </body>
 </html>

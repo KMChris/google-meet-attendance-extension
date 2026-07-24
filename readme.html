@@ -1,56 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meet Attendance Tracker</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        h1 { margin-bottom: 10px; }
-        .subtitle { color: #666; margin-bottom: 40px; }
-        h2 { margin-top: 30px; margin-bottom: 10px; }
-        ul { padding-left: 20px; margin-bottom: 20px; }
-        li { margin-bottom: 6px; }
-        .links {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-        }
-        a { color: #1a73e8; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Meet Attendance Tracker</title>
+  <style>
+    @font-face{font-family:'Space Grotesk';font-weight:700;font-display:swap;src:url('src/lib/fonts/space-grotesk-700-latin.woff2') format('woff2')}
+    @font-face{font-family:'IBM Plex Sans';font-weight:400;font-display:swap;src:url('src/lib/fonts/ibm-plex-sans-400-latin.woff2') format('woff2')}
+    @font-face{font-family:'IBM Plex Sans';font-weight:600;font-display:swap;src:url('src/lib/fonts/ibm-plex-sans-600-latin.woff2') format('woff2')}
+    @font-face{font-family:'IBM Plex Mono';font-weight:500;font-display:swap;src:url('src/lib/fonts/ibm-plex-mono-500-latin.woff2') format('woff2')}
+    :root{--ink:#1a2320;--ink-2:#55635c;--ink-3:#8b978f;--surface:#f4f6f4;--panel:#fff;--line:#e4e8e4;--line-2:#cfd6d0;--present:#1e7a4e;--late:#bd7a15;
+      --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;--disp:'Space Grotesk',var(--sans);--mono:'IBM Plex Mono',ui-monospace,monospace}
+    @media (prefers-color-scheme:dark){:root{--ink:#e7ede9;--ink-2:#9fb0a7;--ink-3:#6f8078;--surface:#0f1512;--panel:#161d19;--line:#26302b;--line-2:#37443d;--present:#4cbb84;--late:#dca747}}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--sans);line-height:1.6;color:var(--ink);background:var(--surface);max-width:760px;margin:0 auto;padding:56px 24px 80px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+    .brand svg{display:block}
+    .brand b{font-family:var(--disp);font-weight:700;font-size:24px}
+    .brand b .sep{color:var(--present)}
+    .eyebrow{font-family:var(--mono);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--ink-3);margin-bottom:10px}
+    h1{font-family:var(--disp);font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1.1}
+    .lede{color:var(--ink-2);margin:14px 0 30px;font-size:16px;max-width:60ch}
+    h2{font-family:var(--disp);font-weight:700;font-size:16px;margin:34px 0 12px}
+    ul{list-style:none}
+    li{padding:9px 0;border-bottom:1px solid var(--line);display:flex;gap:11px;align-items:flex-start}
+    li::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--present);flex:none;margin-top:calc(0.8em - 3.5px)}
+    li b{font-weight:600}
+    ol{padding-left:20px} ol li{display:list-item;border:none;padding:4px 0}
+    code{font-family:var(--mono);font-size:.88em;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+    .cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:34px;padding-top:24px;border-top:1.5px solid var(--line)}
+    a.btn{font-family:var(--mono);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.05em;text-decoration:none;
+      padding:11px 16px;border-radius:9px;background:var(--present);color:#fff}
+    a.btn.ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--line-2)}
+    a{color:var(--present)}
+    .note{font-size:13px;color:var(--ink-3);margin-top:22px}
+  </style>
 </head>
 <body>
-    <h1>Meet Attendance Tracker</h1>
-    <p class="subtitle">A Chrome extension that automatically tracks participant attendance in Google Meet meetings.</p>
+  <div class="brand">
+    <svg width="34" height="34" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="var(--panel)" stroke="var(--line-2)" stroke-width="1.5"/>
+      <rect x="7" y="8.5" width="16" height="3.4" rx="1.7" fill="var(--present)"/>
+      <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="var(--line-2)"/>
+      <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="var(--late)"/>
+    </svg>
+    <b>Attendance<span class="sep">·</span>Tracker</b>
+  </div>
 
-    <h2>Features</h2>
-    <ul>
-        <li>Real-time participant join/leave detection</li>
-        <li>Automatic attendance tracking with timestamps</li>
-        <li>CSV export for attendance records</li>
-        <li>Meeting history management</li>
-        <li>Optional Google Sheets auto-sync</li>
-    </ul>
+  <div class="eyebrow">Chrome extension · Google Meet</div>
+  <h1>Attendance on a presence timeline.</h1>
+  <p class="lede">Attendance Tracker tracks who joined your Google Meet and when — plotting every join and leave on the
+    meeting clock, flagging who was late or absent, and rolling recurring sessions up into a series.</p>
 
-    <h2>Installation</h2>
-    <ol>
-        <li>Clone or download the repository from <a href="https://github.com/starone99/google-meet-attendance-extension">GitHub</a></li>
-        <li>Open <code>chrome://extensions</code> and enable Developer mode</li>
-        <li>Click "Load unpacked" and select the project folder</li>
-    </ol>
+  <h2>What it does</h2>
+  <ul>
+    <li><b>Presence timeline</b> — every join &amp; leave, per participant, on the meeting clock</li>
+    <li><b>Series</b> — bundle a recurring training and see an attendance matrix across sessions</li>
+    <li><b>Late &amp; absent</b> — measured from the meeting start, against an expected roster</li>
+    <li><b>PDF reports</b> — a technical report for one meeting or a whole series, with every event</li>
+    <li><b>Dark mode</b> — follows your browser, with a manual override</li>
+    <li><b>English &amp; Polish</b>, and all data stays on your device</li>
+  </ul>
 
-    <div class="links">
-        <p><a href="https://github.com/starone99/google-meet-attendance-extension">GitHub Repository</a></p>
-        <p><a href="privacy.html">Privacy Policy</a></p>
-    </div>
+  <h2>Install (developer mode)</h2>
+  <ol>
+    <li>Clone from <a href="https://github.com/KMChris/google-meet-attendance-extension">GitHub</a></li>
+    <li>Open <code>chrome://extensions</code> and enable Developer mode</li>
+    <li>Click “Load unpacked” and select the project folder</li>
+  </ol>
+
+  <div class="cta">
+    <a class="btn" href="https://github.com/KMChris/google-meet-attendance-extension">GitHub repository</a>
+    <a class="btn ghost" href="privacy.html">Privacy policy</a>
+  </div>
+
+  <p class="note">MIT licensed.</p>
 </body>
 </html>
