@@ -1,290 +1,164 @@
 /**
- * Google Meet Attendance Tracker - Background Service Worker
- * Handles message passing and data persistence
+ * Background service worker.
+ *
+ * Narrow responsibility: ingest attendance events from the content script into the
+ * canonical history, keep the toolbar badge live, run migration on install, and
+ * auto-sync a finished meeting to Google Sheets. All read/CRUD for the UI happens
+ * in the pages themselves (they import storage.js directly).
+ *
+ * Session identity fix: a recurring Meet link reuses the same code, so we resolve a
+ * per-session record id — resuming an open session on refresh/rejoin, but starting a
+ * fresh record for a later day — instead of letting the code overwrite prior sessions.
  */
 
 import * as storage from '../lib/storage.js';
+import * as attendance from '../lib/attendance.js';
 import * as sheetsApi from '../lib/sheets-api.js';
 
-// Track active meetings per tab
+const BADGE_COLOR = '#1e7a4e'; // present-green, matches the status palette
+
+/** tabId -> raw meeting { id, meetingCode, startTime, url, meetingTitle, groupId?, participants } */
 const activeMeetings = new Map();
 
-/**
- * Handle messages from content scripts and popup
- */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   handleMessage(message, sender)
     .then(sendResponse)
     .catch(error => {
-      console.error('[Background] Error handling message:', error);
+      console.error('[GM Attendance] message error:', error);
       sendResponse({ error: error.message });
     });
-  return true; // Keep channel open for async response
+  return true; // async
 });
 
 async function handleMessage(message, sender) {
   const tabId = sender.tab?.id;
-
   switch (message.type) {
-    case 'MEETING_STARTED':
-      return handleMeetingStarted(message, tabId);
-
-    case 'MEETING_ENDED':
-      return handleMeetingEnded(message, tabId);
-
-    case 'ATTENDANCE_UPDATE':
-      return handleAttendanceUpdate(message, tabId);
-
-    case 'GET_CURRENT_MEETING':
-      return getCurrentMeetingStatus(tabId);
-
-    case 'GET_MEETING_HISTORY':
-      return getMeetingHistory(message.limit);
-
-    case 'GET_MEETING':
-      return storage.getMeeting(message.meetingId);
-
-    case 'DELETE_MEETING':
-      return storage.deleteMeeting(message.meetingId);
-
-    case 'EXPORT_MEETING_CSV':
-      return exportMeetingCSV(message.meetingId);
-
-    case 'GET_SETTINGS':
-      return storage.getSettings();
-
-    case 'UPDATE_SETTINGS':
-      return storage.updateSettings(message.settings);
-
-    case 'EXPORT_ALL':
-      return storage.exportAllMeetings();
-
-    case 'IMPORT_MEETINGS':
-      return storage.importMeetings(message.data);
-
-    case 'CLEAR_ALL_MEETINGS':
-      return storage.clearAllMeetings();
-
-    default:
-      console.warn('[Background] Unknown message type:', message.type);
-      return { error: 'Unknown message type' };
+    case 'MEETING_STARTED':   return handleMeetingStarted(message, tabId);
+    case 'ATTENDANCE_UPDATE': return handleAttendanceUpdate(message, tabId);
+    case 'MEETING_ENDED':     return handleMeetingEnded(message, tabId);
+    default:                  return { error: 'Unknown message type' };
   }
 }
 
-/**
- * Handle meeting start
- */
-async function handleMeetingStarted(message, tabId) {
-  console.log('[Background] Meeting started:', message.meetingId);
+/** Resolve the raw meeting for a tab, resuming a stored session or starting a new one. */
+async function resolveRawMeeting(message, tabId) {
+  if (tabId != null && activeMeetings.has(tabId)) return activeMeetings.get(tabId);
 
-  const meetingData = {
-    meetingId: message.meetingId,
-    startTime: message.startTime,
-    endTime: null,
-    url: message.url,
-    participants: {},
-    tabId: tabId
-  };
+  const code = message.meetingId || null;
+  const resumable = await storage.findResumableSession(code);
 
-  // Track in memory for this tab
-  if (tabId) {
-    activeMeetings.set(tabId, meetingData);
-  }
-
-  // Save to storage
-  await storage.setCurrentMeeting(meetingData);
-  await storage.saveMeeting(meetingData);
-
-  // Update badge to show tracking
-  updateBadge(tabId, 'ON', '#1a73e8');
-
-  return { success: true, meetingId: message.meetingId };
-}
-
-/**
- * Handle meeting end
- */
-async function handleMeetingEnded(message, tabId) {
-  console.log('[Background] Meeting ended:', message.meetingId);
-
-  const meetingData = {
-    meetingId: message.meetingId,
-    endTime: message.endTime,
-    participants: message.participants
-  };
-
-  // Get existing meeting data
-  const existing = await storage.getMeeting(message.meetingId);
-  if (existing) {
-    const updated = {
-      ...existing,
-      ...meetingData,
-      endTime: message.endTime
+  let raw;
+  if (resumable) {
+    raw = {
+      id: resumable.id,
+      meetingCode: code,
+      startTime: resumable.date,
+      url: message.url || resumable.url || '',
+      meetingTitle: resumable.meetingTitle || message.meetingTitle || code,
+      groupId: resumable.groupId,
+      participants: attendance.rawParticipantsFromMeeting(resumable)
     };
-    await storage.saveMeeting(updated);
+  } else {
+    const startIso = message.startTime || new Date().toISOString();
+    raw = {
+      id: attendance.makeSessionId(code, Date.parse(startIso) || Date.now()),
+      meetingCode: code,
+      startTime: startIso,
+      url: message.url || '',
+      meetingTitle: message.meetingTitle || code,
+      participants: {}
+    };
   }
+  if (tabId != null) activeMeetings.set(tabId, raw);
+  return raw;
+}
 
-  // Clear current meeting
-  await storage.clearCurrentMeeting();
+async function handleMeetingStarted(message, tabId) {
+  const raw = await resolveRawMeeting(message, tabId);
+  // Persist the (possibly empty) record so it appears immediately; don't clobber a resume.
+  const existing = await storage.getMeetingById(raw.id);
+  if (!existing) await storage.upsertMeeting(attendance.buildMeetingRecord(raw));
 
-  // Remove from active meetings
-  if (tabId) {
-    activeMeetings.delete(tabId);
-  }
+  updateBadge(tabId, 'ON', BADGE_COLOR);
+  return { success: true, id: raw.id };
+}
 
-  // Update badge
+async function handleAttendanceUpdate(message, tabId) {
+  const raw = await resolveRawMeeting(message, tabId);
+  raw.participants = message.participants || {};
+  if (tabId != null) activeMeetings.set(tabId, raw);
+
+  const record = attendance.buildMeetingRecord(raw);
+  await storage.upsertMeeting(record);
+
+  updateBadge(tabId, String(Object.keys(record.attendance).length), BADGE_COLOR);
+  return { success: true, id: raw.id };
+}
+
+async function handleMeetingEnded(message, tabId) {
+  const raw = await resolveRawMeeting(message, tabId);
+  if (message.participants) raw.participants = message.participants;
+
+  const record = attendance.buildMeetingRecord(raw);
+  record.endedAt = message.endTime || new Date().toISOString();
+  await storage.upsertMeeting(record);
+
+  if (tabId != null) activeMeetings.delete(tabId);
   updateBadge(tabId, '', '');
 
-  // Auto-sync to Google Sheets if enabled
   const settings = await storage.getSettings();
   if (settings.autoSync && settings.spreadsheetId) {
     try {
-      const meeting = await storage.getMeeting(message.meetingId);
-      if (meeting) {
-        await sheetsApi.syncMeeting(settings.spreadsheetId, meeting);
-        console.log('[Background] Auto-synced meeting to Sheets:', message.meetingId);
-      }
+      await sheetsApi.syncMeeting(settings.spreadsheetId, record);
+      console.log('[GM Attendance] auto-synced to Sheets:', record.id);
     } catch (err) {
-      console.warn('[Background] Auto-sync failed:', err);
+      console.warn('[GM Attendance] auto-sync failed:', err);
     }
   }
-
-  return { success: true };
+  return { success: true, id: record.id };
 }
 
-/**
- * Handle attendance updates
- */
-async function handleAttendanceUpdate(message, tabId) {
-  const { meetingId, participants, action, data } = message;
-
-  // Update in-memory tracking
-  if (tabId && activeMeetings.has(tabId)) {
-    const meeting = activeMeetings.get(tabId);
-    meeting.participants = participants;
-    activeMeetings.set(tabId, meeting);
-  }
-
-  // Save to storage
-  await storage.updateMeetingParticipants(meetingId, participants);
-
-  // Update badge with participant count
-  const count = Object.keys(participants).length;
-  updateBadge(tabId, count.toString(), '#1a73e8');
-
-  // Log the event
-  console.log(`[Background] ${action}:`, data?.name || 'unknown');
-
-  return { success: true };
-}
-
-/**
- * Get current meeting status
- */
-async function getCurrentMeetingStatus(tabId) {
-  // Check in-memory first
-  if (tabId && activeMeetings.has(tabId)) {
-    return {
-      active: true,
-      meeting: activeMeetings.get(tabId)
-    };
-  }
-
-  // Check storage
-  const current = await storage.getCurrentMeeting();
-  return {
-    active: !!current,
-    meeting: current
-  };
-}
-
-/**
- * Get meeting history
- */
-async function getMeetingHistory(limit = 50) {
-  return storage.getMeetingHistory(limit);
-}
-
-/**
- * Export meeting to CSV
- */
-async function exportMeetingCSV(meetingId) {
-  const meeting = await storage.getMeeting(meetingId);
-  if (!meeting) {
-    return { error: 'Meeting not found' };
-  }
-
-  const csv = storage.meetingToCSV(meeting);
-  return { csv, meetingId, filename: `attendance_${meetingId}_${Date.now()}.csv` };
-}
-
-/**
- * Update extension badge
- */
 function updateBadge(tabId, text, color) {
-  const options = { text };
-  if (tabId) {
-    options.tabId = tabId;
-  }
-
-  chrome.action.setBadgeText(options);
-
+  const opts = { text };
+  if (tabId != null) opts.tabId = tabId;
+  chrome.action.setBadgeText(opts);
   if (color) {
-    chrome.action.setBadgeBackgroundColor({
-      color,
-      ...(tabId ? { tabId } : {})
-    });
+    chrome.action.setBadgeBackgroundColor({ color, ...(tabId != null ? { tabId } : {}) });
   }
 }
 
-/**
- * Handle tab close - end meeting tracking
- */
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (activeMeetings.has(tabId)) {
-    const meeting = activeMeetings.get(tabId);
-    console.log('[Background] Tab closed, ending meeting:', meeting.meetingId);
+/** Tab closed mid-meeting — close out any still-present sessions and finalize. */
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  if (!activeMeetings.has(tabId)) return;
+  const raw = activeMeetings.get(tabId);
 
-    // Mark all participants as left
-    const endTime = new Date().toISOString();
-    for (const name in meeting.participants) {
-      if (meeting.participants[name].isPresent) {
-        meeting.participants[name].events.push({ time: endTime, type: 'Leave' });
-        meeting.participants[name].isPresent = false;
-      }
+  const endTime = new Date().toISOString();
+  for (const name in raw.participants) {
+    const p = raw.participants[name];
+    if (p && p.isPresent) {
+      p.events = p.events || [];
+      p.events.push({ time: endTime, type: 'Leave' });
+      p.isPresent = false;
     }
-
-    // Save final state
-    storage.saveMeeting({
-      ...meeting,
-      endTime
-    });
-
-    activeMeetings.delete(tabId);
-    storage.clearCurrentMeeting();
   }
+
+  const record = attendance.buildMeetingRecord(raw);
+  record.endedAt = endTime;
+  await storage.upsertMeeting(record);
+  activeMeetings.delete(tabId);
 });
 
-/**
- * Handle extension install/update
- */
-chrome.runtime.onInstalled.addListener(async (details) => {
-  console.log('[Background] Extension installed/updated:', details.reason);
-
-  if (details.reason === 'install') {
-    // Set default settings
-    await storage.updateSettings({});
-    console.log('[Background] Default settings initialized');
+/** Install / update: migrate to the current schema, default autoTrack on. */
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    const { migrated } = await storage.migrateIfNeeded();
+    if (migrated) console.log('[GM Attendance] migrated legacy meetings:', migrated);
+  } catch (err) {
+    console.warn('[GM Attendance] migration failed:', err);
   }
+  chrome.storage.local.get(['autoTrack'], (res) => {
+    if (res.autoTrack === undefined) chrome.storage.local.set({ autoTrack: true });
+  });
 });
 
-/**
- * Keep service worker alive during active meetings
- */
-setInterval(() => {
-  if (activeMeetings.size > 0) {
-    console.log('[Background] Active meetings:', activeMeetings.size);
-  }
-}, 20000);
-
-console.log('[Background] Service worker started');
+console.log('[GM Attendance] service worker started');

@@ -95,6 +95,21 @@
   }
 
   /**
+   * Derive a friendly meeting title from the tab title, falling back to the code.
+   * Google Meet titles look like "Meet – abc-defg-hij" or a Calendar event name.
+   */
+  function getMeetingTitle() {
+    let t = (document.title || '').trim();
+    t = t.replace(/\s*[-–—|]\s*Google Meet\s*$/i, '')
+         .replace(/^Meet\s*[-–—|]\s*/i, '')
+         .replace(/^Google Meet\s*[-–—|]?\s*/i, '')
+         .trim();
+    const code = getMeetingId();
+    if (!t || /^meet$/i.test(t)) return code || 'Meeting';
+    return t;
+  }
+
+  /**
    * Extract participant info from DOM element
    */
   function extractParticipantInfo(element) {
@@ -296,6 +311,17 @@
       return;
     }
 
+    // Respect the auto-track setting (default on). If disabled, stay idle.
+    chrome.storage.local.get(['autoTrack'], (res) => {
+      if (res && res.autoTrack === false) {
+        console.log('[Attendance] Auto-track disabled — not tracking this meeting');
+        return;
+      }
+      beginTracking();
+    });
+  }
+
+  function beginTracking() {
     console.log('[Attendance] Starting tracking for meeting:', currentMeetingId);
     isTracking = true;
     participants = {};
@@ -320,7 +346,8 @@
       type: 'MEETING_STARTED',
       meetingId: currentMeetingId,
       startTime: new Date().toISOString(),
-      url: window.location.href
+      url: window.location.href,
+      meetingTitle: getMeetingTitle()
     }).catch(err => {
       console.warn('[Attendance] Failed to notify meeting start:', err);
     });

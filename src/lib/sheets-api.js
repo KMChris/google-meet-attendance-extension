@@ -9,10 +9,16 @@ const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
  * Get OAuth2 token using Chrome Identity API
  */
 export async function getAuthToken(interactive = true) {
+  const clientId = chrome.runtime.getManifest()?.oauth2?.client_id || '';
+  if (!clientId || clientId.startsWith('YOUR_')) {
+    throw new Error('Google OAuth client_id is not configured in manifest.json — see README.md → Google Cloud Console Setup');
+  }
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive }, (token) => {
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
+      } else if (!token) {
+        reject(new Error('No OAuth token was returned'));
       } else {
         resolve(token);
       }
@@ -122,7 +128,7 @@ export async function createSpreadsheet(title = 'Google Meet Attendance') {
  */
 async function initializeSpreadsheetHeaders(spreadsheetId) {
   const meetingsHeaders = [
-    ['Meeting ID', 'Start Time', 'End Time', 'Duration (min)', 'Participant Count', 'URL']
+    ['Meeting ID', 'Title', 'Start Time', 'End Time', 'Duration (min)', 'Participant Count', 'URL']
   ];
 
   const participantsHeaders = [
@@ -131,7 +137,7 @@ async function initializeSpreadsheetHeaders(spreadsheetId) {
 
   await batchUpdate(spreadsheetId, [
     {
-      range: 'Meetings!A1:F1',
+      range: 'Meetings!A1:G1',
       values: meetingsHeaders
     },
     {
@@ -199,43 +205,53 @@ export async function getData(spreadsheetId, range) {
 }
 
 /**
- * Sync a meeting to Google Sheets
+ * Sync a meeting (attendanceHistory record) to Google Sheets.
+ * record = { id, date, endedAt, meetingTitle, url, attendance: { name: {email, present, events, ...} } }
  */
 export async function syncMeeting(spreadsheetId, meeting) {
-  const meetingId = meeting.meetingId;
-  const startTime = meeting.startTime ? new Date(meeting.startTime).toLocaleString() : '';
-  const endTime = meeting.endTime ? new Date(meeting.endTime).toLocaleString() : '';
+  const meetingId = meeting.id;
+  const startTime = meeting.date ? new Date(meeting.date).toLocaleString() : '';
+  const endTime = meeting.endedAt ? new Date(meeting.endedAt).toLocaleString() : '';
 
   // Calculate duration
   let duration = '';
-  if (meeting.startTime && meeting.endTime) {
-    const durationMs = new Date(meeting.endTime) - new Date(meeting.startTime);
+  if (meeting.date && meeting.endedAt) {
+    const durationMs = new Date(meeting.endedAt) - new Date(meeting.date);
     duration = Math.round(durationMs / 60000).toString();
   }
 
-  const participants = meeting.participants || {};
-  const participantCount = Object.keys(participants).length;
+  const attendance = meeting.attendance || {};
+  const names = Object.keys(attendance);
 
-  // Append meeting row
+  // Append meeting summary row
   const meetingRow = [
-    [meetingId, startTime, endTime, duration, participantCount, meeting.url || '']
+    [meetingId, meeting.meetingTitle || '', startTime, endTime, duration, names.length, meeting.url || '']
   ];
+  await appendData(spreadsheetId, 'Meetings!A:G', meetingRow);
 
-  await appendData(spreadsheetId, 'Meetings!A:F', meetingRow);
-
-  // Append participant event rows
-  if (participantCount > 0) {
+  // Append one row per raw Join/Leave event (falls back to a summary row if none)
+  if (names.length > 0) {
     const participantRows = [];
-    for (const p of Object.values(participants)) {
-      const events = p.events || [];
-      for (const event of events) {
-        const time = event.time ? new Date(event.time).toLocaleString() : '';
+    for (const name of names) {
+      const p = attendance[name] || {};
+      const events = Array.isArray(p.events) ? p.events : [];
+      if (events.length) {
+        for (const event of events) {
+          participantRows.push([
+            meetingId,
+            name,
+            p.email || '',
+            event.time ? new Date(event.time).toLocaleString() : '',
+            event.type
+          ]);
+        }
+      } else {
         participantRows.push([
           meetingId,
-          p.name,
+          name,
           p.email || '',
-          time,
-          event.type
+          p.joinedAt ? new Date(p.joinedAt).toLocaleString() : '',
+          p.present ? 'In call' : 'Left'
         ]);
       }
     }
@@ -245,7 +261,7 @@ export async function syncMeeting(spreadsheetId, meeting) {
     }
   }
 
-  return { success: true, meetingId, participantCount };
+  return { success: true, meetingId, participantCount: names.length };
 }
 
 /**
