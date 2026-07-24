@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attendance Tracker</title>
+  <link rel="stylesheet" href="../src/lib/ui.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- masthead -->
+  <header class="masthead">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="var(--panel)" stroke="var(--line-2)" stroke-width="1.5"/>
+        <rect x="7" y="8.5" width="16" height="3.4" rx="1.7" fill="var(--present)"/>
+        <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="var(--line-2)"/>
+        <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="var(--late)"/>
+      </svg>
+      <span class="name">Attendance<span class="sep">·</span>Tracker</span>
+    </div>
+    <div class="readout mono" id="readout"></div>
+  </header>
+
+  <!-- tab rail -->
+  <nav class="tabrail" id="tabrail">
+    <button class="tab on" data-view="meetings" data-i18n="navMeetings">Meetings</button>
+    <button class="tab" data-view="groups" data-i18n="navGroups">Series</button>
+    <button class="tab" data-view="people" data-i18n="navPeople">People</button>
+    <button class="tab" data-view="analytics" data-i18n="navAnalytics">Analytics</button>
+    <button class="tab" data-view="settings" data-i18n="navSettings">Settings</button>
+  </nav>
+
+  <main>
+    <!-- ============ MEETINGS ============ -->
+    <section class="view on" id="view-meetings">
+      <div class="view-head">
+        <div>
+          <div class="eyebrow" data-i18n="navMeetings">Meetings</div>
+          <p class="lede" data-i18n="meetingsSubtitle"></p>
+        </div>
+        <div class="head-actions">
+          <div class="search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings">
+          </div>
+          <button class="btn ghost sm" id="btn-export-all" data-i18n="export">Export</button>
+          <div class="menu" id="export-all-menu" hidden>
+            <button class="menu-item" data-format="json">JSON</button>
+            <button class="menu-item" data-format="csv">CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats" id="meetings-stats">
+        <div class="stat"><div class="k" id="stat-meetings">—</div><div class="lbl eyebrow" data-i18n="statMeetings"></div></div>
+        <div class="stat"><div class="k" id="stat-people">—</div><div class="lbl eyebrow" data-i18n="statPeople"></div></div>
+        <div class="stat"><div class="k" id="stat-length">—</div><div class="lbl eyebrow" data-i18n="statAvgLength"></div></div>
+        <div class="stat"><div class="k" id="stat-attendance">—</div><div class="lbl eyebrow" data-i18n="statAvgAttendance"></div></div>
+      </div>
+
+      <div class="card list-card" id="meetings-table">
+        <div class="list-head meetings-grid">
+          <span data-i18n="colDate"></span><span data-i18n="colMeeting"></span>
+          <span data-i18n="colGroup"></span><span class="num" data-i18n="colPeople"></span>
+          <span class="num" data-i18n="colAvgTime"></span><span></span>
+        </div>
+        <div id="meetings-body"></div>
+      </div>
+      <div class="empty" id="meetings-empty">
+        <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div>
+        <h3 data-i18n="emptyMeetingsTitle"></h3>
+        <p data-i18n="emptyMeetingsBody"></p>
+      </div>
+    </section>
+
+    <!-- ============ MEETING DETAIL ============ -->
+    <section class="view" id="view-detail">
+      <button class="back" id="btn-back-detail"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg><span data-i18n="navMeetings"></span></button>
+
+      <div class="card detail-card">
+        <div class="detail-head">
+          <div class="detail-headings">
+            <div class="eyebrow" id="detail-eyebrow"></div>
+            <h1 id="detail-title"></h1>
+            <input class="field rename-input" id="rename-input" hidden>
+            <div class="detail-meta mono" id="detail-meta"></div>
+          </div>
+          <div class="detail-actions">
+            <button class="btn ghost sm" id="btn-group" data-i18n="addToGroup">Add to series</button>
+            <button class="btn ghost sm" id="btn-rename" data-i18n="rename">Rename</button>
+            <button class="btn ghost sm" id="btn-export" data-i18n="export">Export</button>
+            <div class="menu" id="export-menu" hidden>
+              <button class="menu-item" data-format="pdf" data-i18n="savePdf"></button>
+              <button class="menu-item" data-format="csv" data-i18n="exportCsv"></button>
+              <button class="menu-item" data-format="clipboard" data-i18n="copyText"></button>
+            </div>
+            <button class="btn subtle sm icon" id="btn-delete" data-i18n-title="delete" aria-label="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          </div>
+        </div>
+
+        <div class="stats inset">
+          <div class="stat"><div class="k" id="d-attended">—</div><div class="lbl eyebrow" data-i18n="statAttended"></div></div>
+          <div class="stat"><div class="k" id="d-avg">—</div><div class="lbl eyebrow" data-i18n="statAvgPresence"></div></div>
+          <div class="stat"><div class="k" id="d-ontime">—</div><div class="lbl eyebrow" data-i18n="statOnTime"></div></div>
+          <div class="stat"><div class="k" id="d-length">—</div><div class="lbl eyebrow" data-i18n="statLength"></div></div>
+        </div>
+
+        <div class="sect">
+          <div class="sect-head"><div class="eyebrow" data-i18n="timelineTitle"></div><div class="eyebrow soft" data-i18n="timelineHint"></div></div>
+          <div class="timeline" id="timeline"></div>
+        </div>
+
+        <div class="sect">
+          <div class="sect-head"><div class="eyebrow" data-i18n="attendanceTitle"></div>
+            <div class="search inline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="participant-search" data-i18n-placeholder="searchPeople"></div>
+          </div>
+          <table class="rc-table" id="attendance-table"><tbody id="attendance-body"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GROUPS ============ -->
+    <section class="view" id="view-groups">
+      <div class="view-head">
+        <div>
+          <div class="eyebrow" data-i18n="navGroups">Series</div>
+          <p class="lede" data-i18n="groupsSubtitle"></p>
+        </div>
+        <div class="head-actions">
+          <button class="btn" id="btn-new-group" data-i18n="newGroup">New series</button>
+        </div>
+      </div>
+      <div id="series-suggestions"></div>
+      <div id="groups-list"></div>
+      <div class="empty" id="groups-empty">
+        <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <h3 data-i18n="emptyGroupsTitle"></h3>
+        <p data-i18n="emptyGroupsBody"></p>
+      </div>
+    </section>
+
+    <!-- ============ GROUP DETAIL ============ -->
+    <section class="view" id="view-group">
+      <button class="back" id="btn-back-group"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg><span data-i18n="navGroups"></span></button>
+      <div class="card detail-card">
+        <div class="detail-head">
+          <div class="detail-headings">
+            <div class="eyebrow" id="group-eyebrow"></div>
+            <h1 id="group-title"></h1>
+            <input class="field rename-input" id="group-rename-input" hidden>
+            <div class="detail-meta mono" id="group-meta"></div>
+          </div>
+          <div class="detail-actions">
+            <button class="btn ghost sm" id="btn-group-rename" data-i18n="rename">Rename</button>
+            <button class="btn ghost sm" id="btn-group-export" data-i18n="groupExportCsv">Export CSV</button>
+            <button class="btn sm" id="btn-group-pdf" data-i18n="groupSavePdf">Series PDF report</button>
+            <button class="btn subtle sm icon" id="btn-group-delete" data-i18n-title="delete" aria-label="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          </div>
+        </div>
+
+        <div class="stats inset">
+          <div class="stat"><div class="k" id="g-sessions">—</div><div class="lbl eyebrow" data-i18n="colSessions"></div></div>
+          <div class="stat"><div class="k" id="g-people">—</div><div class="lbl eyebrow" data-i18n="colGroupPeople"></div></div>
+          <div class="stat"><div class="k" id="g-attendance">—</div><div class="lbl eyebrow" data-i18n="statAvgAttendance"></div></div>
+          <div class="stat"><div class="k" id="g-length">—</div><div class="lbl eyebrow" data-i18n="statAvgLength"></div></div>
+        </div>
+
+        <div class="sect">
+          <div class="sect-head"><div class="eyebrow" data-i18n="matrixTitle"></div><div class="eyebrow soft" data-i18n="matrixHint"></div></div>
+          <div class="matrix-wrap"><table class="rc-table matrix" id="group-matrix"></table></div>
+        </div>
+
+        <div class="sect">
+          <div class="sect-head"><div class="eyebrow" data-i18n="groupRosterTitle"></div></div>
+          <p class="hint" data-i18n="groupRosterHint"></p>
+          <div class="roster-editor">
+            <input class="field" id="group-roster-input" data-i18n-placeholder="rosterPlaceholder">
+            <button class="btn ghost sm" id="group-roster-add" data-i18n="add"></button>
+          </div>
+          <div class="chips" id="group-roster-chips"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PEOPLE ============ -->
+    <section class="view" id="view-people">
+      <div class="view-head">
+        <div>
+          <div class="eyebrow" data-i18n="navPeople">People</div>
+          <p class="lede" data-i18n="peopleSubtitle"></p>
+        </div>
+        <div class="head-actions">
+          <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="people-search" data-i18n-placeholder="searchPeople"></div>
+        </div>
+      </div>
+      <div id="people-panel"></div>
+      <div class="card list-card" id="people-table">
+        <div class="list-head people-grid">
+          <span data-i18n="colName"></span><span class="num" data-i18n="colMeetingsCount"></span>
+          <span class="num" data-i18n="colTotalTimeP"></span><span data-i18n="colAvgRate"></span>
+          <span class="num" data-i18n="colLastSeen"></span>
+        </div>
+        <div id="people-body"></div>
+      </div>
+      <div class="empty" id="people-empty">
+        <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 6a3 3 0 0 1 0 6M21 20c0-2.5-1.5-4.6-3.6-5.5"/></svg></div>
+        <h3 data-i18n="emptyPeopleTitle"></h3>
+        <p data-i18n="emptyPeopleBody"></p>
+      </div>
+    </section>
+
+    <!-- ============ ANALYTICS ============ -->
+    <section class="view" id="view-analytics">
+      <div class="view-head"><div><div class="eyebrow" data-i18n="navAnalytics">Analytics</div><p class="lede" data-i18n="analyticsSubtitle"></p></div></div>
+      <div class="charts" id="charts">
+        <div class="card chart-card"><div class="eyebrow" data-i18n="chartMeetingsPerDay"></div><canvas id="chart-meetings"></canvas></div>
+        <div class="card chart-card"><div class="eyebrow" data-i18n="chartAvgDuration"></div><canvas id="chart-duration"></canvas></div>
+        <div class="card chart-card"><div class="eyebrow" data-i18n="chartParticipants"></div><canvas id="chart-people"></canvas></div>
+        <div class="card chart-card"><div class="eyebrow" data-i18n="chartTopMeetings"></div><canvas id="chart-top"></canvas></div>
+      </div>
+      <div class="empty" id="analytics-empty">
+        <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+        <h3 data-i18n="emptyAnalyticsTitle"></h3>
+        <p data-i18n="emptyAnalyticsBody"></p>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="view" id="view-settings">
+      <div class="view-head"><div><div class="eyebrow" data-i18n="navSettings">Settings</div><p class="lede" data-i18n="settingsSubtitle"></p></div></div>
+
+      <div class="card setting-card">
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="settingTracking"></div><div class="setting-hint" data-i18n="settingTrackingHint"></div></div>
+          <label class="switch"><input type="checkbox" id="set-auto-track"><span class="track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="settingLate"></div><div class="setting-hint" data-i18n="settingLateHint"></div></div>
+          <div class="inline-field"><input class="field num" type="number" min="0" max="120" id="set-late" style="width:80px"><span class="unit mono" data-i18n="minutes"></span></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="settingTheme"></div><div class="setting-hint" data-i18n="settingThemeHint"></div></div>
+          <div class="segmented" id="theme-seg">
+            <button data-theme-val="system" data-i18n="themeSystem"></button>
+            <button data-theme-val="light" data-i18n="themeLight"></button>
+            <button data-theme-val="dark" data-i18n="themeDark"></button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="settingLanguage"></div><div class="setting-hint" data-i18n="settingLanguageHint"></div></div>
+          <select class="field" id="set-language" style="width:180px"></select>
+        </div>
+      </div>
+
+      <div class="card setting-card">
+        <div class="setting-row block">
+          <div class="setting-text"><div class="setting-title" data-i18n="settingRoster"></div><div class="setting-hint" data-i18n="settingRosterHint"></div></div>
+          <div class="roster-editor">
+            <input class="field" id="roster-input" data-i18n-placeholder="rosterPlaceholder">
+            <button class="btn ghost sm" id="roster-add" data-i18n="add"></button>
+            <button class="btn ghost sm" id="roster-paste" data-i18n="rosterPaste"></button>
+            <button class="btn subtle sm" id="roster-clear" data-i18n="rosterClear"></button>
+          </div>
+          <div class="chips" id="roster-chips"></div>
+        </div>
+      </div>
+
+      <div class="card setting-card">
+        <div class="setting-row block">
+          <div class="setting-text"><div class="setting-title" data-i18n="sheetsTitle"></div><div class="setting-hint" data-i18n="sheetsHint"></div></div>
+          <div class="sheets">
+            <div class="sheets-status"><span class="status status--info" id="sheets-status" data-i18n="sheetsNotConnected"></span></div>
+            <div class="sheets-actions">
+              <button class="btn ghost sm" id="sheets-connect" data-i18n="sheetsConnect"></button>
+              <button class="btn subtle sm" id="sheets-disconnect" data-i18n="sheetsDisconnect" hidden></button>
+            </div>
+            <div class="sheets-config" id="sheets-config" hidden>
+              <div class="inline-field">
+                <input class="field mono" id="spreadsheet-id" data-i18n-placeholder="spreadsheetIdPlaceholder">
+                <button class="btn ghost sm" id="sheets-save" data-i18n="sheetsSave"></button>
+                <button class="btn ghost sm" id="sheets-create" data-i18n="sheetsCreate"></button>
+              </div>
+              <a id="sheets-open" class="link mono" target="_blank" rel="noopener" data-i18n="sheetsOpen" hidden></a>
+              <label class="switch-row" id="autosync-row" hidden><input type="checkbox" id="set-autosync"><span class="track"></span><span data-i18n="autoSync"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card setting-card">
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="importTitle"></div><div class="setting-hint" data-i18n="importHint"></div></div>
+          <button class="btn ghost sm" id="btn-import" data-i18n="importBtn"></button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="maxMeetings"></div><div class="setting-hint" data-i18n="maxMeetingsHint"></div></div>
+          <select class="field" id="set-max" style="width:140px"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="500">500</option><option value="1000">1000</option><option value="0" data-i18n="maxUnlimited"></option></select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="clearAll"></div><div class="setting-hint" data-i18n="clearAllHint"></div></div>
+          <button class="btn danger sm" id="btn-clear-all" data-i18n="delete"></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- toast + modals -->
+  <div class="toast" id="toast"></div>
+
+  <div class="modal" id="paste-modal" hidden>
+    <div class="modal-card card">
+      <h2 data-i18n="rosterPasteTitle"></h2>
+      <p class="hint" data-i18n="rosterPasteHint"></p>
+      <textarea class="field" id="paste-textarea" rows="7" data-i18n-placeholder="rosterPastePlaceholder"></textarea>
+      <div class="modal-actions">
+        <button class="btn subtle" id="paste-cancel" data-i18n="cancel"></button>
+        <button class="btn" id="paste-add" data-i18n="rosterAddNames"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="group-modal" hidden>
+    <div class="modal-card card">
+      <h2 id="group-modal-title" data-i18n="createGroupTitle"></h2>
+      <label class="modal-label" data-i18n="groupNameLabel"></label>
+      <input class="field" id="group-modal-name" data-i18n-placeholder="groupNamePlaceholder">
+      <label class="modal-label" data-i18n="groupColorLabel"></label>
+      <div class="color-picker" id="group-modal-colors"></div>
+      <div class="modal-actions">
+        <button class="btn subtle" id="group-modal-cancel" data-i18n="cancel"></button>
+        <button class="btn" id="group-modal-save" data-i18n="create"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="assign-modal" hidden>
+    <div class="modal-card card">
+      <h2 data-i18n="assignTitle"></h2>
+      <div class="assign-list" id="assign-list"></div>
+      <div class="modal-actions">
+        <button class="btn subtle" id="assign-cancel" data-i18n="cancel"></button>
+        <button class="btn ghost" id="assign-new" data-i18n="assignNew"></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="dashboard.js"></script>
+</body>
+</html>

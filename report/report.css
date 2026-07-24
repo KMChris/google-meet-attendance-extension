@@ -1,0 +1,110 @@
+/* Attendance Tracker — technical report. Always a light "document", regardless of app theme. */
+
+.report-body{background:#e9ece9;padding:0;margin:0}
+@media (prefers-color-scheme:dark){ .report-body{background:#0c1210} }
+
+/* toolbar */
+.report-toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;
+  padding:12px 20px;background:var(--panel);border-bottom:1.5px solid var(--line)}
+.tb-brand{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:700;font-size:16px;color:var(--ink)}
+
+/* The report itself pins a light palette so PDFs never come out dark. */
+.report-root{
+  --ink:#1a2320; --ink-2:#55635c; --ink-3:#8b978f;
+  --panel:#fff; --panel-2:#f8faf8; --line:#e4e8e4; --line-2:#cfd6d0;
+  --present:#1e7a4e; --present-2:#dcece2; --late:#bd7a15; --late-2:#f4e8cf;
+  --absent:#98a49d; --absent-2:#eef1ee; --red:#bf453b;
+  color:var(--ink);
+  max-width:820px;margin:26px auto;background:#fff;border:1.5px solid var(--line);
+  border-radius:14px;box-shadow:0 20px 50px -30px rgba(20,30,26,.4);overflow:hidden}
+
+.report-root .doc{padding:38px 44px}
+.rep-eyebrow{font-family:var(--mono);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--present)}
+.report-root h1{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:-.015em;margin:10px 0 0;color:var(--ink)}
+.rep-meta{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:10px;display:flex;flex-wrap:wrap;gap:6px 16px}
+.rep-meta b{color:var(--ink);font-weight:500}
+
+.rep-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;margin:26px 0}
+.rep-stat{background:#fff;padding:14px 16px}
+.rep-stat .k{font-family:var(--disp);font-weight:700;font-size:26px;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.rep-stat .l{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin-top:7px}
+
+.rep-sect{margin:28px 0}
+.rep-sect > h2{font-family:var(--disp);font-size:15px;font-weight:700;margin:0 0 3px;color:var(--ink)}
+.rep-sect .rep-hint{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin:0 0 14px}
+
+.rep-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.rep-table th{text-align:left;font-family:var(--mono);font-weight:500;font-size:9.5px;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--ink-3);padding:0 10px 9px;border-bottom:1.5px solid var(--line-2)}
+.rep-table th.num,.rep-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.rep-table td{padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink)}
+.rep-table td.mono{font-family:var(--mono);color:var(--ink-2)}
+.rep-status{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:500;
+  text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:999px}
+.rep-status::before{content:"";width:5px;height:5px;border-radius:50%}
+.rep-status.present{background:var(--present-2);color:var(--present)} .rep-status.present::before{background:var(--present)}
+.rep-status.late{background:var(--late-2);color:var(--late)} .rep-status.late::before{background:var(--late)}
+.rep-status.absent{background:var(--absent-2);color:var(--ink-3)} .rep-status.absent::before{background:var(--absent)}
+.rep-status.left{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line)} .rep-status.left::before{background:var(--ink-3)}
+
+/* event log */
+.evlog{display:flex;flex-direction:column;gap:2px}
+.ev-person{padding:12px 0;border-bottom:1px solid var(--line)}
+.ev-person:last-child{border-bottom:none}
+.ev-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.ev-head .avatar{width:24px;height:24px;border-radius:7px;background:var(--present-2);color:var(--present);
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:500}
+.ev-head .nm{font-weight:600;font-size:13px}
+.ev-sessions{display:flex;flex-direction:column;gap:5px;padding-left:33px}
+.ev-line{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+.ev-line .io{display:inline-flex;align-items:center;gap:6px;min-width:150px}
+.ev-line .io .t{color:var(--ink)}
+.ev-line .arrow{color:var(--ink-3)}
+.ev-line .dur{color:var(--present);font-weight:500}
+.ev-tag{width:7px;height:7px;border-radius:2px;flex:none}
+.ev-tag.in{background:var(--present)} .ev-tag.out{background:var(--red)} .ev-tag.open{background:var(--late)}
+
+/* roster reconciliation */
+.recon{display:flex;gap:26px;flex-wrap:wrap}
+.recon .col{flex:1;min-width:180px}
+.recon .col h3{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin:0 0 9px}
+.recon .names{display:flex;flex-wrap:wrap;gap:6px}
+.recon .name-chip{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line)}
+.recon .name-chip.absent{background:var(--absent-2);color:var(--ink-2);border-color:var(--absent-2)}
+
+/* per-session block in group report */
+.sess-block{border:1.5px solid var(--line);border-radius:12px;padding:22px 24px;margin:16px 0;break-inside:avoid}
+.sess-block .sb-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.sess-block .sb-title{font-family:var(--disp);font-weight:700;font-size:16px}
+.sess-block .sb-meta{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+
+/* matrix */
+.rep-matrix{width:100%;border-collapse:collapse;font-size:12px}
+.rep-matrix th,.rep-matrix td{text-align:center;padding:8px 8px;border-bottom:1px solid var(--line)}
+.rep-matrix th:first-child,.rep-matrix td:first-child{text-align:left}
+.rep-matrix thead th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.rep-matrix .dot{display:inline-block;width:13px;height:13px;border-radius:4px}
+.rep-matrix .dot.present{background:var(--present)} .rep-matrix .dot.late{background:var(--late)}
+.rep-matrix .dot.absent{background:var(--absent-2);border:1.5px solid var(--line-2)}
+
+.rep-footer{border-top:1.5px solid var(--line);padding:20px 44px;display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap;gap:8px}
+
+.rep-notfound{padding:80px 44px;text-align:center}
+.rep-notfound h1{font-size:22px}
+.rep-notfound p{color:var(--ink-2)}
+
+/* print */
+@media print{
+  .report-body{background:#fff}
+  .no-print{display:none!important}
+  .report-root{max-width:none;margin:0;border:none;border-radius:0;box-shadow:none}
+  .report-root .doc{padding:0}
+  .rep-footer{padding:20px 0}
+  .sess-block{break-inside:avoid}
+  .ev-person,.rep-table tr{break-inside:avoid}
+  thead{display:table-header-group}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{margin:14mm}
+}

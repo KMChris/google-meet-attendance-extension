@@ -1,118 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google Meet Attendance</title>
+  <meta charset="utf-8">
+  <title>Attendance Tracker</title>
+  <link rel="stylesheet" href="../lib/ui.css">
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
-  <div class="container">
-    <!-- Header -->
-    <header class="header">
-      <h1>Meet Attendance</h1>
-      <button id="settingsBtn" class="icon-btn" title="Settings">
-        <svg viewBox="0 0 24 24" width="20" height="20">
-          <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22l-1.92 3.32c-.12.21-.07.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-        </svg>
-      </button>
-    </header>
-
-    <!-- Current Meeting Section -->
-    <section id="currentMeetingSection" class="section">
-      <div class="section-header">
-        <h2>Current Meeting</h2>
-        <span id="statusBadge" class="badge badge-inactive">Not Active</span>
-      </div>
-
-      <div id="meetingInfo" class="meeting-info hidden">
-        <div class="info-row">
-          <span class="label">Meeting ID:</span>
-          <span id="meetingId" class="value">-</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Started:</span>
-          <span id="startTime" class="value">-</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Participants:</span>
-          <span id="participantCount" class="value">0</span>
-        </div>
-      </div>
-
-      <div id="noMeeting" class="empty-state">
-        <p>Open a Google Meet to start tracking attendance.</p>
-      </div>
-    </section>
-
-    <!-- Participants Section -->
-    <section id="participantsSection" class="section hidden">
-      <div class="section-header">
-        <h2>Participants</h2>
-        <button id="refreshBtn" class="icon-btn" title="Refresh">
-          <svg viewBox="0 0 24 24" width="18" height="18">
-            <path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-          </svg>
-        </button>
-      </div>
-
-      <div id="participantList" class="participant-list">
-        <!-- Participants will be rendered here -->
-      </div>
-    </section>
-
-    <!-- Actions Section -->
-    <section id="actionsSection" class="section hidden">
-      <div class="button-group">
-        <button id="exportCsvBtn" class="btn btn-primary">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-          </svg>
-          Export CSV
-        </button>
-        <button id="syncSheetsBtn" class="btn btn-secondary">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M19 11H5m14 0-4-4m4 4-4 4"/>
-          </svg>
-          Sync to Sheets
-        </button>
-      </div>
-    </section>
-
-    <!-- Meeting History Section -->
-    <section id="historySection" class="section">
-      <div class="section-header">
-        <h2>Meeting History</h2>
-        <button id="clearHistoryBtn" class="text-btn" title="Clear History">Clear</button>
-      </div>
-
-      <div id="historyList" class="history-list">
-        <!-- Meeting history will be rendered here -->
-      </div>
-
-      <div id="noHistory" class="empty-state">
-        <p>No meeting history yet.</p>
-      </div>
-    </section>
-  </div>
-
-  <!-- Meeting Detail Modal -->
-  <div id="meetingModal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="modalTitle">Meeting Details</h2>
-        <button id="closeModalBtn" class="icon-btn">&times;</button>
-      </div>
-      <div id="modalBody" class="modal-body">
-        <!-- Meeting details will be rendered here -->
-      </div>
-      <div class="modal-footer">
-        <button id="modalExportBtn" class="btn btn-primary">Export CSV</button>
-        <button id="modalDeleteBtn" class="btn btn-danger">Delete</button>
-      </div>
+<body class="popup">
+  <header class="pop-head">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="var(--panel)" stroke="var(--line-2)" stroke-width="1.5"/>
+        <rect x="7" y="8.5" width="16" height="3.4" rx="1.7" fill="var(--present)"/>
+        <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="var(--line-2)"/>
+        <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="var(--late)"/>
+      </svg>
+      <span class="name">Attendance<span class="sep">·</span>Tracker</span>
     </div>
+    <span class="status status--info" id="pop-status">—</span>
+  </header>
+
+  <div class="live-card" id="live-card">
+    <div class="live-main">
+      <div class="live-count" id="live-count">—</div>
+      <div class="live-label eyebrow" id="live-label" data-i18n="popupInThisCall"></div>
+    </div>
+    <button class="btn ghost sm" id="btn-export-live" hidden data-i18n="popupExport"></button>
   </div>
 
-  <script src="popup.js" type="module"></script>
+  <div class="recent">
+    <div class="recent-head"><span class="eyebrow" data-i18n="popupRecent"></span><button class="link-btn" id="view-all" data-i18n="popupViewAll"></button></div>
+    <div id="recent-list"></div>
+    <div class="recent-empty eyebrow" id="recent-empty" data-i18n="popupNoRecent" hidden></div>
+  </div>
+
+  <button class="btn block" id="open-dash" data-i18n="popupOpenDashboard"></button>
+
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

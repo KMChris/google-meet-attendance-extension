@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attendance Tracker — report</title>
+  <link rel="stylesheet" href="../src/lib/ui.css">
+  <link rel="stylesheet" href="report.css">
+</head>
+<body class="report-body">
+  <div class="report-toolbar no-print">
+    <div class="tb-brand">
+      <svg width="24" height="24" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#fff" stroke="#cfd6d0" stroke-width="1.5"/>
+        <rect x="7" y="8.5" width="16" height="3.4" rx="1.7" fill="#1e7a4e"/>
+        <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="#cfd6d0"/>
+        <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="#bd7a15"/>
+      </svg>
+      <span>Attendance·Tracker</span>
+    </div>
+    <button class="btn" id="btn-print" data-i18n="printReport">Save as PDF</button>
+  </div>
+
+  <div class="report-root" id="report"></div>
+
+  <script type="module" src="report.js"></script>
+</body>
+</html>
