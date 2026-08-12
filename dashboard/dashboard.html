@@ -90,6 +90,7 @@
           </div>
           <div class="detail-actions">
             <button class="btn ghost sm" id="btn-group" data-i18n="addToGroup">Add to series</button>
+            <button class="btn ghost sm" id="btn-hours" data-i18n="editHours">Hours</button>
             <button class="btn ghost sm" id="btn-rename" data-i18n="rename">Rename</button>
             <button class="btn ghost sm" id="btn-export" data-i18n="export">Export</button>
             <div class="menu" id="export-menu" hidden>
@@ -333,6 +334,50 @@
       <div class="modal-actions">
         <button class="btn subtle" id="group-modal-cancel" data-i18n="cancel"></button>
         <button class="btn" id="group-modal-save" data-i18n="create"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="schedule-modal" hidden>
+    <div class="modal-card card">
+      <h2 data-i18n="scheduleTitle"></h2>
+      <p class="hint" data-i18n="scheduleHint"></p>
+      <div class="sched-grid">
+        <div>
+          <label class="modal-label" for="schedule-start" data-i18n="scheduleStart"></label>
+          <input class="field mono" type="datetime-local" id="schedule-start">
+        </div>
+        <div>
+          <label class="modal-label" for="schedule-end" data-i18n="scheduleEnd"></label>
+          <input class="field mono" type="datetime-local" id="schedule-end">
+        </div>
+      </div>
+      <div class="sched-observed mono" id="schedule-observed"></div>
+      <div class="modal-actions">
+        <button class="btn subtle" id="schedule-cancel" data-i18n="cancel"></button>
+        <button class="btn ghost" id="schedule-auto" data-i18n="scheduleAuto"></button>
+        <button class="btn" id="schedule-save" data-i18n="save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="participant-modal" hidden>
+    <div class="modal-card card">
+      <h2 data-i18n="editParticipantTitle"></h2>
+      <p class="hint" data-i18n="editParticipantHint"></p>
+      <label class="modal-label" data-i18n="participantNameLabel"></label>
+      <input class="field" id="participant-name" autocomplete="off" spellcheck="false">
+      <div class="merge-note" id="merge-note" hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>
+        <span id="merge-note-text"></span>
+      </div>
+      <div id="merge-pick">
+        <label class="modal-label" data-i18n="mergePickLabel"></label>
+        <div class="merge-list" id="merge-list"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn subtle" id="participant-cancel" data-i18n="cancel"></button>
+        <button class="btn" id="participant-save" data-i18n="save"></button>
       </div>
     </div>
   </div>

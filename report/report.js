@@ -80,8 +80,8 @@ function renderMeeting(m, roster, threshold) {
     <div class="rep-eyebrow">GM · ${t('reportSubtitle')}</div>
     <h1>${esc(m.meetingTitle)}</h1>
     <div class="rep-meta">
-      <span>${esc(i18n.formatDate(m.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))}</span>
-      <span><b>${time(m.date)}</b>${m.endedAt ? ' – <b>' + time(m.endedAt) + '</b>' : ''}</span>
+      <span>${esc(i18n.formatDate(A.meetingStartIso(m), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))}</span>
+      <span><b>${time(A.meetingStartIso(m))}</b> – <b>${time(A.meetingEndIso(m))}</b></span>
       ${m.meetingCode ? `<span>${esc(m.meetingCode)}</span>` : ''}
     </div>
     ${summaryStats(m, roster, threshold)}

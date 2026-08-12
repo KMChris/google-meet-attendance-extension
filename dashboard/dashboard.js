@@ -137,7 +137,8 @@ function renderMeetings(filter = '') {
   table.style.display = ''; empty.classList.remove('visible');
 
   $('#meetings-body').innerHTML = list.map(m => {
-    const d = new Date(m.date);
+    const startIso = A.meetingStartIso(m);
+    const d = new Date(startIso);
     const people = Object.keys(m.attendance).length;
     const avg = people ? Math.round(Object.values(m.attendance).reduce((s, a) => s + A.liveSecondsFor(a, m), 0) / people) : 0;
     const g = m.groupId ? groupById(m.groupId) : null;
@@ -147,7 +148,7 @@ function renderMeetings(filter = '') {
     const live = A.isInProgress(m) ? `<span class="status status--present" style="margin-left:6px">${t('inCall')}</span>` : '';
     return `<div class="row meetings-grid" data-id="${esc(m.id)}">
       <div class="col-date"><div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div></div>
-      <div class="col-title"><div class="m-title">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(m.date)}</div></div>
+      <div class="col-title"><div class="m-title">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(startIso)}</div></div>
       <div class="col-group">${groupCell}</div>
       <div class="col-people num">${people}</div>
       <div class="col-avg num">${fmtDur(avg)}</div>
@@ -176,8 +177,9 @@ function renderDetail(m) {
   const absentees = A.absenteesFor(m, roster);
   const lateN = people.filter(([, a]) => A.isLate(a, m, lateThreshold)).length;
 
+  const startIso = A.meetingStartIso(m), endIso = A.meetingEndIso(m);
   $('#detail-eyebrow').textContent =
-    `${i18n.formatDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' })} · ${i18n.formatTime(m.date)} · ${m.meetingCode || m.id}`;
+    `${i18n.formatDate(startIso, { weekday: 'short', day: 'numeric', month: 'short' })} · ${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)} · ${m.meetingCode || m.id}`;
   $('#detail-title').textContent = m.meetingTitle;
   $('#detail-meta').innerHTML =
     `<b>${people.length}</b> ${t('metaAttended')} · <b>${absentees.length}</b> ${t('metaAbsent')} · <b>${lateN}</b> ${t('metaLate')}`;
@@ -191,6 +193,11 @@ function renderDetail(m) {
   // group button label
   const g = m.groupId ? groupById(m.groupId) : null;
   $('#btn-group').textContent = g ? g.name : t('addToGroup');
+
+  // hours button doubles as the readout of pinned hours
+  const hours = $('#btn-hours');
+  hours.textContent = A.hasSchedule(m) ? `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}` : t('editHours');
+  hours.classList.toggle('pinned', A.hasSchedule(m));
 
   renderTimeline(m);
   renderAttendance(m, $('#participant-search').value.trim());
@@ -257,7 +264,7 @@ function renderAttendance(m, filter) {
   let people = Object.entries(m.attendance).sort((a, b) => a[0].localeCompare(b[0]));
   if (q) people = people.filter(([n]) => n.toLowerCase().includes(q));
 
-  let rows = people.map(([name, a]) => {
+  let rows = people.map(([name, a], i) => {
     const st = A.statusFor(a, m, lateThreshold);
     let chip;
     if (st.late) chip = `<span class="status status--late">${t('lateBy', { n: st.lateMinutes })}</span>`;
@@ -270,6 +277,7 @@ function renderAttendance(m, filter) {
       <td class="num mono">${fmtHMS(st.seconds)}</td>
       <td><div class="share-cell"><div class="share-bar"><i style="width:${st.sharePct}%"></i></div><span class="pct">${st.sharePct}%</span></div></td>
       <td>${chip}</td>
+      <td class="cell-actions"><button class="edit-name" data-i="${i}" title="${esc(t('editParticipantTitle'))}" aria-label="${esc(t('editParticipantTitle'))}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></td>
     </tr>`;
   }).join('');
 
@@ -280,11 +288,14 @@ function renderAttendance(m, filter) {
       <td class="mono">—</td><td class="mono">—</td><td class="num mono">00:00:00</td>
       <td><div class="share-cell"><div class="share-bar"><i style="width:0"></i></div><span class="pct">0%</span></div></td>
       <td><span class="status status--absent">${t('absent')}</span></td>
+      <td class="cell-actions"></td>
     </tr>`).join('');
 
   // header (localized) built once per render
-  const thead = `<thead><tr><th data-i18n="colParticipant">${t('colParticipant')}</th><th>${t('colFirstSeen')}</th><th>${t('colLastLeft')}</th><th class="num">${t('colPresent')}</th><th>${t('colShare')}</th><th>${t('colStatus')}</th></tr></thead>`;
+  const thead = `<thead><tr><th data-i18n="colParticipant">${t('colParticipant')}</th><th>${t('colFirstSeen')}</th><th>${t('colLastLeft')}</th><th class="num">${t('colPresent')}</th><th>${t('colShare')}</th><th>${t('colStatus')}</th><th class="cell-actions"></th></tr></thead>`;
   $('#attendance-table').innerHTML = thead + `<tbody id="attendance-body">${rows}</tbody>`;
+  $$('#attendance-table .edit-name').forEach(b =>
+    b.addEventListener('click', () => openParticipantModal(people[Number(b.dataset.i)][0])));
 }
 $('#participant-search').addEventListener('input', e => { const m = currentMeeting(); if (m) renderAttendance(m, e.target.value.trim()); });
 
@@ -312,6 +323,111 @@ $('#rename-input').addEventListener('keydown', e => {
   else if (e.key === 'Escape') { $('#rename-input').hidden = true; $('#detail-title').hidden = false; }
 });
 $('#rename-input').addEventListener('blur', commitRename);
+
+/* ---- meeting hours ---- */
+// <input type="datetime-local"> speaks local wall time; storage speaks ISO.
+function toLocalInput(msVal) {
+  if (!Number.isFinite(msVal) || msVal <= 0) return '';
+  const local = new Date(msVal - new Date(msVal).getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function fromLocalInput(value) {
+  if (!value) return null;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+function openScheduleModal() {
+  const m = currentMeeting(); if (!m) return;
+  $('#schedule-start').value = toLocalInput(A.meetingStartMs(m));
+  $('#schedule-end').value = toLocalInput(A.meetingEndMs(m));
+
+  const obs = A.observedBounds(m);
+  $('#schedule-observed').textContent = Number.isFinite(obs.startMs)
+    ? t('scheduleObserved', { range: `${i18n.formatTime(new Date(obs.startMs).toISOString())}–${i18n.formatTime(new Date(obs.endMs).toISOString())}` })
+    : '';
+
+  $('#schedule-modal').hidden = false;
+  $('#schedule-start').focus();
+}
+
+async function saveSchedule(start, end) {
+  const m = currentMeeting(); if (!m) return;
+  await store.setMeetingSchedule(m.id, { start, end });
+  $('#schedule-modal').hidden = true;
+  await load();
+  openMeeting(m.id);
+  toast(start || end ? t('savedToast') : t('scheduleClearedToast'));
+}
+
+$('#btn-hours').addEventListener('click', openScheduleModal);
+$('#schedule-cancel').addEventListener('click', () => { $('#schedule-modal').hidden = true; });
+$('#schedule-auto').addEventListener('click', () => saveSchedule(null, null));
+$('#schedule-save').addEventListener('click', () => {
+  const start = fromLocalInput($('#schedule-start').value);
+  const end = fromLocalInput($('#schedule-end').value);
+  if (start && end && Date.parse(end) <= Date.parse(start)) { toast(t('scheduleInvalid')); return; }
+  saveSchedule(start, end);
+});
+$$('#schedule-start, #schedule-end').forEach(el => el.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); $('#schedule-save').click(); }
+}));
+
+/* ---- participant rename / merge ---- */
+let editingName = null; // participant being edited in #participant-modal
+
+function participantMergeTarget() {
+  const m = currentMeeting(); if (!m || editingName == null) return null;
+  const v = $('#participant-name').value.trim().toLowerCase();
+  if (!v) return null;
+  return Object.keys(m.attendance).find(n => n !== editingName && n.toLowerCase() === v) || null;
+}
+
+function refreshParticipantModal() {
+  const v = $('#participant-name').value.trim();
+  const target = participantMergeTarget();
+  $('#merge-note').hidden = !target;
+  if (target) $('#merge-note-text').textContent = t('mergeWarning', { name: target });
+  const save = $('#participant-save');
+  save.textContent = target ? t('merge') : t('save');
+  save.disabled = !v || v === editingName;
+}
+
+function openParticipantModal(name) {
+  const m = currentMeeting(); if (!m) return;
+  editingName = name;
+  $('#participant-name').value = name;
+  const others = Object.keys(m.attendance).filter(n => n !== name).sort((a, b) => a.localeCompare(b));
+  $('#merge-pick').hidden = !others.length;
+  $('#merge-list').innerHTML = others.map((n, i) =>
+    `<button class="merge-item" data-i="${i}"><span class="avatar" style="${avatarStyle(n)}">${esc(initials(n))}</span><span class="nm">${esc(n)}</span></button>`).join('');
+  $$('#merge-list .merge-item').forEach(b => b.addEventListener('click', () => {
+    $('#participant-name').value = others[Number(b.dataset.i)];
+    refreshParticipantModal();
+  }));
+  refreshParticipantModal();
+  $('#participant-modal').hidden = false;
+  const input = $('#participant-name'); input.focus(); input.select();
+}
+
+async function commitParticipantEdit() {
+  const m = currentMeeting();
+  const v = $('#participant-name').value.trim();
+  $('#participant-modal').hidden = true;
+  if (!m || editingName == null || !v || v === editingName) { editingName = null; return; }
+  const res = await store.renameParticipant(m.id, editingName, v);
+  editingName = null;
+  if (!res) return;
+  await load();
+  openMeeting(m.id);
+  toast(res.merged ? t('mergedToast') : t('renamedToast'));
+}
+$('#participant-name').addEventListener('input', refreshParticipantModal);
+$('#participant-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !$('#participant-save').disabled) { e.preventDefault(); commitParticipantEdit(); }
+});
+$('#participant-save').addEventListener('click', commitParticipantEdit);
+$('#participant-cancel').addEventListener('click', () => { $('#participant-modal').hidden = true; editingName = null; });
 
 $('#btn-delete').addEventListener('click', async () => {
   const m = currentMeeting(); if (!m) return;

@@ -35,6 +35,7 @@ async function handleMessage(message, sender) {
   switch (message.type) {
     case 'MEETING_STARTED':   return handleMeetingStarted(message, tabId);
     case 'ATTENDANCE_UPDATE': return handleAttendanceUpdate(message, tabId);
+    case 'MEETING_SCHEDULE':  return handleMeetingSchedule(message, tabId);
     case 'MEETING_ENDED':     return handleMeetingEnded(message, tabId);
     default:                  return { error: 'Unknown message type' };
   }
@@ -83,15 +84,33 @@ async function handleMeetingStarted(message, tabId) {
   return { success: true, id: raw.id };
 }
 
+/**
+ * Scheduled hours scraped from the calendar event Meet shows. Only fills blanks, so a
+ * hand-set value is never overwritten; the record is created first if the schedule
+ * arrives before MEETING_STARTED landed.
+ */
+async function handleMeetingSchedule(message, tabId) {
+  const raw = await resolveRawMeeting(message, tabId);
+  const existing = await storage.getMeetingById(raw.id);
+  if (!existing) await storage.upsertMeeting(attendance.buildMeetingRecord(raw));
+
+  const applied = await storage.applyDetectedSchedule(raw.id, {
+    start: message.scheduledStart || null,
+    end: message.scheduledEnd || null
+  });
+  if (applied) console.log('[GM Attendance] scheduled hours detected:', message.scheduledStart, '→', message.scheduledEnd);
+  return { success: true, id: raw.id, applied: !!applied };
+}
+
 async function handleAttendanceUpdate(message, tabId) {
   const raw = await resolveRawMeeting(message, tabId);
   raw.participants = message.participants || {};
   if (tabId != null) activeMeetings.set(tabId, raw);
 
-  const record = attendance.buildMeetingRecord(raw);
-  await storage.upsertMeeting(record);
+  // upsertMeeting re-applies any user renames/merges (nameMap) — count the mapped result.
+  const saved = await storage.upsertMeeting(attendance.buildMeetingRecord(raw));
 
-  updateBadge(tabId, String(Object.keys(record.attendance).length), BADGE_COLOR);
+  updateBadge(tabId, String(Object.keys(saved.attendance).length), BADGE_COLOR);
   return { success: true, id: raw.id };
 }
 
@@ -101,7 +120,8 @@ async function handleMeetingEnded(message, tabId) {
 
   const record = attendance.buildMeetingRecord(raw);
   record.endedAt = message.endTime || new Date().toISOString();
-  await storage.upsertMeeting(record);
+  // The stored record has the user's renames/merges (nameMap) applied — sync that one.
+  const saved = await storage.upsertMeeting(record);
 
   if (tabId != null) activeMeetings.delete(tabId);
   updateBadge(tabId, '', '');
@@ -109,13 +129,13 @@ async function handleMeetingEnded(message, tabId) {
   const settings = await storage.getSettings();
   if (settings.autoSync && settings.spreadsheetId) {
     try {
-      await sheetsApi.syncMeeting(settings.spreadsheetId, record);
-      console.log('[GM Attendance] auto-synced to Sheets:', record.id);
+      await sheetsApi.syncMeeting(settings.spreadsheetId, saved);
+      console.log('[GM Attendance] auto-synced to Sheets:', saved.id);
     } catch (err) {
       console.warn('[GM Attendance] auto-sync failed:', err);
     }
   }
-  return { success: true, id: record.id };
+  return { success: true, id: saved.id };
 }
 
 function updateBadge(tabId, text, color) {

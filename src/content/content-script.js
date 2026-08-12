@@ -12,6 +12,8 @@
   let observer = null;
   let pollingInterval = null;
   let isTracking = false;
+  let scheduledWindow = null;   // { start, end } ISO, scraped from the calendar event
+  let scheduleAttempts = 0;
 
   // Multiple selectors for participant detection (Google Meet DOM changes frequently)
   const PARTICIPANT_SELECTORS = [
@@ -107,6 +109,98 @@
     const code = getMeetingId();
     if (!t || /^meet$/i.test(t)) return code || 'Meeting';
     return t;
+  }
+
+  /**
+   * Scheduled hours of the calendar event, as Meet prints them ("10:00 – 11:00").
+   *
+   * Worth scraping because the tracked start time is merely when the tab was opened —
+   * joining early would otherwise mark everyone who arrives on time as late. Best-effort
+   * only: heavily validated, never overwrites a value the user set, and the dashboard
+   * always allows fixing the hours by hand.
+   */
+  const CLOCK = String.raw`(\d{1,2})[:.](\d{2})\s*(a\.?m\.?|p\.?m\.?)?`;
+  const TIME_RANGE_RE = new RegExp(CLOCK + String.raw`\s*[–—−-]\s*` + CLOCK, 'i');
+
+  function to24h(hour, meridiem) {
+    const h = Number(hour);
+    if (!meridiem) return h;
+    if (/^p/i.test(meridiem)) return h < 12 ? h + 12 : h;
+    return h === 12 ? 0 : h;
+  }
+
+  /**
+   * The 24h readings one side could stand for. A side that carries its own am/pm is
+   * fixed; a bare side is literal on a 24h clock, but ambiguous once the other side
+   * proves the range is written on a 12h one ("11:00 – 12:30 pm" starts at 11am).
+   */
+  function hourCandidates(hour, meridiem, anyMeridiem) {
+    if (meridiem) return [to24h(hour, meridiem)];
+    if (!anyMeridiem) return [Number(hour)];
+    return [to24h(hour, 'am'), to24h(hour, 'pm')];
+  }
+
+  /** Parse "10:00 – 11:00" (optionally am/pm) into today's ISO window, or null. */
+  function parseTimeRange(text) {
+    const m = TIME_RANGE_RE.exec(text);
+    if (!m) return null;
+
+    const startMin = Number(m[2]), endMin = Number(m[5]);
+    if (startMin > 59 || endMin > 59) return null;
+
+    const anyMeridiem = !!(m[3] || m[6]);
+    const now = new Date();
+    let best = null;
+
+    for (const startH of hourCandidates(m[1], m[3], anyMeridiem)) {
+      for (const endH of hourCandidates(m[4], m[6], anyMeridiem)) {
+        if (startH > 23 || endH > 23) continue;
+
+        const start = new Date(now); start.setHours(startH, startMin, 0, 0);
+        const end = new Date(now); end.setHours(endH, endMin, 0, 0);
+
+        const minutes = (end - start) / 60000;
+        if (minutes <= 0 || minutes > 12 * 60) continue;          // not a sane meeting length
+        if (Math.abs(start - now) > 6 * 60 * 60 * 1000) continue; // not the event we're in
+
+        if (!best || minutes < best.minutes) best = { start, end, minutes };
+      }
+    }
+    return best ? { start: best.start.toISOString(), end: best.end.toISOString() } : null;
+  }
+
+  /** Look for a short text node that is just a time range (event header, green room). */
+  function detectScheduledWindow() {
+    if (!document.body) return null;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = (node.nodeValue || '').trim();
+      if (text.length < 9 || text.length > 48) continue;
+      const win = parseTimeRange(text);
+      if (win) return win;
+    }
+    return null;
+  }
+
+  /** Poll for the event time while it may still be on screen (green room, event header). */
+  function pollScheduledWindow() {
+    if (!isTracking || scheduledWindow || scheduleAttempts >= 8) return;
+    scheduleAttempts++;
+
+    scheduledWindow = detectScheduledWindow();
+    if (!scheduledWindow) { setTimeout(pollScheduledWindow, 2000); return; }
+
+    console.log('[Attendance] Scheduled hours detected:', scheduledWindow.start, '→', scheduledWindow.end);
+    chrome.runtime.sendMessage({
+      type: 'MEETING_SCHEDULE',
+      meetingId: currentMeetingId,
+      url: window.location.href,
+      meetingTitle: getMeetingTitle(),
+      scheduledStart: scheduledWindow.start,
+      scheduledEnd: scheduledWindow.end
+    }).catch(err => {
+      console.warn('[Attendance] Failed to report scheduled hours:', err);
+    });
   }
 
   /**
@@ -325,6 +419,8 @@
     console.log('[Attendance] Starting tracking for meeting:', currentMeetingId);
     isTracking = true;
     participants = {};
+    scheduledWindow = null;
+    scheduleAttempts = 0;
 
     // Auto-open participant panel to initialize DOM, then close it
     openParticipantPanelOnce();
@@ -351,6 +447,9 @@
     }).catch(err => {
       console.warn('[Attendance] Failed to notify meeting start:', err);
     });
+
+    // Read the event's scheduled hours while they may still be on screen
+    pollScheduledWindow();
   }
 
   /**

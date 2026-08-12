@@ -136,29 +136,76 @@ export function isInProgress(meeting) {
   return anyPresent(meeting) && !isStale(meeting);
 }
 
-/** Meeting start — authoritative `date`, pulled back to the earliest join if needed. */
-export function meetingStartMs(meeting) {
-  let start = meeting && meeting.date ? ms(meeting.date) : NaN;
+/** Earliest join across all participants (Infinity when nobody ever joined). */
+function earliestJoinMs(meeting) {
   let earliest = Infinity;
   Object.values((meeting && meeting.attendance) || {}).forEach(p => {
     const fs = p.firstSeen || (p.sessions && p.sessions[0] && p.sessions[0].joinedAt) || p.joinedAt;
     const t = ms(fs);
     if (!Number.isNaN(t)) earliest = Math.min(earliest, t);
   });
+  return earliest;
+}
+
+/**
+ * The window actually observed — earliest join to last activity — ignoring any
+ * scheduled hours. This is what tracking saw; `meetingBounds` is what the meeting
+ * officially was.
+ */
+export function observedBounds(meeting) {
+  const earliest = earliestJoinMs(meeting);
+  const startMs = earliest !== Infinity ? earliest : ms(meeting && meeting.date);
+  const endMs = isInProgress(meeting) ? Date.now() : lastActivityMs(meeting);
+  return { startMs, endMs: endMs || startMs };
+}
+
+/**
+ * Meeting start — the scheduled start when one is known (from the calendar event or set
+ * by hand), otherwise the authoritative `date` pulled back to the earliest join.
+ *
+ * The scheduled value is deliberately NOT pulled back: joining the call early must not
+ * drag the start with it, or everyone arriving on time is counted as late.
+ */
+export function meetingStartMs(meeting) {
+  const scheduled = ms(meeting && meeting.scheduledStart);
+  if (!Number.isNaN(scheduled)) return scheduled;
+
+  let start = meeting && meeting.date ? ms(meeting.date) : NaN;
+  const earliest = earliestJoinMs(meeting);
   if (Number.isNaN(start)) start = earliest;
   else if (earliest !== Infinity) start = Math.min(start, earliest);
   return Number.isFinite(start) ? start : NaN;
 }
 
-/** Meeting end — endedAt, else "now" while genuinely live, else frozen at last activity. */
+/**
+ * Meeting end — "now" while genuinely live (an open session can't run into the future),
+ * else the scheduled end when known, else endedAt, else frozen at last activity.
+ */
 export function meetingEndMs(meeting) {
-  if (meeting && meeting.endedAt) return ms(meeting.endedAt);
   if (isInProgress(meeting)) return Date.now();
+  const scheduled = ms(meeting && meeting.scheduledEnd);
+  if (!Number.isNaN(scheduled)) return scheduled;
+  if (meeting && meeting.endedAt) return ms(meeting.endedAt);
   return lastActivityMs(meeting);
 }
 
 export function meetingBounds(meeting) {
   return { startMs: meetingStartMs(meeting), endMs: meetingEndMs(meeting) };
+}
+
+/** Are the meeting's hours pinned (calendar event or hand-set) rather than derived? */
+export function hasSchedule(meeting) {
+  return !!(meeting && (meeting.scheduledStart || meeting.scheduledEnd));
+}
+
+/** Effective start / end as ISO strings, for display and formatting (null if unknown). */
+export function meetingStartIso(meeting) {
+  const t = meetingStartMs(meeting);
+  return Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : ((meeting && meeting.date) || null);
+}
+export function meetingEndIso(meeting) {
+  const t = meetingEndMs(meeting);
+  return Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : ((meeting && meeting.endedAt) || null);
 }
 
 export function meetingDurationSeconds(meeting) {
@@ -245,7 +292,7 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
   const sorted = (meetings || []).slice().sort((a, b) => ms(a.date) - ms(b.date));
   const sessions = sorted.map(m => ({
     id: m.id,
-    date: m.date,
+    date: meetingStartIso(m),
     title: m.meetingTitle,
     durationSeconds: meetingDurationSeconds(m)
   }));
@@ -310,6 +357,67 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
   };
 }
 
+/* ============================ name aliases ============================ */
+
+/**
+ * A meeting may carry a `nameMap` — { normalizedSourceName: displayName } — recorded when
+ * the user renames a participant or merges two of them (same person, different Meet name).
+ * The content script keeps reporting raw scraped names during a live meeting, so the map
+ * is re-applied on every write (storage.upsertMeeting) and defensively on read
+ * (normalizeMeeting) instead of being a one-off rewrite.
+ */
+
+/** Display name for a raw name under a nameMap (follows chains, guarded). */
+export function resolveMappedName(name, nameMap) {
+  let cur = String(name == null ? '' : name);
+  if (!nameMap) return cur;
+  for (let i = 0; i < 20; i++) {
+    const next = nameMap[norm(cur)];
+    if (typeof next !== 'string' || !next.trim() || next === cur) break;
+    cur = next;
+  }
+  return cur;
+}
+
+/** Raw events of an attendee, reconstructed from sessions for legacy no-events records. */
+function eventsOf(a) {
+  if (Array.isArray(a && a.events) && a.events.length) return a.events;
+  const evs = [];
+  (Array.isArray(a && a.sessions) ? a.sessions : []).forEach(s => {
+    if (!s || !s.joinedAt) return;
+    evs.push({ time: s.joinedAt, type: 'Join' });
+    if (s.leftAt) evs.push({ time: s.leftAt, type: 'Leave' });
+  });
+  return evs;
+}
+
+/**
+ * Apply a nameMap to an attendance object: rename keys and, when two entries land on
+ * the same person, merge them by concatenating their raw events and re-deriving.
+ * Idempotent — safe to run on both write and read paths.
+ */
+export function applyNameMap(attendance, nameMap) {
+  const src = attendance || {};
+  if (!nameMap || !Object.keys(nameMap).length) return { ...src };
+
+  const buckets = new Map(); // norm(target) -> { name: display target, list: [attendee] }
+  for (const name in src) {
+    const target = resolveMappedName(name, nameMap);
+    const k = norm(target);
+    if (!buckets.has(k)) buckets.set(k, { name: target, list: [] });
+    buckets.get(k).list.push(src[name]);
+  }
+
+  const out = {};
+  buckets.forEach(({ name, list }) => {
+    if (list.length === 1) { out[name] = list[0]; return; }
+    const events = list.flatMap(eventsOf);
+    const email = list.map(a => a && a.email).find(Boolean) || null;
+    out[name] = deriveAttendee({ email, events });
+  });
+  return out;
+}
+
 /* ============================ normalization ============================ */
 
 /**
@@ -320,7 +428,7 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
 export function normalizeMeeting(meeting) {
   if (!meeting || typeof meeting !== 'object') return meeting;
   const attendance = {};
-  const src = meeting.attendance || {};
+  const src = applyNameMap(meeting.attendance || {}, meeting.nameMap);
   for (const name in src) {
     const a = src[name] || {};
     if (Array.isArray(a.events) && a.events.length) {

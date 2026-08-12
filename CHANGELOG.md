@@ -2,6 +2,28 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] 2026-08-12
+
+### Added
+- **Edit participant names & merge duplicates** — a pencil on each row of the meeting's
+  attendance table opens an editor: fix the display name, or enter/pick another participant's
+  name to **merge the two entries into one person** (their joins & leaves are combined and
+  sessions, lateness and share re-derived). Useful when someone joins under a different name
+  and is counted as a new person. Edits are stored as a per-meeting alias map (`nameMap`) and
+  re-applied on every write, so they survive live-meeting updates, rejoins under the old name,
+  and flow through to reports, CSV exports and Sheets sync.
+- **Editable meeting hours** — an *Hours* button in the meeting detail pins the official start
+  and end (`scheduledStart` / `scheduledEnd`). They are read automatically from the calendar
+  event Meet displays when it can be found, and can always be corrected by hand; the editor
+  shows the tracked activity window for reference and offers a way back to automatic.
+
+### Fixed
+- **Joining early no longer marks everyone late.** The tracked `date` is merely when the tab
+  was opened, and the meeting start was pulled back to the earliest join — so opening the call
+  15 minutes ahead flagged everyone arriving on time as 15 minutes late. Lateness, length and
+  attendance share are now measured against the meeting's hours, and a scheduled start is never
+  dragged backwards by an early join. Time actually connected is still reported in full.
+
 ## [1.2.0] 2026-07-24 · fork by [KMChris](https://github.com/KMChris/google-meet-attendance-extension)
 
 First release of the fork — a full redesign plus new capabilities.

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Google Meet Attendance Tracker",
   "short_name": "GM Attendance",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Track Google Meet attendance on a presence timeline: meetings, meeting series, late & absent detection, PDF reports, dark mode, optional Google Sheets sync.",
   "permissions": [
     "storage",

@@ -14,7 +14,7 @@
  */
 
 import {
-  buildMeetingRecord, normalizeMeeting, lastActivityMs, RESUME_WINDOW_MS
+  buildMeetingRecord, normalizeMeeting, applyNameMap, lastActivityMs, RESUME_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -76,14 +76,25 @@ export async function getMeetingById(id) {
   return (await getHistory()).find(m => m.id === id) || null;
 }
 
-/** Insert or replace by id, newest-first, capped to maxStoredMeetings (0 = unlimited). Preserves groupId. */
+/**
+ * Insert or replace by id, newest-first, capped to maxStoredMeetings (0 = unlimited).
+ * Preserves groupId and nameMap; re-applies the nameMap so a live meeting that keeps
+ * rebuilding attendance from raw scraped names doesn't undo the user's renames/merges.
+ * Returns the record as stored.
+ */
 export async function upsertMeeting(record) {
   const settings = await getSettings();
   let history = await getHistory();
 
   const idx = history.findIndex(m => m.id === record.id);
-  if (idx >= 0) history[idx] = { ...history[idx], ...record };
-  else history.push(record);
+
+  const nameMap = record.nameMap || (idx >= 0 && history[idx].nameMap) || null;
+  const toStore = (nameMap && Object.keys(nameMap).length)
+    ? { ...record, nameMap, attendance: applyNameMap(record.attendance, nameMap) }
+    : record;
+
+  const merged = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
+  if (idx >= 0) history[idx] = merged; else history.push(merged);
 
   history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
 
@@ -92,7 +103,7 @@ export async function upsertMeeting(record) {
   if (cap > 0 && history.length > cap) history = history.slice(0, cap);
 
   await saveHistory(history);
-  return record;
+  return merged;
 }
 
 export async function deleteMeetingById(id) {
@@ -122,6 +133,78 @@ export async function findResumableSession(code) {
     if (now - t < RESUME_WINDOW_MS && t > bestT) { best = m; bestT = t; }
   }
   return best;
+}
+
+/* ============================ participants ============================ */
+
+const normName = (s) => String(s || '').trim().toLowerCase();
+
+/**
+ * Rename one participant of one meeting; when the new name already belongs to another
+ * participant the two entries are merged into one person. The alias is recorded in the
+ * meeting's `nameMap`, so a live meeting that keeps reporting the old scraped name
+ * re-applies the edit on every update. Returns { meeting, merged } or null.
+ */
+export async function renameParticipant(meetingId, fromName, toName) {
+  const from = String(fromName || '').trim();
+  const to = String(toName || '').trim();
+  if (!from || !to || from === to) return null;
+
+  const history = await getHistory();
+  const meeting = history.find(m => m.id === meetingId);
+  if (!meeting) return null;
+
+  const key = normName(from);
+  const merged = Object.keys(meeting.attendance || {})
+    .some(n => normName(n) !== key && normName(n) === normName(to));
+
+  // Flatten chains at write time: aliases that pointed at the old name follow it.
+  const nameMap = { ...(meeting.nameMap || {}) };
+  for (const k in nameMap) if (normName(nameMap[k]) === key) nameMap[k] = to;
+  nameMap[key] = to;
+
+  meeting.nameMap = nameMap;
+  meeting.attendance = applyNameMap(meeting.attendance, nameMap);
+  await saveHistory(history);
+  return { meeting, merged };
+}
+
+/* ============================ meeting hours ============================ */
+
+/**
+ * The official hours of a meeting, kept separately from `date` (which is when tracking
+ * started) so that joining the call early doesn't move the start and mark everyone late.
+ * `buildMeetingRecord` never emits these fields, so the spread in `upsertMeeting` keeps
+ * them across live-meeting rewrites — same mechanism that preserves `groupId`.
+ */
+function writeSchedule(meeting, start, end) {
+  if (start) meeting.scheduledStart = start; else delete meeting.scheduledStart;
+  if (end) meeting.scheduledEnd = end; else delete meeting.scheduledEnd;
+}
+
+/** Set the hours by hand. Pass null for a side to drop it back to automatic. */
+export async function setMeetingSchedule(meetingId, { start = null, end = null } = {}) {
+  const history = await getHistory();
+  const meeting = history.find(m => m.id === meetingId);
+  if (!meeting) return null;
+  writeSchedule(meeting, start, end);
+  await saveHistory(history);
+  return meeting;
+}
+
+/**
+ * Fill in hours detected from the calendar event. Only fills blanks — a value already
+ * on the record (typically the user's own edit) always wins.
+ */
+export async function applyDetectedSchedule(meetingId, { start = null, end = null } = {}) {
+  const history = await getHistory();
+  const meeting = history.find(m => m.id === meetingId);
+  if (!meeting) return null;
+  if (meeting.scheduledStart || meeting.scheduledEnd) return null;
+  if (!start && !end) return null;
+  writeSchedule(meeting, start, end);
+  await saveHistory(history);
+  return meeting;
 }
 
 /* ============================ groups CRUD ============================ */

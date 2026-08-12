@@ -52,11 +52,12 @@ function renderRecent(history) {
   if (!history.length) { empty.hidden = false; return; }
   empty.hidden = true;
   list.innerHTML = history.slice(0, 4).map(m => {
-    const d = new Date(m.date);
+    const startIso = A.meetingStartIso(m);
+    const d = new Date(startIso);
     const n = Object.keys(m.attendance).length;
     return `<div class="rec-item" data-id="${esc(m.id)}">
       <div class="rec-date"><span class="d">${d.getDate()}</span><span class="m">${esc(i18n.monthShort(d))}</span></div>
-      <div class="rec-body"><div class="rec-title">${esc(m.meetingTitle)}${A.isInProgress(m) ? ' ·' : ''}</div><div class="rec-sub">${i18n.formatTime(m.date)}</div></div>
+      <div class="rec-body"><div class="rec-title">${esc(m.meetingTitle)}${A.isInProgress(m) ? ' ·' : ''}</div><div class="rec-sub">${i18n.formatTime(startIso)}</div></div>
       <div class="rec-count">${n}</div></div>`;
   }).join('');
   list.querySelectorAll('.rec-item').forEach(it => it.addEventListener('click', () => openDashboard('#meeting=' + encodeURIComponent(it.dataset.id))));
