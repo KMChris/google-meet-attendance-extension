@@ -591,7 +591,37 @@ function renderGroup(g) {
   setStat($('#g-length'), fmtDur(agg.sessionCount ? Math.round(agg.totalDurationSeconds / agg.sessionCount) : 0), '');
 
   renderMatrix(agg);
+  renderGroupSessions(ms);
   renderGroupRoster(g);
+}
+
+/** The sessions behind the matrix, each a way into the meeting itself. */
+function renderGroupSessions(ms) {
+  const table = $('#group-sessions');
+  if (!ms.length) { table.innerHTML = `<tbody><tr><td class="mono" style="color:var(--ink-3)">—</td></tr></tbody>`; return; }
+  const chevron = `<svg class="go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>`;
+  const head = `<thead><tr><th>${t('colDate')}</th><th>${t('colMeeting')}</th>
+    <th class="num">${t('colPeople')}</th><th class="num">${t('statLength')}</th><th class="num">${t('colShare')}</th><th class="cell-go"></th></tr></thead>`;
+  const body = '<tbody>' + ms.map(m => {
+    const startIso = A.meetingStartIso(m);
+    const entries = Object.values(m.attendance);
+    const share = entries.length ? Math.round(entries.reduce((s, a) => s + A.sharePct(a, m), 0) / entries.length) : 0;
+    return `<tr data-id="${esc(m.id)}" tabindex="0" title="${esc(t('openMeeting'))}">
+      <td class="mono">${esc(i18n.formatDate(startIso, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
+      <td><div class="s-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}</div>
+        <div class="s-time mono">${i18n.formatTime(startIso)}–${i18n.formatTime(A.meetingEndIso(m))}</div></td>
+      <td class="num">${entries.length}</td>
+      <td class="num mono">${fmtDur(A.meetingDurationSeconds(m))}</td>
+      <td class="num mono">${share}%</td>
+      <td class="cell-go">${chevron}</td></tr>`;
+  }).join('') + '</tbody>';
+  table.innerHTML = head + body;
+
+  $$('#group-sessions tbody tr').forEach(tr => {
+    const open = () => go('meeting=' + encodeURIComponent(tr.dataset.id));
+    tr.addEventListener('click', open);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  });
 }
 
 function renderMatrix(agg) {
