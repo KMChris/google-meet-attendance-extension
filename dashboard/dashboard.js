@@ -297,13 +297,6 @@ function renderTimeline(m) {
       const width = Math.max(0.6, (Math.min(eMs, endMs) - Math.max(sMs, startMs)) / span * 100);
       segs += `<div class="seg" style="left:${left}%;width:${width}%"></div>`;
     });
-    if (!a.present && a.lastLeft) {
-      const leftMs = Date.parse(a.lastLeft);
-      if (endMs - leftMs > 30000) {
-        const p = (leftMs - startMs) / span * 100;
-        segs += `<span class="evt early" style="left:${Math.max(0, Math.min(100, p))}%"></span>`;
-      }
-    }
     lanes += `<div class="tl-lane"><div class="tl-name"><span class="dot" style="background:var(--present)"></span><span class="who">${esc(name)}</span></div><div class="tl-track">${segs}</div></div>`;
   });
 
@@ -313,7 +306,6 @@ function renderTimeline(m) {
 
   const legend = `<div class="tl-legend">
     <span class="lg"><span class="sw" style="background:var(--present)"></span>${t('legendPresent')}</span>
-    <span class="lg"><span class="sw tick" style="background:var(--red)"></span>${t('legendEarly')}</span>
     <span class="lg"><span class="sw" style="background:var(--absent-2);border:1px solid var(--line-2)"></span>${t('legendAbsent')}</span>
   </div>`;
 
