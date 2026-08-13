@@ -211,7 +211,7 @@ function makePicker(sel, { searchable, allLabel, onChange }) {
      <div class="pick-menu" hidden>
        ${searchable ? '<div class="pick-search"><input class="field" type="search" autocomplete="off"></div>' : ''}
        <div class="pick-list"></div>
-       <div class="pick-foot"><button class="pick-clear btn subtle sm" type="button"></button><span class="pick-count mono"></span></div>
+       <div class="pick-foot"><button class="pick-clear btn subtle" type="button"></button><span class="pick-count mono"></span></div>
      </div>`;
 
   const btn = $('.pick-btn', root);

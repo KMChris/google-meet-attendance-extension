@@ -131,7 +131,6 @@ a{color:var(--accent);text-decoration:none}
 .btn.ghost:hover{background:var(--panel-2);filter:none;border-color:var(--ink-3)}
 .btn.subtle{background:transparent;color:var(--ink-2);border-color:transparent;padding:8px 10px}
 .btn.subtle:hover{background:var(--panel-2);filter:none;color:var(--ink)}
-.btn.sm{padding:7px 11px;font-size:11px}
 .btn.danger{background:var(--red);color:#fff}
 .btn:disabled{opacity:.5;cursor:default;filter:none}
 

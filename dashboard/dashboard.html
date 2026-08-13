@@ -46,7 +46,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings">
           </div>
-          <button class="btn ghost sm" id="btn-export-all" data-i18n="export">Export</button>
+          <button class="btn ghost" id="btn-export-all" data-i18n="export">Export</button>
           <div class="menu" id="export-all-menu" hidden>
             <button class="menu-item" data-format="json">JSON</button>
             <button class="menu-item" data-format="csv">CSV</button>
@@ -99,11 +99,11 @@
             </div>
           </div>
           <div class="detail-actions">
-            <button class="btn ghost sm" id="btn-group" data-i18n="addToGroup">Add to series</button>
-            <button class="btn ghost sm" id="btn-copy" data-i18n="copyText">Copy</button>
-            <button class="btn ghost sm" id="btn-export" data-i18n="exportCsv">Export CSV</button>
-            <button class="btn sm" id="btn-pdf" data-i18n="savePdf">PDF report</button>
-            <button class="btn subtle sm icon" id="btn-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+            <button class="btn ghost" id="btn-group" data-i18n="addToGroup">Add to series</button>
+            <button class="btn ghost" id="btn-copy" data-i18n="copyText">Copy</button>
+            <button class="btn ghost" id="btn-export" data-i18n="exportCsv">Export CSV</button>
+            <button class="btn" id="btn-pdf" data-i18n="savePdf">PDF report</button>
+            <button class="btn subtle icon" id="btn-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>
 
@@ -163,9 +163,9 @@
             <div class="detail-badges"><div class="detail-meta mono" id="group-meta"></div></div>
           </div>
           <div class="detail-actions">
-            <button class="btn ghost sm" id="btn-group-export" data-i18n="groupExportCsv">Export CSV</button>
-            <button class="btn sm" id="btn-group-pdf" data-i18n="groupSavePdf">Series PDF report</button>
-            <button class="btn subtle sm icon" id="btn-group-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+            <button class="btn ghost" id="btn-group-export" data-i18n="groupExportCsv">Export CSV</button>
+            <button class="btn" id="btn-group-pdf" data-i18n="groupSavePdf">Series PDF report</button>
+            <button class="btn subtle icon" id="btn-group-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>
 
@@ -186,7 +186,7 @@
           <p class="hint" data-i18n="groupRosterHint"></p>
           <div class="roster-editor">
             <input class="field" id="group-roster-input" data-i18n-placeholder="rosterPlaceholder">
-            <button class="btn ghost sm" id="group-roster-add" data-i18n="add"></button>
+            <button class="btn ghost" id="group-roster-add" data-i18n="add"></button>
           </div>
           <div class="chips" id="group-roster-chips"></div>
         </div>
@@ -228,7 +228,7 @@
           <p class="lede" data-i18n="analyticsSubtitle"></p>
         </div>
         <div class="head-actions">
-          <button class="btn ghost sm" id="btn-analytics-csv" data-i18n="exportCsv">Export CSV</button>
+          <button class="btn ghost" id="btn-analytics-csv" data-i18n="exportCsv">Export CSV</button>
         </div>
       </div>
 
@@ -255,7 +255,7 @@
             <div class="picker" id="pick-series"></div>
             <span class="fb-key eyebrow" data-i18n="filterMeetings"></span>
             <div class="picker" id="pick-titles"></div>
-            <button class="btn subtle sm" id="filters-reset" data-i18n="filterReset" hidden></button>
+            <button class="btn subtle" id="filters-reset" data-i18n="filterReset" hidden></button>
           </div>
           <div class="fb-summary mono" id="filter-summary"></div>
         </div>
@@ -374,9 +374,9 @@
           <div class="setting-text"><div class="setting-title" data-i18n="settingRoster"></div><div class="setting-hint" data-i18n="settingRosterHint"></div></div>
           <div class="roster-editor">
             <input class="field" id="roster-input" data-i18n-placeholder="rosterPlaceholder">
-            <button class="btn ghost sm" id="roster-add" data-i18n="add"></button>
-            <button class="btn ghost sm" id="roster-paste" data-i18n="rosterPaste"></button>
-            <button class="btn subtle sm" id="roster-clear" data-i18n="rosterClear"></button>
+            <button class="btn ghost" id="roster-add" data-i18n="add"></button>
+            <button class="btn ghost" id="roster-paste" data-i18n="rosterPaste"></button>
+            <button class="btn subtle" id="roster-clear" data-i18n="rosterClear"></button>
           </div>
           <div class="chips" id="roster-chips"></div>
         </div>
@@ -388,14 +388,14 @@
           <div class="sheets">
             <div class="sheets-status"><span class="status status--info" id="sheets-status" data-i18n="sheetsNotConnected"></span></div>
             <div class="sheets-actions">
-              <button class="btn ghost sm" id="sheets-connect" data-i18n="sheetsConnect"></button>
-              <button class="btn subtle sm" id="sheets-disconnect" data-i18n="sheetsDisconnect" hidden></button>
+              <button class="btn ghost" id="sheets-connect" data-i18n="sheetsConnect"></button>
+              <button class="btn subtle" id="sheets-disconnect" data-i18n="sheetsDisconnect" hidden></button>
             </div>
             <div class="sheets-config" id="sheets-config" hidden>
               <div class="inline-field">
                 <input class="field mono" id="spreadsheet-id" data-i18n-placeholder="spreadsheetIdPlaceholder">
-                <button class="btn ghost sm" id="sheets-save" data-i18n="sheetsSave"></button>
-                <button class="btn ghost sm" id="sheets-create" data-i18n="sheetsCreate"></button>
+                <button class="btn ghost" id="sheets-save" data-i18n="sheetsSave"></button>
+                <button class="btn ghost" id="sheets-create" data-i18n="sheetsCreate"></button>
               </div>
               <a id="sheets-open" class="link mono" target="_blank" rel="noopener" data-i18n="sheetsOpen" hidden></a>
               <label class="switch-row" id="autosync-row" hidden><input type="checkbox" id="set-autosync"><span class="track"></span><span data-i18n="autoSync"></span></label>
@@ -407,14 +407,14 @@
       <div class="card setting-card">
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="importTitle"></div><div class="setting-hint" data-i18n="importHint"></div></div>
-          <button class="btn ghost sm" id="btn-import" data-i18n="importBtn"></button>
+          <button class="btn ghost" id="btn-import" data-i18n="importBtn"></button>
           <input type="file" id="import-file" accept="application/json,.json,text/csv,.csv" hidden>
         </div>
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="importAppsTitle"></div><div class="setting-hint" data-i18n="importAppsHint"></div></div>
           <div class="inline-field">
             <select class="field" id="import-source" style="width:230px"></select>
-            <button class="btn ghost sm" id="btn-import-app" data-i18n="importAppsBtn"></button>
+            <button class="btn ghost" id="btn-import-app" data-i18n="importAppsBtn"></button>
             <input type="file" id="import-app-file" accept="application/json,.json" hidden>
           </div>
         </div>
@@ -424,7 +424,7 @@
         </div>
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="clearAll"></div><div class="setting-hint" data-i18n="clearAllHint"></div></div>
-          <button class="btn danger sm" id="btn-clear-all" data-i18n="delete"></button>
+          <button class="btn danger" id="btn-clear-all" data-i18n="delete"></button>
         </div>
       </div>
     </section>
@@ -500,7 +500,7 @@
         <label class="modal-label" data-i18n="unmergeLabel"></label>
         <div class="unmerge-row">
           <div class="unmerge-names" id="unmerge-names"></div>
-          <button class="btn ghost sm" id="btn-unmerge" data-i18n="unmerge"></button>
+          <button class="btn ghost" id="btn-unmerge" data-i18n="unmerge"></button>
         </div>
       </div>
       <div class="modal-actions">
@@ -519,7 +519,7 @@
           <h2 id="person-name"></h2>
           <div class="pm-sub mono" id="person-sub"></div>
         </div>
-        <button class="btn subtle sm icon" id="person-close" data-i18n-title="close" data-i18n-aria="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        <button class="btn subtle icon" id="person-close" data-i18n-title="close" data-i18n-aria="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       </div>
       <div class="pm-stats" id="person-stats"></div>
       <p class="hint" data-i18n="personSessionsHint"></p>

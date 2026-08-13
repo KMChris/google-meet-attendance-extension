@@ -565,7 +565,7 @@ function renderSeriesSuggestions() {
     div.className = 'suggest';
     div.innerHTML = `<div class="s-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
       <div class="s-txt"><div class="s-title">${t('seriesSuggestTitle')}</div><div class="s-sub">${esc(title)} · ${t('seriesSuggestBody', { n: ungrouped.length })}</div></div>
-      <button class="btn sm">${t('groupThese', { n: ungrouped.length })}</button>`;
+      <button class="btn">${t('groupThese', { n: ungrouped.length })}</button>`;
     div.querySelector('button').addEventListener('click', async () => {
       const g = await store.createGroup({ name: title });
       await store.assignMeetingsToGroup(ungrouped.map(m => m.id), g.id);
