@@ -285,7 +285,7 @@ export async function restoreAll(spreadsheetId) {
   const byKey = new Map();
   rows.forEach(([kind, id, part, json]) => {
     if (!kind || !id) return;
-    const key = `${kind} ${id}`;
+    const key = `${kind}::${id}`;
     const idx = Number(part) || 0;
     if (idx === 0 || !byKey.has(key)) byKey.set(key, { kind, id, parts: new Map() });
     byKey.get(key).parts.set(idx, json || '');
