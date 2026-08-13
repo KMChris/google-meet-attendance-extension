@@ -84,28 +84,33 @@
         <div class="detail-head">
           <div class="detail-headings">
             <div class="eyebrow" id="detail-eyebrow"></div>
-            <h1 id="detail-title"></h1>
+            <div class="title-line">
+              <h1 id="detail-title"></h1>
+              <button class="title-edit" id="btn-rename" data-i18n-title="rename" data-i18n-aria="rename"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+            </div>
             <input class="field rename-input" id="rename-input" hidden>
-            <div class="detail-meta mono" id="detail-meta"></div>
+            <div class="detail-badges">
+              <button class="hours-badge" id="btn-hours">
+                <svg class="hb-ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+                <span class="hb-val" id="hours-value"></span>
+                <svg class="hb-edit" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              </button>
+              <div class="detail-meta mono" id="detail-meta"></div>
+            </div>
           </div>
           <div class="detail-actions">
             <button class="btn ghost sm" id="btn-group" data-i18n="addToGroup">Add to series</button>
-            <button class="btn ghost sm" id="btn-hours" data-i18n="editHours">Hours</button>
-            <button class="btn ghost sm" id="btn-rename" data-i18n="rename">Rename</button>
-            <button class="btn ghost sm" id="btn-export" data-i18n="export">Export</button>
-            <div class="menu" id="export-menu" hidden>
-              <button class="menu-item" data-format="pdf" data-i18n="savePdf"></button>
-              <button class="menu-item" data-format="csv" data-i18n="exportCsv"></button>
-              <button class="menu-item" data-format="clipboard" data-i18n="copyText"></button>
-            </div>
-            <button class="btn subtle sm icon" id="btn-delete" data-i18n-title="delete" aria-label="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+            <button class="btn ghost sm" id="btn-copy" data-i18n="copyText">Copy</button>
+            <button class="btn ghost sm" id="btn-export" data-i18n="exportCsv">Export CSV</button>
+            <button class="btn sm" id="btn-pdf" data-i18n="savePdf">PDF report</button>
+            <button class="btn subtle sm icon" id="btn-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>
 
         <div class="stats inset">
           <div class="stat"><div class="k" id="d-attended">—</div><div class="lbl eyebrow" data-i18n="statAttended"></div></div>
           <div class="stat"><div class="k" id="d-avg">—</div><div class="lbl eyebrow" data-i18n="statAvgPresence"></div></div>
-          <div class="stat"><div class="k" id="d-ontime">—</div><div class="lbl eyebrow" data-i18n="statOnTime"></div></div>
+          <div class="stat"><div class="k" id="d-share">—</div><div class="lbl eyebrow" data-i18n="statAvgShare"></div></div>
           <div class="stat"><div class="k" id="d-length">—</div><div class="lbl eyebrow" data-i18n="statLength"></div></div>
         </div>
 
@@ -150,15 +155,17 @@
         <div class="detail-head">
           <div class="detail-headings">
             <div class="eyebrow" id="group-eyebrow"></div>
-            <h1 id="group-title"></h1>
+            <div class="title-line">
+              <h1 id="group-title"></h1>
+              <button class="title-edit" id="btn-group-rename" data-i18n-title="rename" data-i18n-aria="rename"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+            </div>
             <input class="field rename-input" id="group-rename-input" hidden>
-            <div class="detail-meta mono" id="group-meta"></div>
+            <div class="detail-badges"><div class="detail-meta mono" id="group-meta"></div></div>
           </div>
           <div class="detail-actions">
-            <button class="btn ghost sm" id="btn-group-rename" data-i18n="rename">Rename</button>
             <button class="btn ghost sm" id="btn-group-export" data-i18n="groupExportCsv">Export CSV</button>
             <button class="btn sm" id="btn-group-pdf" data-i18n="groupSavePdf">Series PDF report</button>
-            <button class="btn subtle sm icon" id="btn-group-delete" data-i18n-title="delete" aria-label="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+            <button class="btn subtle sm icon" id="btn-group-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>
 
@@ -349,10 +356,6 @@
           <label class="switch"><input type="checkbox" id="set-auto-track"><span class="track"></span></label>
         </div>
         <div class="setting-row">
-          <div class="setting-text"><div class="setting-title" data-i18n="settingLate"></div><div class="setting-hint" data-i18n="settingLateHint"></div></div>
-          <div class="inline-field"><input class="field num" type="number" min="0" max="120" id="set-late" style="width:80px"><span class="unit mono" data-i18n="minutes"></span></div>
-        </div>
-        <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="settingTheme"></div><div class="setting-hint" data-i18n="settingThemeHint"></div></div>
           <div class="segmented" id="theme-seg">
             <button data-theme-val="system" data-i18n="themeSystem"></button>
@@ -405,7 +408,15 @@
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="importTitle"></div><div class="setting-hint" data-i18n="importHint"></div></div>
           <button class="btn ghost sm" id="btn-import" data-i18n="importBtn"></button>
-          <input type="file" id="import-file" accept="application/json,.json" hidden>
+          <input type="file" id="import-file" accept="application/json,.json,text/csv,.csv" hidden>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><div class="setting-title" data-i18n="importAppsTitle"></div><div class="setting-hint" data-i18n="importAppsHint"></div></div>
+          <div class="inline-field">
+            <select class="field" id="import-source" style="width:230px"></select>
+            <button class="btn ghost sm" id="btn-import-app" data-i18n="importAppsBtn"></button>
+            <input type="file" id="import-app-file" accept="application/json,.json" hidden>
+          </div>
         </div>
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="maxMeetings"></div><div class="setting-hint" data-i18n="maxMeetingsHint"></div></div>
@@ -485,10 +496,34 @@
         <label class="modal-label" data-i18n="mergePickLabel"></label>
         <div class="merge-list" id="merge-list"></div>
       </div>
+      <div class="unmerge" id="unmerge-block" hidden>
+        <label class="modal-label" data-i18n="unmergeLabel"></label>
+        <div class="unmerge-row">
+          <div class="unmerge-names" id="unmerge-names"></div>
+          <button class="btn ghost sm" id="btn-unmerge" data-i18n="unmerge"></button>
+        </div>
+      </div>
       <div class="modal-actions">
         <button class="btn subtle" id="participant-cancel" data-i18n="cancel"></button>
         <button class="btn" id="participant-save" data-i18n="save"></button>
       </div>
+    </div>
+  </div>
+
+  <!-- one participant across a whole series: exact presence, session by session -->
+  <div class="modal" id="person-modal" hidden>
+    <div class="modal-card card person-modal-card">
+      <div class="pm-head">
+        <span class="avatar" id="person-avatar"></span>
+        <div class="pm-id">
+          <h2 id="person-name"></h2>
+          <div class="pm-sub mono" id="person-sub"></div>
+        </div>
+        <button class="btn subtle sm icon" id="person-close" data-i18n-title="close" data-i18n-aria="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="pm-stats" id="person-stats"></div>
+      <p class="hint" data-i18n="personSessionsHint"></p>
+      <div class="pm-sessions" id="person-sessions"></div>
     </div>
   </div>
 

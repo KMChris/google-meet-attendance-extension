@@ -2,6 +2,7 @@ import * as store from '../src/lib/storage.js';
 import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 import * as sheets from '../src/lib/sheets-api.js';
+import * as importers from '../src/lib/importers.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
 
 const { t } = i18n;
@@ -13,7 +14,6 @@ let history = [];         // normalized meetings, newest-first
 let groups = [];
 let settings = {};
 let roster = [];          // global default roster
-let lateThreshold = 5;
 let curMeetingId = null;
 let curGroupId = null;
 let assignContextId = null; // meeting id awaiting group assignment
@@ -65,31 +65,109 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if ((settings.theme || 'system') === 'system' && $('#view-analytics').classList.contains('on')) renderAnalytics();
 });
 
-/* ------------------------------ nav ------------------------------ */
+/* ------------------------------ router ------------------------------ */
+/**
+ * Every view is a URL: #meetings · #meeting=<id> · #groups · #group=<id>[&person=<name>] ·
+ * #people[&person=<name>] · #analytics · #settings.
+ *
+ * Nothing renders except through route(), so an in-app click, the browser's back button and a
+ * deep link from the popup all land in the same place. `window.history` is spelled out because
+ * `history` is the meetings array in this module.
+ */
+const VIEWS = ['meetings', 'groups', 'people', 'analytics', 'settings'];
+const PARENT_TAB = { detail: 'meetings', group: 'groups' };
+let renderedRoute = null;
+let previousRoute = null;
+
+function currentHash() { return (location.hash || '').replace(/^#/, ''); }
+
+function parseRoute(hash) {
+  const p = new URLSearchParams(hash);
+  if (p.get('meeting')) return { view: 'detail', id: p.get('meeting') };
+  if (p.get('group')) return { view: 'group', id: p.get('group'), person: p.get('person') || null };
+  const view = VIEWS.find(v => p.has(v)) || 'meetings';
+  return { view, person: view === 'people' ? (p.get('person') || null) : null };
+}
+
+/** Navigate. `replace` for corrections (a dead id, a view you should not be able to go back to). */
+function go(hash, { replace = false } = {}) {
+  if (hash === currentHash()) { route(true); return; }
+  const depth = (window.history.state && window.history.state.d) || 0;
+  if (replace) window.history.replaceState({ d: depth }, '', '#' + hash);
+  else window.history.pushState({ d: depth + 1 }, '', '#' + hash);
+  route(true);
+}
+/**
+ * The in-app back control is labelled with where it goes ("‹ Meetings"), so it always goes
+ * there. When that is also the entry we came from it unwinds history instead of pushing a
+ * duplicate — the browser's own back button is what retraces the actual path.
+ */
+function goBack(fallback) {
+  const depth = (window.history.state && window.history.state.d) || 0;
+  if (depth > 0 && previousRoute === fallback) window.history.back();
+  else go(fallback, { replace: depth === 0 });
+}
+
+function route(force) {
+  const hash = currentHash();
+  if (!force && hash === renderedRoute) return;
+  if (hash !== renderedRoute) previousRoute = renderedRoute;
+  renderedRoute = hash;
+  const r = parseRoute(hash);
+
+  if (r.view === 'detail') {
+    const m = history.find(x => x.id === r.id);
+    if (!m) { go('meetings', { replace: true }); return; }
+    curMeetingId = r.id; curGroupId = null;
+    hidePersonModal();
+    renderDetail(m);
+    switchView('detail');
+    return;
+  }
+  if (r.view === 'group') {
+    const g = groupById(r.id);
+    if (!g) { go('groups', { replace: true }); return; }
+    curGroupId = r.id; curMeetingId = null;
+    renderGroup(g);
+    switchView('group');
+    if (r.person) renderPersonModal(g, r.person); else hidePersonModal();
+    return;
+  }
+  curMeetingId = null; curGroupId = null;
+  hidePersonModal();
+  switchView(r.view);
+  if (r.view === 'people' && r.person) openPerson(r.person);
+}
+
+// go() renders straight after pushState; these catch the browser's own moves through history.
+window.addEventListener('popstate', () => route());
+window.addEventListener('hashchange', () => route());
+
 function switchView(name) {
-  $$('.tab').forEach(tb => tb.classList.toggle('on', tb.dataset.view === name));
-  $$('.view').forEach(v => v.classList.remove('on'));
+  $$('.tab').forEach(tb => tb.classList.toggle('on', tb.dataset.view === (PARENT_TAB[name] || name)));
   const view = $('#view-' + name);
-  if (view) view.classList.add('on');
+  if (view && !view.classList.contains('on')) {
+    $$('.view').forEach(v => v.classList.remove('on'));
+    view.classList.add('on');
+  }
+  if (name === 'meetings') renderMeetings($('#meeting-search').value.trim());
   if (name === 'groups') renderGroups();
   if (name === 'people') renderPeople($('#people-search').value.trim());
   if (name === 'analytics') renderAnalytics();
 }
-$$('.tab').forEach(tb => tb.addEventListener('click', () => switchView(tb.dataset.view)));
-$('#btn-back-detail').addEventListener('click', () => { curMeetingId = null; switchView('meetings'); });
-$('#btn-back-group').addEventListener('click', () => { curGroupId = null; switchView('groups'); });
+$$('.tab').forEach(tb => tb.addEventListener('click', () => go(tb.dataset.view)));
+$('#btn-back-detail').addEventListener('click', () => goBack('meetings'));
+$('#btn-back-group').addEventListener('click', () => goBack('groups'));
 
 /* ------------------------------ load ------------------------------ */
 async function load() {
   const [h, g, s, r] = await Promise.all([store.getHistory(), store.getGroups(), store.getSettings(), store.getRoster()]);
   history = h.map(A.normalizeMeeting).sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
   groups = g; settings = s; roster = r;
-  lateThreshold = Number(settings.lateThresholdMinutes) || 5;
   applyTheme(settings.theme || 'system');
   renderReadout();
-  renderMeetings($('#meeting-search').value.trim());
   syncSettingsUI();
-  handleDeepLink();
+  route(true);   // whatever is on screen is re-read from the fresh data
 }
 
 function renderReadout() {
@@ -141,7 +219,7 @@ function renderMeetings(filter = '') {
     const live = A.isInProgress(m) ? `<span class="status status--present" style="margin-left:6px">${t('inCall')}</span>` : '';
     return `<div class="row meetings-grid" data-id="${esc(m.id)}">
       <div class="col-date"><div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div></div>
-      <div class="col-title"><div class="m-title">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(startIso)}</div></div>
+      <div class="col-title"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(startIso)}</div></div>
       <div class="col-group">${groupCell}</div>
       <div class="col-people num">${people}</div>
       <div class="col-avg num">${fmtDur(avg)}</div>
@@ -149,7 +227,7 @@ function renderMeetings(filter = '') {
     </div>`;
   }).join('');
 
-  $$('#meetings-body .row').forEach(row => row.addEventListener('click', () => openMeeting(row.dataset.id)));
+  $$('#meetings-body .row').forEach(row => row.addEventListener('click', () => go('meeting=' + encodeURIComponent(row.dataset.id))));
   $$('#meetings-body [data-act="export"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); downloadMeetingCSV(b.dataset.id); }));
 }
 $('#meeting-search').addEventListener('input', e => renderMeetings(e.target.value.trim()));
@@ -157,40 +235,37 @@ $('#meeting-search').addEventListener('input', e => renderMeetings(e.target.valu
 /* ============================ MEETING DETAIL ============================ */
 function currentMeeting() { return history.find(m => m.id === curMeetingId) || null; }
 
-function openMeeting(id) {
-  curMeetingId = id;
-  const m = currentMeeting(); if (!m) return;
-  renderDetail(m);
-  switchView('detail');
-}
-
 function renderDetail(m) {
   const roster = effectiveRoster(m);
   const people = Object.entries(m.attendance);
   const absentees = A.absenteesFor(m, roster);
-  const lateN = people.filter(([, a]) => A.isLate(a, m, lateThreshold)).length;
 
   const startIso = A.meetingStartIso(m), endIso = A.meetingEndIso(m);
+  // the hours live in their own badge under the title now — the eyebrow keeps date and code
   $('#detail-eyebrow').textContent =
-    `${i18n.formatDate(startIso, { weekday: 'short', day: 'numeric', month: 'short' })} · ${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)} · ${m.meetingCode || m.id}`;
+    `${i18n.formatDate(startIso, { weekday: 'short', day: 'numeric', month: 'short' })} · ${m.meetingCode || m.id}`;
+  // clamped to two lines in CSS — the full title stays reachable on hover
   $('#detail-title').textContent = m.meetingTitle;
+  $('#detail-title').title = m.meetingTitle;
   $('#detail-meta').innerHTML =
-    `<b>${people.length}</b> ${t('metaAttended')} · <b>${absentees.length}</b> ${t('metaAbsent')} · <b>${lateN}</b> ${t('metaLate')}`;
+    `<b>${people.length}</b> ${t('metaAttended')} · <b>${absentees.length}</b> ${t('metaAbsent')}`;
 
   const avg = people.length ? Math.round(people.reduce((s, [, a]) => s + A.liveSecondsFor(a, m), 0) / people.length) : 0;
   setStat($('#d-attended'), people.length, absentees.length ? `+${absentees.length} ${t('absent').toLowerCase()}` : '');
   setStat($('#d-avg'), fmtDur(avg), '');
-  setStat($('#d-ontime'), people.length - lateN, `/${people.length}`);
+  const share = people.length ? Math.round(people.reduce((s, [, a]) => s + A.sharePct(a, m), 0) / people.length) : 0;
+  setStat($('#d-share'), share, '%');
   setStat($('#d-length'), fmtDur(A.meetingDurationSeconds(m)), '');
 
   // group button label
   const g = m.groupId ? groupById(m.groupId) : null;
   $('#btn-group').textContent = g ? g.name : t('addToGroup');
 
-  // hours button doubles as the readout of pinned hours
-  const hours = $('#btn-hours');
-  hours.textContent = A.hasSchedule(m) ? `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}` : t('editHours');
-  hours.classList.toggle('pinned', A.hasSchedule(m));
+  // the hours badge reads them out and edits them; pinned hours are marked, not spelled out
+  const hours = $('#btn-hours'), pinned = A.hasSchedule(m);
+  $('#hours-value').textContent = `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}`;
+  hours.classList.toggle('pinned', pinned);
+  hours.title = pinned ? t('hoursPinnedTitle') : t('hoursAutoTitle');
 
   renderTimeline(m);
   renderAttendance(m, $('#participant-search').value.trim());
@@ -214,8 +289,6 @@ function renderTimeline(m) {
   const attended = Object.entries(m.attendance).sort((a, b) => (Date.parse(a[1].firstSeen) || 0) - (Date.parse(b[1].firstSeen) || 0));
   let lanes = '';
   attended.forEach(([name, a]) => {
-    const late = A.isLate(a, m, lateThreshold);
-    const dot = late ? 'var(--late)' : 'var(--present)';
     let segs = '';
     (a.sessions || []).forEach(s => {
       const sMs = Date.parse(s.joinedAt); if (Number.isNaN(sMs)) return;
@@ -224,10 +297,6 @@ function renderTimeline(m) {
       const width = Math.max(0.6, (Math.min(eMs, endMs) - Math.max(sMs, startMs)) / span * 100);
       segs += `<div class="seg" style="left:${left}%;width:${width}%"></div>`;
     });
-    if (late && a.firstSeen) {
-      const p = (Date.parse(a.firstSeen) - startMs) / span * 100;
-      segs += `<span class="evt late" style="left:${Math.max(0, Math.min(100, p))}%"></span>`;
-    }
     if (!a.present && a.lastLeft) {
       const leftMs = Date.parse(a.lastLeft);
       if (endMs - leftMs > 30000) {
@@ -235,7 +304,7 @@ function renderTimeline(m) {
         segs += `<span class="evt early" style="left:${Math.max(0, Math.min(100, p))}%"></span>`;
       }
     }
-    lanes += `<div class="tl-lane"><div class="tl-name"><span class="dot" style="background:${dot}"></span><span class="who">${esc(name)}</span></div><div class="tl-track">${segs}</div></div>`;
+    lanes += `<div class="tl-lane"><div class="tl-name"><span class="dot" style="background:var(--present)"></span><span class="who">${esc(name)}</span></div><div class="tl-track">${segs}</div></div>`;
   });
 
   A.absenteesFor(m, effectiveRoster(m)).sort((a, b) => a.localeCompare(b)).forEach(name => {
@@ -244,12 +313,23 @@ function renderTimeline(m) {
 
   const legend = `<div class="tl-legend">
     <span class="lg"><span class="sw" style="background:var(--present)"></span>${t('legendPresent')}</span>
-    <span class="lg"><span class="sw tick" style="background:var(--late)"></span>${t('legendLate')}</span>
     <span class="lg"><span class="sw tick" style="background:var(--red)"></span>${t('legendEarly')}</span>
     <span class="lg"><span class="sw" style="background:var(--absent-2);border:1px solid var(--line-2)"></span>${t('legendAbsent')}</span>
   </div>`;
 
   tl.innerHTML = axis + lanes + legend;
+}
+
+/** Names an attendee row was merged from, empty when it is a single participant. */
+function mergedNames(a) {
+  return Array.isArray(a && a.mergedFrom) && a.mergedFrom.length > 1 ? a.mergedFrom : [];
+}
+/** Badge marking a row as several Meet identities of one person (hover lists them). */
+function mergedChip(a) {
+  const names = mergedNames(a);
+  if (!names.length) return '';
+  return `<span class="merged-chip" title="${esc(t('mergedFromTitle', { names: names.join(' · ') }))}">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>${names.length}</span>`;
 }
 
 function renderAttendance(m, filter) {
@@ -258,13 +338,11 @@ function renderAttendance(m, filter) {
   if (q) people = people.filter(([n]) => n.toLowerCase().includes(q));
 
   let rows = people.map(([name, a], i) => {
-    const st = A.statusFor(a, m, lateThreshold);
-    let chip;
-    if (st.late) chip = `<span class="status status--late">${t('lateBy', { n: st.lateMinutes })}</span>`;
-    else if (a.present) chip = `<span class="status status--present">${t('inCall')}</span>`;
-    else chip = `<span class="status status--left">${t('left')}</span>`;
+    // attendance is binary — being in the call at all is the whole story
+    const st = A.statusFor(a, m);
+    const chip = `<span class="status status--present">${t('present')}</span>`;
     return `<tr>
-      <td><div class="name-cell"><span class="avatar" style="${avatarStyle(name)}">${esc(initials(name))}</span><span class="nm">${esc(name)}</span></div></td>
+      <td><div class="name-cell"><span class="avatar" style="${avatarStyle(name)}">${esc(initials(name))}</span><span class="nm">${esc(name)}</span>${mergedChip(a)}</div></td>
       <td class="mono">${i18n.formatTime(a.firstSeen)}</td>
       <td class="mono">${a.present ? '<span class="mono">'+esc(t('inCall'))+'</span>' : i18n.formatTime(a.lastLeft)}</td>
       <td class="num mono">${fmtHMS(st.seconds)}</td>
@@ -349,7 +427,6 @@ async function saveSchedule(start, end) {
   await store.setMeetingSchedule(m.id, { start, end });
   $('#schedule-modal').hidden = true;
   await load();
-  openMeeting(m.id);
   toast(start || end ? t('savedToast') : t('scheduleClearedToast'));
 }
 
@@ -398,10 +475,30 @@ function openParticipantModal(name) {
     $('#participant-name').value = others[Number(b.dataset.i)];
     refreshParticipantModal();
   }));
+
+  // the entries behind a merged row are still stored separately — offer the way back
+  const sources = mergedNames(m.attendance[name]);
+  $('#unmerge-block').hidden = !sources.length;
+  $('#unmerge-names').innerHTML = sources
+    .map(n => `<span class="chip"><span>${esc(n)}</span></span>`).join('');
+
   refreshParticipantModal();
   $('#participant-modal').hidden = false;
   const input = $('#participant-name'); input.focus(); input.select();
 }
+
+async function commitUnmerge() {
+  const m = currentMeeting();
+  const name = editingName;
+  $('#participant-modal').hidden = true;
+  editingName = null;
+  if (!m || name == null) return;
+  const res = await store.unmergeParticipant(m.id, name);
+  if (!res) return;
+  await load();
+  toast(t('unmergedToast', { n: res.restored.length + 1 }));
+}
+$('#btn-unmerge').addEventListener('click', commitUnmerge);
 
 async function commitParticipantEdit() {
   const m = currentMeeting();
@@ -412,7 +509,6 @@ async function commitParticipantEdit() {
   editingName = null;
   if (!res) return;
   await load();
-  openMeeting(m.id);
   toast(res.merged ? t('mergedToast') : t('renamedToast'));
 }
 $('#participant-name').addEventListener('input', refreshParticipantModal);
@@ -426,18 +522,13 @@ $('#btn-delete').addEventListener('click', async () => {
   const m = currentMeeting(); if (!m) return;
   if (!confirm(t('confirmDeleteMeeting'))) return;
   await store.deleteMeetingById(m.id);
-  await load(); switchView('meetings');
+  await load(); go('meetings', { replace: true });
 });
 
-// export menu
-toggleMenu('#btn-export', '#export-menu');
-$$('#export-menu .menu-item').forEach(it => it.addEventListener('click', () => {
-  $('#export-menu').hidden = true;
-  const m = currentMeeting(); if (!m) return;
-  if (it.dataset.format === 'pdf') openReport('meeting', m.id);
-  else if (it.dataset.format === 'csv') downloadMeetingCSV(m.id);
-  else copyMeeting(m);
-}));
+// export — the same three controls the series head offers, in the same order
+$('#btn-copy').addEventListener('click', () => { const m = currentMeeting(); if (m) copyMeeting(m); });
+$('#btn-export').addEventListener('click', () => { if (curMeetingId) downloadMeetingCSV(curMeetingId); });
+$('#btn-pdf').addEventListener('click', () => { if (curMeetingId) openReport('meeting', curMeetingId); });
 
 // assign to group
 $('#btn-group').addEventListener('click', () => { assignContextId = curMeetingId; openAssignModal(currentMeeting()); });
@@ -451,7 +542,7 @@ function renderGroups() {
 
   list.innerHTML = groups.map(g => {
     const ms = history.filter(m => m.groupId === g.id);
-    const agg = A.aggregateGroup(ms, g.roster, lateThreshold);
+    const agg = A.aggregateGroup(ms, g.roster);
     const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
     return `<div class="card group-card" data-id="${esc(g.id)}">
       <div class="gc-top"><span class="gc-swatch" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>
@@ -462,7 +553,7 @@ function renderGroups() {
         <div class="gc-stat"><div class="n">${fmtDur(agg.totalDurationSeconds)}</div><div class="l">${t('colTotalTime')}</div></div>
       </div></div>`;
   }).join('');
-  $$('#groups-list .group-card').forEach(c => c.addEventListener('click', () => openGroup(c.dataset.id)));
+  $$('#groups-list .group-card').forEach(c => c.addEventListener('click', () => go('group=' + encodeURIComponent(c.dataset.id))));
 }
 
 // Name a series after the title text shared before a separator (e.g. "Szkolenie — Dzień 1/2" → "Szkolenie").
@@ -486,26 +577,20 @@ function renderSeriesSuggestions() {
     div.querySelector('button').addEventListener('click', async () => {
       const g = await store.createGroup({ name: title });
       await store.assignMeetingsToGroup(ungrouped.map(m => m.id), g.id);
-      await load(); openGroup(g.id);
+      await load(); go('group=' + encodeURIComponent(g.id));
     });
     box.appendChild(div);
   });
 }
 
-function openGroup(id) {
-  curGroupId = id;
-  const g = groupById(id); if (!g) return;
-  renderGroup(g);
-  switchView('group');
-}
-
 function renderGroup(g) {
   const ms = history.filter(m => m.groupId === g.id).sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
-  const agg = A.aggregateGroup(ms, g.roster, lateThreshold);
+  const agg = A.aggregateGroup(ms, g.roster);
   const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
 
   $('#group-eyebrow').innerHTML = `<span style="color:var(${GRP_COLORS[g.color] || '--grp-teal'})">●</span> ${t('navGroups').toUpperCase()}`;
   $('#group-title').textContent = g.name;
+  $('#group-title').title = g.name;
   $('#group-meta').innerHTML = `${ms.length === 1 ? t('sessionOne') : t('sessionsN', { n: ms.length })} · ${agg.peopleCount === 1 ? t('peopleOne') : t('peopleN', { n: agg.peopleCount })}`;
 
   setStat($('#g-sessions'), agg.sessionCount, '');
@@ -520,18 +605,109 @@ function renderGroup(g) {
 function renderMatrix(agg) {
   if (!agg.sessions.length) { $('#group-matrix').innerHTML = `<tbody><tr><td class="mono" style="color:var(--ink-3);padding:16px">—</td></tr></tbody>`; return; }
   const head = `<thead><tr>
-    <th>${t('matrixPerson')}</th>
+    <th>${t('colParticipant')}</th>
     ${agg.sessions.map(s => `<th class="col-session"><span class="ds">${esc(i18n.formatDate(s.date, { day: 'numeric', month: 'short' }))}</span>${esc((s.title || '').slice(0, 10))}</th>`).join('')}
     <th class="num">${t('colAttendedShare')}</th><th class="num">${t('colTotalTime')}</th>
   </tr></thead>`;
-  const body = '<tbody>' + agg.people.map(p => `<tr>
-    <td><div class="m-name"><span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span><span class="nm">${esc(p.name)}</span></div></td>
-    ${agg.sessions.map(s => { const c = p.perSession[s.id]; return `<td><span class="cell-dot ${c.state}" title="${c.state} · ${c.sharePct}%"></span></td>`; }).join('')}
+  const chevron = `<svg class="go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>`;
+  const body = '<tbody>' + agg.people.map(p => `<tr data-name="${esc(p.name)}" tabindex="0" title="${esc(t('personSessionsTitle', { name: p.name }))}">
+    <td><div class="m-name"><span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span><span class="nm">${esc(p.name)}</span>${chevron}</div></td>
+    ${agg.sessions.map(s => {
+      const c = p.perSession[s.id];
+      // the dot keeps the pattern readable across a row; the number says how much of it
+      return `<td title="${esc(c.state === 'absent' ? t('absent') : fmtDur(c.seconds))}">
+        <span class="cell-dot ${c.state}"></span><span class="cell-pct ${c.state}">${c.state === 'absent' ? '—' : c.sharePct + '%'}</span></td>`;
+    }).join('')}
     <td class="num"><span class="m-att">${p.attendedCount}</span><span class="mono" style="color:var(--ink-3)">/${agg.sessionCount}</span></td>
     <td class="num m-total">${fmtDur(p.totalSeconds)}</td>
   </tr>`).join('') + '</tbody>';
   $('#group-matrix').innerHTML = head + body;
+
+  $$('#group-matrix tbody tr').forEach(tr => {
+    const open = () => go(`group=${encodeURIComponent(curGroupId)}&person=${encodeURIComponent(tr.dataset.name)}`);
+    tr.addEventListener('click', open);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  });
 }
+
+/* ---- one participant, across every session of the series ---- */
+function seriesMeetings(g) {
+  return history.filter(m => m.groupId === g.id).sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
+}
+/** The attendee entry for `name` in `m` — matched case-insensitively, as aggregateGroup does. */
+function attendeeIn(m, name) {
+  const key = String(name || '').trim().toLowerCase();
+  const hit = Object.entries(m.attendance || {}).find(([n]) => n.trim().toLowerCase() === key);
+  return hit ? hit[1] : null;
+}
+
+/**
+ * The exact presence of one person in one session: the meeting's own hours as the track, their
+ * join/leave blocks on it, and the same intervals spelled out underneath. Absent sessions keep
+ * the lane (hatched) so the reading stays comparable down the list.
+ */
+function personSessionBlock(m, a) {
+  const { startMs, endMs } = A.meetingBounds(m);
+  const span = Math.max(1, endMs - startMs);
+  const st = A.statusFor(a, m);
+  const sessions = (a && Array.isArray(a.sessions)) ? a.sessions : [];
+
+  let segs = '', ranges = '';
+  sessions.forEach(s => {
+    const sMs = Date.parse(s.joinedAt); if (Number.isNaN(sMs)) return;
+    const open = !s.leftAt;
+    const eMs = open ? endMs : Date.parse(s.leftAt);
+    const left = Math.max(0, (Math.max(sMs, startMs) - startMs) / span * 100);
+    const width = Math.max(0.6, (Math.min(eMs, endMs) - Math.max(sMs, startMs)) / span * 100);
+    segs += `<div class="seg" style="left:${left}%;width:${width}%"></div>`;
+    ranges += `<span class="pm-range"><i class="rdot ${open ? 'open' : ''}"></i>${i18n.formatTime(s.joinedAt)} → ${open ? esc(t('stillInCall')) : i18n.formatTime(s.leftAt)} <b>${fmtDur(Math.max(0, Math.floor((eMs - sMs) / 1000)))}</b></span>`;
+  });
+
+  return `<div class="pm-sess${a ? '' : ' absent'}">
+    <div class="pm-sess-head">
+      <button class="pm-open" data-id="${esc(m.id)}" title="${esc(t('openMeeting'))}">
+        <span class="pm-date">${esc(i18n.formatDate(A.meetingStartIso(m), { day: 'numeric', month: 'short' }))}</span>
+        <span class="pm-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}</span>
+      </button>
+      <span class="pm-share">${a ? `${fmtHMS(st.seconds)} · ${st.sharePct}%` : esc(t('absent'))}</span>
+    </div>
+    <div class="tl-lane pm-line${a ? '' : ' absent'}">
+      <span class="pm-edge">${i18n.formatTime(A.meetingStartIso(m))}</span>
+      <div class="tl-track">${a ? segs : `<span class="tl-abs">${esc(t('absent'))}</span>`}</div>
+      <span class="pm-edge r">${i18n.formatTime(A.meetingEndIso(m))}</span>
+    </div>
+    ${ranges ? `<div class="pm-ranges">${ranges}</div>` : ''}
+  </div>`;
+}
+
+function renderPersonModal(g, name) {
+  const ms = seriesMeetings(g);
+  const agg = A.aggregateGroup(ms, g.roster);
+  const key = String(name).trim().toLowerCase();
+  const p = agg.people.find(x => x.name.trim().toLowerCase() === key);
+  if (!p) { go('group=' + encodeURIComponent(g.id), { replace: true }); return; }
+
+  const avatar = $('#person-avatar');
+  avatar.textContent = initials(p.name);
+  avatar.setAttribute('style', avatarStyle(p.name));
+  $('#person-name').textContent = p.name;
+  $('#person-sub').textContent = g.name;
+  $('#person-stats').innerHTML = [
+    [`${p.attendedCount}<small>/${agg.sessionCount}</small>`, t('colAttendedShare')],
+    [esc(fmtDur(p.totalSeconds)), t('colTotalTime')],
+    [`${p.totalShare}%`, t('colTotalShare')]
+  ].map(([n, l]) => `<div class="pm-stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`).join('');
+
+  $('#person-sessions').innerHTML = ms.map(m => personSessionBlock(m, attendeeIn(m, p.name))).join('');
+  $$('#person-sessions .pm-open').forEach(b =>
+    b.addEventListener('click', () => go('meeting=' + encodeURIComponent(b.dataset.id))));
+
+  $('#person-modal').hidden = false;
+}
+function hidePersonModal() { $('#person-modal').hidden = true; }
+/** The panel is a route, so closing it means going back — never just hiding the node. */
+function closePersonModal() { goBack('group=' + encodeURIComponent(curGroupId || '')); }
+$('#person-close').addEventListener('click', closePersonModal);
 
 function renderGroupRoster(g) {
   const box = $('#group-roster-chips');
@@ -575,7 +751,7 @@ $('#btn-group-delete').addEventListener('click', async () => {
   const g = groupById(curGroupId); if (!g) return;
   if (!confirm(t('confirmDeleteGroup'))) return;
   await store.deleteGroup(g.id);
-  await load(); switchView('groups');
+  await load(); go('groups', { replace: true });
 });
 $('#btn-group-pdf').addEventListener('click', () => { if (curGroupId) openReport('group', curGroupId); });
 $('#btn-group-export').addEventListener('click', () => downloadGroupCSV(curGroupId));
@@ -619,10 +795,10 @@ function renderPeople(filter = '') {
       <div class="col-last num mono">${esc(i18n.formatDate(new Date(p.last).toISOString(), { day: 'numeric', month: 'short', year: 'numeric' }))}</div>
     </div>`;
   }).join('');
-  $$('#people-body .row').forEach(r => r.addEventListener('click', () => openPerson(r.dataset.name, map)));
+  $$('#people-body .row').forEach(r => r.addEventListener('click', () => go('people&person=' + encodeURIComponent(r.dataset.name))));
 }
-function openPerson(name, map) {
-  const p = map.get(name.toLowerCase()); if (!p) return;
+function openPerson(name) {
+  const p = aggregatePeople().get(String(name).toLowerCase()); if (!p) return;
   const avg = p.shares.length ? Math.round(p.shares.reduce((s, r) => s + r, 0) / p.shares.length) : 0;
   const meetings = p.meetings.slice().sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
   const panel = $('#people-panel');
@@ -637,9 +813,13 @@ function openPerson(name, map) {
       <td class="num mono">${fmtHMS(mm.secs)}</td>
       <td><div class="share-cell"><div class="share-bar"><i style="width:${mm.share}%"></i></div><span class="pct">${mm.share}%</span></div></td></tr>`).join('')}</tbody></table></div>`;
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  $$('#people-panel tbody tr').forEach(tr => tr.addEventListener('click', () => openMeeting(tr.dataset.id)));
+  $$('#people-panel tbody tr').forEach(tr => tr.addEventListener('click', () => go('meeting=' + encodeURIComponent(tr.dataset.id))));
 }
-$('#people-search').addEventListener('input', e => renderPeople(e.target.value.trim()));
+// searching replaces the open person rather than leaving the URL pointing at a hidden panel
+$('#people-search').addEventListener('input', e => {
+  if (parseRoute(currentHash()).person) go('people', { replace: true });
+  else renderPeople(e.target.value.trim());
+});
 
 /* ============================ ANALYTICS ============================ */
 // The view itself lives in ./analytics.js; this page only supplies the data and the
@@ -654,36 +834,98 @@ window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer
 
 /* ============================ EXPORT ============================ */
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); }
-function safe(s) { return String(s || 'export').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'export'; }
+// Meet titles can run to a couple of hundred characters; a file name that long is a nuisance
+// to handle and can push a path over the Windows limit, so it is cut to something readable.
+function safe(s) { return String(s || 'export').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60).replace(/-$/, '') || 'export'; }
 function csvRow(cells) { return cells.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(','); }
+
+function downloadCSV(rows, filename) {
+  // BOM + CRLF: what Excel needs to open a UTF-8 CSV without mangling the Polish characters
+  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\r\n')], { type: 'text/csv;charset=utf-8;' }), filename);
+}
+/** Calendar day of an instant in local time — toISOString() would name the UTC day. */
+function localDay(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * One row per participant per meeting — the same columns for a single meeting, a series and
+ * the whole history, so the three exports line up and can be pasted into one sheet.
+ *
+ * Every join and leave rides along in one cell as a JSON array of "HH:MM–HH:MM" strings (an
+ * open session ends empty), which a spreadsheet keeps in a single column and a script can
+ * still read back. Times are local wall clock like everywhere else in the app; the exact
+ * instants live in the JSON backup, which is the machine-readable path.
+ *
+ * The last column is the meeting's own id: it is what lets the file be imported back without
+ * duplicating meetings that are already here (see importers.fromOwnCSV).
+ */
+function csvDetailHeader() {
+  return [t('colDate'), t('colMeeting'), t('csvMeetingCode'), t('colGroup'),
+    t('csvMeetingStart'), t('csvMeetingEnd'), t('csvMeetingLength'),
+    t('colParticipant'), t('csvEmail'), t('colStatus'), t('colFirstSeen'), t('colLastLeft'),
+    t('colPresent'), t('csvPresentMinutes'), t('colShare'),
+    t('csvSessionCount'), t('csvSessionList'), t('csvMergedFrom'), t('csvId')];
+}
+function csvSessionList(a) {
+  return JSON.stringify(((a && a.sessions) || []).map(s =>
+    `${i18n.formatTime(s.joinedAt)}–${s.leftAt ? i18n.formatTime(s.leftAt) : ''}`));
+}
+function csvDetailRows(m) {
+  const startIso = A.meetingStartIso(m), endIso = A.meetingEndIso(m);
+  const g = m.groupId ? groupById(m.groupId) : null;
+  const meta = [localDay(startIso), m.meetingTitle, m.meetingCode || '', g ? g.name : '',
+    i18n.formatTime(startIso), i18n.formatTime(endIso), fmtHMS(A.meetingDurationSeconds(m))];
+
+  const rows = Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).map(([name, a]) => {
+    const st = A.statusFor(a, m);
+    const merged = mergedNames(a);
+    return [...meta, name, a.email || '', t('present'),
+      i18n.formatTime(a.firstSeen), a.present ? t('stillInCall') : i18n.formatTime(a.lastLeft),
+      fmtHMS(st.seconds), Math.round(st.seconds / 60), st.sharePct + '%',
+      (a.sessions || []).length, csvSessionList(a), merged.length ? JSON.stringify(merged) : '', m.id];
+  });
+  A.absenteesFor(m, effectiveRoster(m)).sort((a, b) => a.localeCompare(b)).forEach(name =>
+    rows.push([...meta, name, '', t('absent'), '—', '—', '00:00:00', 0, '0%', 0, '[]', '', m.id]));
+  return rows;
+}
 
 function downloadMeetingCSV(id) {
   const m = history.find(x => x.id === id); if (!m) return;
-  const rows = [[t('colParticipant'), 'Email', t('colFirstSeen'), t('colLastLeft'), t('colPresent'), t('colShare'), t('colStatus')]];
-  Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).forEach(([name, a]) => {
-    const st = A.statusFor(a, m, lateThreshold);
-    rows.push([name, a.email || '', i18n.formatTime(a.firstSeen), a.present ? t('stillInCall') : i18n.formatTime(a.lastLeft), fmtHMS(st.seconds), st.sharePct + '%', st.late ? t('late') : (a.present ? t('inCall') : t('left'))]);
-  });
-  A.absenteesFor(m, effectiveRoster(m)).forEach(name => rows.push([name, '', '—', '—', '00:00:00', '0%', t('absent')]));
-  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\n')], { type: 'text/csv;charset=utf-8;' }), `${safe(m.meetingTitle)}-${new Date(m.date).toISOString().slice(0, 10)}.csv`);
+  downloadCSV([csvDetailHeader(), ...csvDetailRows(m)],
+    `${safe(m.meetingTitle)}-${localDay(A.meetingStartIso(m))}.csv`);
 }
+/** The series file carries both readings: the matrix to scan, the detail to work with. */
 function downloadGroupCSV(id) {
   const g = groupById(id); if (!g) return;
-  const ms = history.filter(m => m.groupId === g.id).sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
-  const agg = A.aggregateGroup(ms, g.roster, lateThreshold);
-  const header = [t('colParticipant'), ...agg.sessions.map(s => `${i18n.formatDate(s.date, { day: 'numeric', month: 'short' })}`), t('colAttendedShare'), t('colTotalTime')];
-  const rows = [header];
-  agg.people.forEach(p => rows.push([p.name, ...agg.sessions.map(s => { const c = p.perSession[s.id]; return c.state === 'absent' ? t('absent') : c.sharePct + '%'; }), `${p.attendedCount}/${agg.sessionCount}`, fmtHMS(p.totalSeconds)]));
-  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\n')], { type: 'text/csv;charset=utf-8;' }), `${safe(g.name)}-series.csv`);
+  const ms = seriesMeetings(g);
+  const agg = A.aggregateGroup(ms, g.roster);
+  const rows = [
+    [t('matrixTitle'), g.name],
+    [t('colParticipant'), t('csvEmail'),
+      ...agg.sessions.map(s => i18n.formatDate(s.date, { day: 'numeric', month: 'short' })),
+      t('colAttendedShare'), t('colTotalTime'), t('csvTotalMinutes'), t('colTotalShare')],
+    ...agg.people.map(p => [p.name, p.email || '',
+      ...agg.sessions.map(s => { const c = p.perSession[s.id]; return c.state === 'absent' ? t('absent') : c.sharePct + '%'; }),
+      `${p.attendedCount}/${agg.sessionCount}`, fmtHMS(p.totalSeconds), Math.round(p.totalSeconds / 60), p.totalShare + '%']),
+    [],
+    [t('sessionsBreakdown')],
+    csvDetailHeader(),
+    ...ms.flatMap(m => csvDetailRows(m))
+  ];
+  downloadCSV(rows, `${safe(g.name)}-series.csv`);
 }
 function copyMeeting(m) {
   let text = `${m.meetingTitle}\n${new Date(m.date).toLocaleString()}\n\n`;
   Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).forEach(([name, a]) => { text += `${name} — ${i18n.formatTime(a.firstSeen)} — ${fmtHMS(A.liveSecondsFor(a, m))}\n`; });
   navigator.clipboard.writeText(text).then(() => toast(t('copiedToast')));
 }
+// Same tab: the report is a view of this data, not a second app. It carries its own back
+// button (hidden on paper), and this page comes back from history with its route intact.
 function openReport(kind, id) {
-  const url = chrome.runtime.getURL('report/report.html') + `#${kind}=${encodeURIComponent(id)}`;
-  chrome.tabs ? chrome.tabs.create({ url }) : window.open(url, '_blank');
+  location.href = chrome.runtime.getURL('report/report.html') + `#${kind}=${encodeURIComponent(id)}`;
 }
 
 // export-all menu
@@ -694,12 +936,9 @@ $$('#export-all-menu .menu-item').forEach(it => it.addEventListener('click', asy
   else downloadCombinedCSV();
 }));
 function downloadCombinedCSV() {
-  const rows = [[t('colDate'), t('colMeeting'), t('colParticipant'), t('colFirstSeen'), t('colLastLeft'), t('colPresent'), t('colStatus')]];
-  history.forEach(m => Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).forEach(([name, a]) => {
-    const st = A.statusFor(a, m, lateThreshold);
-    rows.push([new Date(m.date).toISOString().slice(0, 10), m.meetingTitle, name, i18n.formatTime(a.firstSeen), a.present ? t('stillInCall') : i18n.formatTime(a.lastLeft), fmtHMS(st.seconds), st.late ? t('late') : (a.present ? t('inCall') : t('left'))]);
-  }));
-  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\n')], { type: 'text/csv;charset=utf-8;' }), `gm-attendance-all-${new Date().toISOString().slice(0, 10)}.csv`);
+  const rows = [csvDetailHeader()];
+  history.slice().reverse().forEach(m => rows.push(...csvDetailRows(m)));   // oldest first, like a register
+  downloadCSV(rows, `gm-attendance-all-${localDay(new Date().toISOString())}.csv`);
 }
 
 /* ============================ MODALS ============================ */
@@ -728,7 +967,8 @@ $('#group-modal-save').addEventListener('click', async () => {
   assignContextId = null;
   await load();
   toast(t('groupCreatedToast'));
-  if (openMeetingAfter) openMeeting(openMeetingAfter); else openGroup(g.id);
+  if (openMeetingAfter) go('meeting=' + encodeURIComponent(openMeetingAfter));
+  else go('group=' + encodeURIComponent(g.id));
 });
 
 function openAssignModal(m) {
@@ -741,18 +981,23 @@ function openAssignModal(m) {
     const gid = it.dataset.id === '__none' ? null : it.dataset.id;
     await store.assignMeetingToGroup(m.id, gid);
     $('#assign-modal').hidden = true;
-    await load(); openMeeting(m.id); toast(t('assignedToast'));
+    await load(); toast(t('assignedToast'));
   }));
   $('#assign-modal').hidden = false;
 }
 $('#assign-cancel').addEventListener('click', () => $('#assign-modal').hidden = true);
 $('#assign-new').addEventListener('click', () => { $('#assign-modal').hidden = true; openGroupModal(assignContextId); });
-$$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target === mod) mod.hidden = true; }));
+
+/** Closing a modal that is part of the URL has to go through the router, not hide the node. */
+function dismissModal(mod) {
+  if (mod.id === 'person-modal') closePersonModal();
+  else mod.hidden = true;
+}
+$$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target === mod) dismissModal(mod); }));
 
 /* ============================ SETTINGS ============================ */
 function syncSettingsUI() {
   $('#set-auto-track').checked = settings.autoTrack !== false; // read below from local
-  $('#set-late').value = lateThreshold;
   $('#set-max').value = String(settings.maxStoredMeetings ?? 200);
   $('#set-language').value = i18n.getLanguagePreference();
   applyTheme(settings.theme || 'system');
@@ -762,12 +1007,6 @@ function syncSettingsUI() {
 chrome.storage.local.get(['autoTrack'], r => { $('#set-auto-track').checked = r.autoTrack !== false; });
 $('#set-auto-track').addEventListener('change', () => chrome.storage.local.set({ autoTrack: $('#set-auto-track').checked }));
 
-$('#set-late').addEventListener('change', async () => {
-  lateThreshold = Math.max(0, parseInt($('#set-late').value, 10) || 0);
-  settings = await store.updateSettings({ lateThresholdMinutes: lateThreshold });
-  const m = currentMeeting(); if (m && $('#view-detail').classList.contains('on')) renderDetail(m);
-  toast(t('savedToast'));
-});
 $$('#theme-seg button').forEach(b => b.addEventListener('click', async () => { settings = await store.updateSettings({ theme: b.dataset.themeVal }); applyTheme(b.dataset.themeVal); }));
 $('#set-max').addEventListener('change', async () => {
   const cap = parseInt($('#set-max').value, 10) || 0; // 0 = unlimited
@@ -808,34 +1047,99 @@ $('#paste-add').addEventListener('click', async () => {
   $('#paste-modal').hidden = true;
   toast(names.length === 1 ? t('addedNamesOne') : t('addedNamesMany', { n: names.length }));
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal').forEach(m => m.hidden = true); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(dismissModal); });
 
 // import
+function readTextFile(input, handler) {
+  input.addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      Promise.resolve(handler(String(reader.result || '')))
+        .catch(err => { console.error('[GM Attendance] import failed:', (err && err.message) || err); toast(t('importInvalid')); });
+    };
+    reader.readAsText(file); e.target.value = '';
+  });
+}
+
+/**
+ * A CSV of ours names its series in plain text; on the way back in, that name is matched to an
+ * existing series or becomes one, so a restored file lands in the same shape it left.
+ */
+async function resolveGroupNames(records) {
+  const wanted = Array.from(new Set(records.map(r => r.groupName).filter(Boolean)));
+  for (const name of wanted) {
+    const key = name.trim().toLowerCase();
+    let g = groups.find(x => String(x.name).trim().toLowerCase() === key);
+    if (!g) { g = await store.createGroup({ name }); groups.push(g); }
+    records.forEach(r => { if (r.groupName === name) r.groupId = g.id; });
+  }
+  records.forEach(r => { delete r.groupName; });
+}
+
+/**
+ * Add imported records to the history, keeping every meeting already stored. Merge annotations
+ * become the meeting's nameMap, and records are written *unmerged* — merging on write would
+ * bake two people into one and make the merge impossible to undo (see storage.upsertMeeting).
+ *
+ * Starts from what is on disk rather than from `history`, which is the merged *view*: writing
+ * that back would bake every existing merge in as a side effect of importing.
+ */
+async function mergeImportedMeetings(records) {
+  const byId = new Map((await store.getHistory()).map(m => [m.id, m]));
+  let added = 0;
+  records.forEach(rec => {
+    if (rec && rec.id && !byId.has(rec.id)) { byId.set(rec.id, A.adoptMergeAnnotations(rec)); added++; }
+  });
+  const merged = Array.from(byId.values())
+    .map(m => A.normalizeMeeting(m, { mergeAliases: false }))
+    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+  await store.saveHistory(merged);
+  await load();
+  return added;
+}
+
+// a backup of our own: the JSON one, or a CSV this app exported
 $('#btn-import').addEventListener('click', () => $('#import-file').click());
-$('#import-file').addEventListener('change', e => {
-  const file = e.target.files && e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    try {
-      const data = JSON.parse(reader.result);
-      const meetings = Array.isArray(data) ? data : (Array.isArray(data.meetings) ? data.meetings : null);
-      if (!meetings) { toast(t('importInvalid')); return; }
-      const byId = new Map(history.map(m => [m.id, m]));
-      let added = 0;
-      meetings.forEach(rec => { if (rec && rec.id && !byId.has(rec.id)) { byId.set(rec.id, rec); added++; } });
-      if (data.groups && Array.isArray(data.groups)) { const gids = new Set(groups.map(g => g.id)); data.groups.forEach(g => { if (g && g.id && !gids.has(g.id)) groups.push(g); }); await store.saveGroups(groups); }
-      const merged = Array.from(byId.values()).map(A.normalizeMeeting).sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-      await store.saveHistory(merged);
-      await load();
-      toast(t('importedToast', { n: added }));
-    } catch { toast(t('importInvalid')); }
-  };
-  reader.readAsText(file); e.target.value = '';
+readTextFile($('#import-file'), async text => {
+  if (!/^\s*[{[]/.test(text.replace(/^﻿/, ''))) {           // not JSON — read it as our CSV
+    let converted;
+    try { converted = importers.fromOwnCSV(text); }
+    catch { toast(t('importInvalid')); return; }
+    await resolveGroupNames(converted.meetings);
+    const added = await mergeImportedMeetings(converted.meetings);
+    toast(added ? t('importedToast', { n: added }) : t('importNothingNew'));
+    return;
+  }
+
+  let data;
+  try { data = JSON.parse(text); } catch { toast(t('importInvalid')); return; }
+  const meetings = Array.isArray(data) ? data : (Array.isArray(data.meetings) ? data.meetings : null);
+  if (!meetings) { toast(t('importInvalid')); return; }
+  if (data.groups && Array.isArray(data.groups)) {
+    const gids = new Set(groups.map(g => g.id));
+    data.groups.forEach(g => { if (g && g.id && !gids.has(g.id)) groups.push(g); });
+    await store.saveGroups(groups);
+  }
+  toast(t('importedToast', { n: await mergeImportedMeetings(meetings) }));
+});
+
+// import from another attendance extension — the file is converted first, then merged as above
+$('#import-source').innerHTML = importers.IMPORT_SOURCES.map(s => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
+$('#btn-import-app').addEventListener('click', () => $('#import-app-file').click());
+readTextFile($('#import-app-file'), async text => {
+  const source = importers.getImportSource($('#import-source').value) || importers.IMPORT_SOURCES[0];
+  let converted;
+  try { converted = source.convert(JSON.parse(text)); }
+  catch { toast(t('importSourceInvalid', { src: source.label })); return; }
+
+  const added = await mergeImportedMeetings(converted.meetings);
+  toast(added ? t('importedConvertedToast', { n: added, src: source.label }) : t('importNothingNew'));
 });
 
 $('#btn-clear-all').addEventListener('click', async () => {
   if (!confirm(t('confirmClearAll'))) return;
-  await store.clearHistory(); await load(); switchView('meetings');
+  await store.clearHistory(); await load(); go('meetings', { replace: true });
 });
 
 /* ---- Sheets ---- */
@@ -881,27 +1185,11 @@ $('#sheets-save').addEventListener('click', async () => {
 });
 $('#set-autosync').addEventListener('change', async () => { settings = await store.updateSettings({ autoSync: $('#set-autosync').checked }); toast(t('savedToast')); });
 
-/* ============================ deep link + locale ============================ */
-function handleDeepLink() {
-  const hash = (location.hash || '').slice(1); if (!hash) return;
-  const params = new URLSearchParams(hash);
-  if (params.get('meeting')) { const id = params.get('meeting'); if (history.some(m => m.id === id)) openMeeting(id); }
-  else if (params.get('group')) { const id = params.get('group'); if (groupById(id)) openGroup(id); }
-}
-window.addEventListener('hashchange', handleDeepLink);
-
+/* ============================ locale ============================ */
 i18n.onLocaleChange(() => {
   i18n.applyI18n(document);
   renderReadout();
-  renderMeetings($('#meeting-search').value.trim());
-  const active = $('.view.on');
-  if (active) {
-    if (active.id === 'view-detail' && currentMeeting()) renderDetail(currentMeeting());
-    else if (active.id === 'view-group' && groupById(curGroupId)) renderGroup(groupById(curGroupId));
-    else if (active.id === 'view-groups') renderGroups();
-    else if (active.id === 'view-people') renderPeople($('#people-search').value.trim());
-    else if (active.id === 'view-analytics') renderAnalytics();
-  }
+  route(true);
 });
 
 /* ============================ boot ============================ */
@@ -913,8 +1201,7 @@ i18n.onLocaleChange(() => {
     groupById,
     groupColorVar,
     rosterFor: effectiveRoster,
-    lateThreshold: () => lateThreshold,
-    openMeeting,
+    openMeeting: id => go('meeting=' + encodeURIComponent(id)),
     exportCSV
   });
   await load();

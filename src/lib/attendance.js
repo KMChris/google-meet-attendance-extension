@@ -2,8 +2,8 @@
  * Attendance core — pure derivation & aggregation (no chrome.* here).
  *
  * The raw source of truth for every participant is `events: [{time, type:'Join'|'Leave'}]`.
- * Everything else (sessions, presence, durations, lateness, status, group roll-ups) is
- * derived from those events so the whole app reads one consistent model.
+ * Everything else (sessions, presence, durations, status, group roll-ups) is derived from
+ * those events so the whole app reads one consistent model.
  *
  * Imported by the service worker (module) and by the dashboard / report / popup pages
  * (loaded as `<script type="module">`).
@@ -36,23 +36,42 @@ export function makeSessionId(code, startMs) {
 
 /* ============================ per-participant ============================ */
 
+/** Join sorts before Leave at an identical timestamp — see sessionsFromEvents. */
+function eventRank(type) {
+  return type === 'Join' ? 0 : 1;
+}
+
 /**
- * Pair Join/Leave events into presence sessions. Events are sorted defensively;
- * duplicate joins are ignored, a trailing open Join yields `leftAt: null` (present).
+ * Fold Join/Leave events into presence sessions — the *union* of the intervals they
+ * describe, not a strict alternation.
+ *
+ * A merge (two Meet identities of the same person, see `applyNameMap`) concatenates two
+ * event streams, and those streams overlap: one identity leaves after — or at the very
+ * moment — the other joins. Pairing each Join with the next Leave would close the session
+ * on the wrong stream's Leave and silently drop every overlapping stretch, so a merged
+ * person lost most of their time. Counting open joins instead keeps the session open until
+ * the Leave that balances the last one, which is the only reading that can't lose presence.
+ *
+ * Ties sort Join first so a hand-off (one identity leaves in the same scan tick the other
+ * joins) reads as one continuous session rather than two touching ones. A stray Leave with
+ * nothing open is ignored; a trailing open Join yields `leftAt: null` (still present).
  */
 export function sessionsFromEvents(events) {
   const evs = (Array.isArray(events) ? events : [])
     .filter(e => e && e.time && e.type && !Number.isNaN(ms(e.time)))
     .slice()
-    .sort((a, b) => ms(a.time) - ms(b.time));
+    .sort((a, b) => ms(a.time) - ms(b.time) || eventRank(a.type) - eventRank(b.type));
 
   const sessions = [];
   let open = null;
+  let depth = 0; // how many identities/streams are currently inside the call
   for (const e of evs) {
     if (e.type === 'Join') {
-      if (open == null) open = e.time;
+      if (depth === 0) open = e.time;
+      depth++;
     } else if (e.type === 'Leave') {
-      if (open != null) { sessions.push({ joinedAt: open, leftAt: e.time }); open = null; }
+      if (depth === 0) continue; // unmatched Leave — nothing is open to close
+      if (--depth === 0) { sessions.push({ joinedAt: open, leftAt: e.time }); open = null; }
     }
   }
   if (open != null) sessions.push({ joinedAt: open, leftAt: null });
@@ -63,6 +82,9 @@ export function sessionsFromEvents(events) {
  * Derive the attendee shape the UI consumes from a raw record
  * ({ email, events }). `present` is derived from an unclosed session — not from any
  * live `isPresent` flag — so stored/migrated/imported data is always self-consistent.
+ *
+ * `mergedFrom` (the scraped names folded into this person) is carried through when given,
+ * so a merged row stays labelled as one all the way to the UI and the exports.
  */
 export function deriveAttendee(p) {
   const events = (Array.isArray(p && p.events) ? p.events : []).filter(e => e && e.time && e.type);
@@ -77,7 +99,7 @@ export function deriveAttendee(p) {
     if (s.leftAt) { lastLeft = s.leftAt; closedMs += Math.max(0, ms(s.leftAt) - ms(s.joinedAt)); }
   }
 
-  return {
+  const out = {
     email: (p && p.email) || null,
     present,
     firstSeen,
@@ -87,6 +109,9 @@ export function deriveAttendee(p) {
     sessions,
     events
   };
+  const from = Array.isArray(p && p.mergedFrom) ? p.mergedFrom.filter(Boolean) : [];
+  if (from.length > 1) out.mergedFrom = from.slice();
+  return out;
 }
 
 /** Seconds a participant was present, open sessions clamped to `endMs`. */
@@ -164,7 +189,8 @@ export function observedBounds(meeting) {
  * by hand), otherwise the authoritative `date` pulled back to the earliest join.
  *
  * The scheduled value is deliberately NOT pulled back: joining the call early must not
- * drag the start with it, or everyone arriving on time is counted as late.
+ * drag the start with it, or the meeting reads as longer than it was and everyone's
+ * share of it drops.
  */
 export function meetingStartMs(meeting) {
   const scheduled = ms(meeting && meeting.scheduledStart);
@@ -219,20 +245,6 @@ export function liveSecondsFor(attendee, meeting) {
   return presenceSeconds(attendee, meetingEndMs(meeting));
 }
 
-/** Whole minutes a participant arrived after the meeting start (0 if on time / early). */
-export function latenessMinutes(attendee, meeting) {
-  const startMs = meetingStartMs(meeting);
-  const fs = attendee && attendee.firstSeen;
-  const fsMs = ms(fs);
-  if (Number.isNaN(fsMs) || !Number.isFinite(startMs)) return 0;
-  const diff = (fsMs - startMs) / 60000;
-  return diff > 0 ? Math.round(diff) : 0;
-}
-
-export function isLate(attendee, meeting, thresholdMin) {
-  return latenessMinutes(attendee, meeting) > (Number(thresholdMin) || 0);
-}
-
 /** Attendance share (0–100) of the meeting duration. */
 export function sharePct(attendee, meeting) {
   const dur = meetingDurationSeconds(meeting);
@@ -242,17 +254,17 @@ export function sharePct(attendee, meeting) {
 
 /**
  * Status for one attendee in one meeting.
- *   state: 'present' (still in call) | 'left' (attended, gone) | 'late' | 'absent'
- * `late` is orthogonal and also returned as a flag.
+ *   state: 'present' (was in the call at some point) | 'absent' (never showed up)
+ *
+ * Attendance is binary and nothing else: arriving late or leaving early doesn't make someone
+ * less present. Whether they are in the call *right now* is a live detail, reported as
+ * `inCall` rather than as a status of its own. How long and how much of the meeting they were
+ * there for is reported as time and share, which is where nuance belongs.
  */
-export function statusFor(attendee, meeting, thresholdMin) {
-  const late = isLate(attendee, meeting, thresholdMin);
-  const state = late ? 'late' : (attendee && attendee.present ? 'present' : 'left');
+export function statusFor(attendee, meeting) {
   return {
-    state,
-    late,
-    lateMinutes: latenessMinutes(attendee, meeting),
-    present: !!(attendee && attendee.present),
+    state: attendee ? 'present' : 'absent',
+    inCall: !!(attendee && attendee.present),
     seconds: liveSecondsFor(attendee, meeting),
     sharePct: sharePct(attendee, meeting)
   };
@@ -288,7 +300,7 @@ export function seriesByCode(meetings) {
  * totals. Anyone who attended any session is a row; roster names who never attended are
  * added as fully-absent rows. Not attending a session counts as 'absent' for that column.
  */
-export function aggregateGroup(meetings, roster, thresholdMin) {
+export function aggregateGroup(meetings, roster) {
   const sorted = (meetings || []).slice().sort((a, b) => ms(a.date) - ms(b.date));
   const sessions = sorted.map(m => ({
     id: m.id,
@@ -309,6 +321,10 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
   });
   (roster || []).forEach(name => { const k = norm(name); if (!nameByKey.has(k)) nameByKey.set(k, name); });
 
+  // Share across the whole series is measured against the summed meeting hours, not against
+  // the sessions a person happened to attend — missing a session has to cost.
+  const totalDuration = sessions.reduce((s, x) => s + x.durationSeconds, 0);
+
   const people = [];
   nameByKey.forEach((displayName, key) => {
     const perSession = {};
@@ -319,9 +335,8 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
     sorted.forEach(m => {
       const entry = Object.entries(m.attendance || {}).find(([n]) => norm(n) === key);
       if (entry) {
-        const st = statusFor(entry[1], m, thresholdMin);
-        const state = st.late ? 'late' : 'present';
-        perSession[m.id] = { state, seconds: st.seconds, sharePct: st.sharePct };
+        const st = statusFor(entry[1], m);
+        perSession[m.id] = { state: st.state, seconds: st.seconds, sharePct: st.sharePct };
         attendedCount++;
         totalSeconds += st.seconds;
         shareSum += st.sharePct;
@@ -337,7 +352,8 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
       attendedCount,
       totalSeconds,
       avgShare: sessions.length ? Math.round(shareSum / sessions.length) : 0,
-      attendedShare: sessions.length ? Math.round((attendedCount / sessions.length) * 100) : 0
+      attendedShare: sessions.length ? Math.round((attendedCount / sessions.length) * 100) : 0,
+      totalShare: totalDuration > 0 ? Math.min(100, Math.round((totalSeconds / totalDuration) * 100)) : 0
     });
   });
 
@@ -353,7 +369,7 @@ export function aggregateGroup(meetings, roster, thresholdMin) {
     people,
     sessionCount: sessions.length,
     peopleCount: people.length,
-    totalDurationSeconds: sessions.reduce((s, x) => s + x.durationSeconds, 0)
+    totalDurationSeconds: totalDuration
   };
 }
 
@@ -379,6 +395,29 @@ export function resolveMappedName(name, nameMap) {
   return cur;
 }
 
+/**
+ * Split an event list into the streams it was concatenated from. One participant's events are
+ * appended in real time, so they only ever move forward; a step backwards means another
+ * stream starts there. Returns a single stream when the list is already monotonic.
+ *
+ * Used to take apart records merged by an older version, which folded both participants'
+ * events into one entry and dropped the other name.
+ */
+export function splitConcatenatedEvents(events) {
+  const streams = [];
+  let cur = [];
+  let prev = -Infinity;
+  for (const e of (Array.isArray(events) ? events : [])) {
+    const t = ms(e && e.time);
+    if (Number.isNaN(t)) continue;
+    if (t < prev && cur.length) { streams.push(cur); cur = []; }
+    cur.push(e);
+    prev = t;
+  }
+  if (cur.length) streams.push(cur);
+  return streams;
+}
+
 /** Raw events of an attendee, reconstructed from sessions for legacy no-events records. */
 function eventsOf(a) {
   if (Array.isArray(a && a.events) && a.events.length) return a.events;
@@ -393,29 +432,83 @@ function eventsOf(a) {
 
 /**
  * Apply a nameMap to an attendance object: rename keys and, when two entries land on
- * the same person, merge them by concatenating their raw events and re-deriving.
- * Idempotent — safe to run on both write and read paths.
+ * the same person, merge them by concatenating their raw events and re-deriving. The
+ * scraped names behind a merged row are kept as `mergedFrom`, which is what lets the UI
+ * label the row and offer to split it again.
+ *
+ * This is a *view*: storage keeps the entries separate and the map beside them, so a merge
+ * is applied on every read and stays undoable (storage.unmergeParticipant). Idempotent.
  */
 export function applyNameMap(attendance, nameMap) {
   const src = attendance || {};
   if (!nameMap || !Object.keys(nameMap).length) return { ...src };
 
-  const buckets = new Map(); // norm(target) -> { name: display target, list: [attendee] }
+  const buckets = new Map(); // norm(target) -> { name: display target, list: [{ from, attendee }] }
   for (const name in src) {
     const target = resolveMappedName(name, nameMap);
     const k = norm(target);
     if (!buckets.has(k)) buckets.set(k, { name: target, list: [] });
-    buckets.get(k).list.push(src[name]);
+    buckets.get(k).list.push({ from: name, attendee: src[name] });
   }
 
   const out = {};
   buckets.forEach(({ name, list }) => {
-    if (list.length === 1) { out[name] = list[0]; return; }
-    const events = list.flatMap(eventsOf);
-    const email = list.map(a => a && a.email).find(Boolean) || null;
-    out[name] = deriveAttendee({ email, events });
+    if (list.length === 1) { out[name] = list[0].attendee; return; }
+    const events = list.flatMap(x => eventsOf(x.attendee));
+    const email = list.map(x => x.attendee && x.attendee.email).find(Boolean) || null;
+    out[name] = deriveAttendee({ email, events, mergedFrom: list.map(x => x.from) });
   });
   return out;
+}
+
+/**
+ * Annotate an *unmerged* meeting for export: every entry that a rename or a merge folds into
+ * another name gets `mergeInto: "<display name>"` beside its own events.
+ *
+ * A backup has to carry the participants as they were recorded — the raw Meet identities — or
+ * re-importing it hands back one lump with no way to take it apart. The `nameMap` beside them
+ * is what restores the merge, and this annotation is the same instruction written where a
+ * human reading the file will see it. The map stays authoritative; entries whose alias only
+ * restyles their own name (a rename, "edyta tatara" → "EDYTA TATARA") are left alone.
+ */
+export function annotateMerges(meeting) {
+  const nameMap = meeting && meeting.nameMap;
+  if (!nameMap || !Object.keys(nameMap).length) return meeting;
+
+  const attendance = { ...((meeting && meeting.attendance) || {}) };
+  let changed = false;
+  for (const name in attendance) {
+    const target = resolveMappedName(name, nameMap);
+    if (!target || norm(target) === norm(name)) continue;
+    attendance[name] = { ...attendance[name], mergeInto: target };
+    changed = true;
+  }
+  return changed ? { ...meeting, attendance } : meeting;
+}
+
+/**
+ * The other direction, for import: fold `mergeInto` annotations back into the meeting's
+ * nameMap so a file that carries them (ours, or one edited by hand) merges on read like any
+ * locally-made merge. An explicit nameMap entry wins — the annotation only fills gaps.
+ *
+ * The annotations themselves don't survive `normalizeMeeting`, which rebuilds each attendee
+ * from its events, so nothing stale is written to storage.
+ */
+export function adoptMergeAnnotations(meeting) {
+  const attendance = (meeting && meeting.attendance) || null;
+  if (!attendance) return meeting;
+
+  const nameMap = { ...((meeting && meeting.nameMap) || {}) };
+  let changed = false;
+  for (const name in attendance) {
+    const target = attendance[name] && attendance[name].mergeInto;
+    if (typeof target !== 'string' || !target.trim()) continue;
+    const key = norm(name);
+    if (nameMap[key]) continue;
+    nameMap[key] = target.trim();
+    changed = true;
+  }
+  return changed ? { ...meeting, nameMap } : meeting;
 }
 
 /* ============================ normalization ============================ */
@@ -424,15 +517,18 @@ export function applyNameMap(attendance, nameMap) {
  * Re-derive every attendee from its preserved `events`, and backfill `meetingCode`.
  * Runs during migration and defensively on read, so old / imported records gain
  * `sessions` / `firstSeen` / `lastLeft` and a consistent `present`.
+ *
+ * Renames and merges are applied on the way out. Pass `{ mergeAliases: false }` when the
+ * result goes back to storage, which keeps participants separate — see storage.upsertMeeting.
  */
-export function normalizeMeeting(meeting) {
+export function normalizeMeeting(meeting, { mergeAliases = true } = {}) {
   if (!meeting || typeof meeting !== 'object') return meeting;
   const attendance = {};
-  const src = applyNameMap(meeting.attendance || {}, meeting.nameMap);
+  const src = mergeAliases ? applyNameMap(meeting.attendance || {}, meeting.nameMap) : (meeting.attendance || {});
   for (const name in src) {
     const a = src[name] || {};
     if (Array.isArray(a.events) && a.events.length) {
-      attendance[name] = deriveAttendee({ email: a.email, events: a.events });
+      attendance[name] = deriveAttendee({ email: a.email, events: a.events, mergedFrom: a.mergedFrom });
     } else {
       // No raw events (unexpected) — keep what we have, fill the derived shape.
       const sessions = Array.isArray(a.sessions) ? a.sessions : [];
@@ -446,6 +542,7 @@ export function normalizeMeeting(meeting) {
         sessions,
         events: []
       };
+      if (Array.isArray(a.mergedFrom) && a.mergedFrom.length > 1) attendance[name].mergedFrom = a.mergedFrom.slice();
     }
   }
   const meetingCode = meeting.meetingCode || (isMeetCode(meeting.id) ? meeting.id : null);
@@ -491,15 +588,15 @@ function csvRow(cells) {
 }
 
 /** Plain (English) per-participant CSV — used by the popup's quick export. */
-export function meetingToCSV(meeting, thresholdMin) {
+export function meetingToCSV(meeting) {
   const rows = [['Name', 'Email', 'First seen', 'Last left', 'Time (s)', 'Share %', 'Status']];
   Object.entries((meeting && meeting.attendance) || {})
     .sort(([a], [b]) => a.localeCompare(b))
     .forEach(([name, a]) => {
-      const st = statusFor(a, meeting, thresholdMin);
+      const st = statusFor(a, meeting);
       rows.push([
         name, a.email || '', a.firstSeen || '', a.present ? '' : (a.lastLeft || ''),
-        st.seconds, st.sharePct, st.late ? 'Late' : (a.present ? 'In call' : 'Left')
+        st.seconds, st.sharePct, 'Present'
       ]);
     });
   return rows.map(csvRow).join('\n');

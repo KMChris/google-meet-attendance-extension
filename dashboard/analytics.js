@@ -151,7 +151,6 @@ function fillBuckets(buckets, meetings) {
 
 /** Everything the KPI strip and the read-outs need, from one pass over the slice. */
 function summarize(list) {
-  const threshold = deps.lateThreshold();
   const people = new Set();
   let durSum = 0, presenceSum = 0, shareSum = 0, parts = 0, absentN = 0, sizeSum = 0;
 
@@ -161,7 +160,7 @@ function summarize(list) {
     sizeSum += entries.length;
     entries.forEach(([name, a]) => {
       people.add(name.toLowerCase());
-      const st = A.statusFor(a, m, threshold);
+      const st = A.statusFor(a, m);
       shareSum += st.sharePct;
       presenceSum += st.seconds;
       parts++;
@@ -181,14 +180,13 @@ function summarize(list) {
 
 /** Per-person roll-up across the slice. */
 function peopleStats(list) {
-  const threshold = deps.lateThreshold();
   const map = new Map();
   list.forEach(m => {
     Object.entries(m.attendance).forEach(([name, a]) => {
       const key = name.toLowerCase();
       if (!map.has(key)) map.set(key, { name, meetings: 0, seconds: 0, shareSum: 0 });
       const p = map.get(key);
-      const st = A.statusFor(a, m, threshold);
+      const st = A.statusFor(a, m);
       p.meetings++; p.seconds += st.seconds; p.shareSum += st.sharePct;
     });
   });
@@ -722,7 +720,8 @@ function renderSeries(scoped, pal) {
     // colour follows the series itself, so filtering never repaints the survivors
     return {
       name: (g && g.name) || '—', color: tokenColor(deps.groupColorVar(g)),
-      share: Math.round(s.avgShare), sessions: list.length, people: s.people
+      share: Math.round(s.avgShare), sessions: list.length, people: s.people,
+      hours: s.durSum
     };
   }).sort((a, b) => b.share - a.share || b.sessions - a.sessions).slice(0, 7);
 
@@ -732,11 +731,12 @@ function renderSeries(scoped, pal) {
     seriesLabel: t('colGroupAttendance'), fmt: v => pct(v),
     extraRows: i => [
       { value: num(rows[i].sessions), label: t('colSessions') },
-      { value: num(rows[i].people), label: t('unitPeople') }
+      { value: num(rows[i].people), label: t('unitPeople') },
+      { value: i18n.formatDuration(rows[i].hours), label: t('colTotalTime') }
     ]
   });
-  setTable('series', [t('colGroupName'), t('colGroupAttendance'), t('colSessions'), t('unitPeople')],
-    rows.map(r => [r.name, pct(r.share), num(r.sessions), num(r.people)]));
+  setTable('series', [t('colGroupName'), t('colGroupAttendance'), t('colSessions'), t('unitPeople'), t('colTotalTime')],
+    rows.map(r => [r.name, pct(r.share), num(r.sessions), num(r.people), i18n.formatDuration(r.hours)]));
 }
 
 /* ---- read-outs ---- */
@@ -758,6 +758,10 @@ function renderInsights(scoped, prev) {
 
   const people = peopleStats(scoped);
   const regular = people.slice().sort((a, b) => b.meetings - a.meetings || b.seconds - a.seconds)[0];
+  // among people seen often enough for a rate to mean anything
+  const eligible = people.filter(p => p.meetings >= Math.min(3, scoped.length));
+  const steady = eligible.slice().sort((a, b) => b.avgShare - a.avgShare || b.meetings - a.meetings)[0];
+  const fleeting = eligible.filter(p => p.avgShare < 50).sort((a, b) => a.avgShare - b.avgShare)[0];
 
   const busiestDay = perDay.indexOf(Math.max(...perDay));
   const peakHour = perHour.indexOf(Math.max(...perHour));
@@ -771,6 +775,8 @@ function renderInsights(scoped, prev) {
     longest && { key: 'insightLongest', value: i18n.formatDuration(longest.dur), hint: titleOf(longest.m), meeting: longest.m.id },
     largest && { key: 'insightLargest', value: largest.size === 1 ? t('peopleOne') : t('peopleN', { n: largest.size }), hint: titleOf(largest.m), meeting: largest.m.id },
     regular && { key: 'insightRegular', value: regular.name, hint: t('insightAttendedOf', { n: regular.meetings, m: scoped.length }) },
+    steady && { key: 'insightSteadiestPerson', value: steady.name, hint: t('insightShareOf', { n: Math.round(steady.avgShare), m: steady.meetings }) },
+    fleeting && { key: 'insightFleetingPerson', value: fleeting.name, hint: t('insightShareOf', { n: Math.round(fleeting.avgShare), m: fleeting.meetings }) },
     trend != null && { key: 'insightTrend', value: `${trend > 0 ? '+' : ''}${num(trend)} ${t('unitPoints')}`, hint: t('kpiVsPrev'), tone: trend === 0 ? '' : (trend > 0 ? 'up' : 'down') }
   ].filter(Boolean);
 
@@ -807,17 +813,20 @@ function exportSlice() {
   const scoped = deps.history().filter(m => matches(m, from, to)).sort((a, b) => A.meetingStartMs(a) - A.meetingStartMs(b));
   if (!scoped.length) return;
 
-  const rows = [[t('colDate'), t('colMeeting'), t('colGroup'), t('statLength'), t('colPeople'), t('legendAbsentP'), t('statAvgAttendance')]];
+  const rows = [[t('colDate'), t('colMeeting'), t('colGroup'), t('statLength'), t('colPeople'),
+    t('legendAbsentP'), t('csvPresentMinutes'), t('statAvgAttendance')]];
   scoped.forEach(m => {
     const g = m.groupId ? deps.groupById(m.groupId) : null;
     const entries = Object.values(m.attendance);
+    const presence = entries.reduce((s, a) => s + A.liveSecondsFor(a, m), 0);
     const share = entries.length ? Math.round(entries.reduce((s, a) => s + A.sharePct(a, m), 0) / entries.length) : 0;
     rows.push([
-      new Date(A.meetingStartMs(m)).toISOString().slice(0, 10),
+      dayKey(A.meetingStartMs(m)),
       titleOf(m), (g && g.name) || '',
       i18n.formatDuration(A.meetingDurationSeconds(m)),
       entries.length,
       A.absenteesFor(m, deps.rosterFor(m)).length,
+      Math.round(presence / 60),
       `${share}%`
     ]);
   });

@@ -1,11 +1,10 @@
 /**
- * chrome.storage layer for the attendance data model (schemaVersion 3).
+ * chrome.storage layer for the attendance data model (schemaVersion 4).
  *
  * Stores:
  *   attendanceHistory : Meeting[]  (newest-first)
  *   meetingGroups     : Group[]    ({ id, name, color, roster[], createdAt })
- *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings,
- *                         lateThresholdMinutes, theme }
+ *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings, theme }
  *   savedRoster       : string[]   (global default roster)
  *   autoTrack         : boolean    (own key — the content script reads it directly)
  *   schemaVersion     : number
@@ -14,7 +13,8 @@
  */
 
 import {
-  buildMeetingRecord, normalizeMeeting, applyNameMap, lastActivityMs, RESUME_WINDOW_MS
+  buildMeetingRecord, normalizeMeeting, resolveMappedName, splitConcatenatedEvents,
+  annotateMerges, lastActivityMs, RESUME_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -27,14 +27,13 @@ export const STORAGE_KEYS = {
   SCHEMA_VERSION: 'schemaVersion'
 };
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const DEFAULT_SETTINGS = {
   autoSync: false,
   syncInterval: 5,
   spreadsheetId: null,
   maxStoredMeetings: 200, // 0 = unlimited (keep every meeting)
-  lateThresholdMinutes: 5,
   theme: 'system' // 'system' | 'light' | 'dark'
 };
 
@@ -78,9 +77,12 @@ export async function getMeetingById(id) {
 
 /**
  * Insert or replace by id, newest-first, capped to maxStoredMeetings (0 = unlimited).
- * Preserves groupId and nameMap; re-applies the nameMap so a live meeting that keeps
- * rebuilding attendance from raw scraped names doesn't undo the user's renames/merges.
- * Returns the record as stored.
+ * Preserves groupId and the nameMap across live-meeting rewrites, so a rename/merge isn't
+ * undone by the content script reporting raw scraped names again.
+ *
+ * The map is *not* folded into the stored attendance: participants stay separate on disk and
+ * are merged on read (normalizeMeeting), which is what keeps a merge undoable. Callers get
+ * the merged view back — it is what the badge counts and what Sheets should receive.
  */
 export async function upsertMeeting(record) {
   const settings = await getSettings();
@@ -89,9 +91,7 @@ export async function upsertMeeting(record) {
   const idx = history.findIndex(m => m.id === record.id);
 
   const nameMap = record.nameMap || (idx >= 0 && history[idx].nameMap) || null;
-  const toStore = (nameMap && Object.keys(nameMap).length)
-    ? { ...record, nameMap, attendance: applyNameMap(record.attendance, nameMap) }
-    : record;
+  const toStore = (nameMap && Object.keys(nameMap).length) ? { ...record, nameMap } : record;
 
   const merged = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
   if (idx >= 0) history[idx] = merged; else history.push(merged);
@@ -103,7 +103,7 @@ export async function upsertMeeting(record) {
   if (cap > 0 && history.length > cap) history = history.slice(0, cap);
 
   await saveHistory(history);
-  return merged;
+  return normalizeMeeting(merged);
 }
 
 export async function deleteMeetingById(id) {
@@ -141,9 +141,10 @@ const normName = (s) => String(s || '').trim().toLowerCase();
 
 /**
  * Rename one participant of one meeting; when the new name already belongs to another
- * participant the two entries are merged into one person. The alias is recorded in the
- * meeting's `nameMap`, so a live meeting that keeps reporting the old scraped name
- * re-applies the edit on every update. Returns { meeting, merged } or null.
+ * participant the two entries read as one person from then on. Only an alias is written to
+ * the meeting's `nameMap` — the entries themselves are left alone, so a live meeting that
+ * keeps reporting the old scraped name re-applies the edit on every read, and the merge can
+ * be taken back later. Returns { meeting, merged } or null.
  */
 export async function renameParticipant(meetingId, fromName, toName) {
   const from = String(fromName || '').trim();
@@ -164,16 +165,41 @@ export async function renameParticipant(meetingId, fromName, toName) {
   nameMap[key] = to;
 
   meeting.nameMap = nameMap;
-  meeting.attendance = applyNameMap(meeting.attendance, nameMap);
   await saveHistory(history);
   return { meeting, merged };
+}
+
+/**
+ * Undo a merge: drop every alias that resolves to `displayName`, so the entries folded into
+ * that person appear under their own scraped names again. An alias that only restyles the
+ * same name (a rename, "edyta tatara" → "EDYTA TATARA") is kept — that is not what the merge
+ * added, and dropping it would undo an unrelated edit. Returns { meeting, restored } or null.
+ */
+export async function unmergeParticipant(meetingId, displayName) {
+  const history = await getHistory();
+  const meeting = history.find(m => m.id === meetingId);
+  if (!meeting || !meeting.nameMap) return null;
+
+  const target = normName(displayName);
+  const kept = {};
+  const restored = [];
+  for (const key in meeting.nameMap) {
+    const landsHere = normName(resolveMappedName(key, meeting.nameMap)) === target;
+    if (landsHere && key !== target) restored.push(key);
+    else kept[key] = meeting.nameMap[key];
+  }
+  if (!restored.length) return null;
+
+  if (Object.keys(kept).length) meeting.nameMap = kept; else delete meeting.nameMap;
+  await saveHistory(history);
+  return { meeting, restored };
 }
 
 /* ============================ meeting hours ============================ */
 
 /**
  * The official hours of a meeting, kept separately from `date` (which is when tracking
- * started) so that joining the call early doesn't move the start and mark everyone late.
+ * started) so that joining the call early doesn't move the start and stretch the meeting.
  * `buildMeetingRecord` never emits these fields, so the spread in `upsertMeeting` keeps
  * them across live-meeting rewrites — same mechanism that preserves `groupId`.
  */
@@ -297,9 +323,50 @@ export async function saveRoster(roster) {
 /* ============================ migration ============================ */
 
 /**
- * Migrate to schemaVersion 3: fold any legacy v1 `meetings` object into the history,
- * normalize every record (adds meetingCode / sessions / firstSeen, consistent presence).
- * Idempotent and gated on schemaVersion.
+ * Take apart merges that an older version wrote into the attendance itself: the alias target
+ * holds both participants' events and the source entry is gone, so the merge cannot be undone.
+ * Where the target's events are plainly a concatenation (time steps backwards) and the parts
+ * line up one-for-one with the missing sources, hand the extra parts back to their names.
+ * Anything ambiguous is left merged — a wrong split would be worse than no split.
+ */
+function unbakeMerges(meeting) {
+  const nameMap = meeting && meeting.nameMap;
+  const attendance = meeting && meeting.attendance;
+  if (!nameMap || !attendance) return meeting;
+
+  const present = new Set(Object.keys(attendance).map(normName));
+  const missing = new Map(); // display target -> [source keys with no entry of their own]
+  for (const key in nameMap) {
+    const target = resolveMappedName(key, nameMap);
+    if (key === normName(target) || present.has(key)) continue;
+    if (!missing.has(target)) missing.set(target, []);
+    missing.get(target).push(key);
+  }
+  if (!missing.size) return meeting;
+
+  const next = { ...attendance };
+  let changed = false;
+  missing.forEach((sources, target) => {
+    const entry = next[target];
+    if (!entry) return;
+    const parts = splitConcatenatedEvents(entry.events);
+    if (parts.length !== sources.length + 1) return; // can't tell the streams apart — leave it
+    next[target] = { ...entry, events: parts[0] };
+    sources.forEach((src, i) => { next[src] = { email: null, events: parts[i + 1] }; });
+    changed = true;
+  });
+  return changed ? { ...meeting, attendance: next } : meeting;
+}
+
+/**
+ * Migrate to the current schemaVersion: fold any legacy v1 `meetings` object into the
+ * history, normalize every record (adds meetingCode / sessions / firstSeen, consistent
+ * presence). Idempotent and gated on schemaVersion.
+ *
+ * v4 rewrites in place, without folding aliases in: records written before the session
+ * folding understood merged participants hold sessions that dropped the overlap between two
+ * merged identities, and merges that were baked into the attendance are split back out so
+ * they can be undone. Every read path merges the view anyway.
  */
 export async function migrateIfNeeded() {
   const stored = await getMany([
@@ -321,7 +388,7 @@ export async function migrateIfNeeded() {
     }
   }
 
-  history = history.map(normalizeMeeting)
+  history = history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
     .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
 
   const groups = Array.isArray(stored[STORAGE_KEYS.GROUPS]) ? stored[STORAGE_KEYS.GROUPS] : [];
@@ -336,7 +403,19 @@ export async function migrateIfNeeded() {
 
 /* ============================ export ============================ */
 
+/**
+ * Full backup. Meetings are normalized on the way out — like every read path — so the file
+ * carries freshly derived sessions and totals rather than whatever a record was written with;
+ * records stored before a derivation fix would otherwise export stale numbers.
+ *
+ * Participants are exported *unmerged*, exactly as recorded, because a merge is a view and not
+ * a fact about the call: folding it in would export one lump of two people's events and no
+ * backup could give them back. The merge travels beside them instead — as the `nameMap` the
+ * app already uses, plus a readable `mergeInto` on each folded entry (attendance.annotateMerges)
+ * — so importing restores the merged view and leaves it undoable.
+ */
 export async function exportAllJSON() {
   const [history, groups] = await Promise.all([getHistory(), getGroups()]);
-  return JSON.stringify({ schemaVersion: SCHEMA_VERSION, groups, meetings: history }, null, 2);
+  const meetings = history.map(m => annotateMerges(normalizeMeeting(m, { mergeAliases: false })));
+  return JSON.stringify({ schemaVersion: SCHEMA_VERSION, groups, meetings }, null, 2);
 }

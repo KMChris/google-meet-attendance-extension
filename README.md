@@ -8,12 +8,14 @@ every time they left and rejoined.
 ## Features
 
 - **Real-time Participant Detection**: Track participant join/leave events using MutationObserver and polling
-- **Event-based Tracking**: Records each join and leave as a separate event with timestamp; presence, sessions, durations and lateness are all derived from those raw events
-- **Full Dashboard** (Meetings · Series · People · Analytics · Settings): search, rename, native canvas charts, and the presence timeline — opens as the extension's options page
-- **Analytics**: filter by date range, series and meeting, then read the slice as headline numbers with period-over-period deltas, charts (activity over time, length vs. presence, punctuality, a weekday × hour heatmap, attendance distribution, top meetings and people, series comparison) and derived read-outs. Every chart flips to the table behind it and exports to CSV
-- **Series**: Bundle recurring sessions (e.g. a weekend training) into a series. Recurring links are auto-detected; each series has an aggregate **attendance matrix** (people × sessions), per-series roster, and its own report
-- **Roster & Status**: Expected-attendee rosters flag who was **Late** or **Absent** (configurable late threshold, measured from the meeting start)
-- **Exports**: Per-meeting CSV, combined CSV, JSON backup/restore, clipboard, and detailed **technical PDF reports** — for a single meeting or a whole series — with attendance and every join/leave event, print-ready
+- **Event-based Tracking**: Records each join and leave as a separate event with timestamp; presence, sessions, durations and shares are all derived from those raw events
+- **Full Dashboard** (Meetings · Series · People · Analytics · Settings): search, rename, native canvas charts, and the presence timeline — opens as the extension's options page. Every view has its own URL, so the browser's back button works and any view can be linked to
+- **Analytics**: filter by date range, series and meeting, then read the slice as headline numbers with period-over-period deltas, charts (activity over time, length vs. presence, a weekday × hour heatmap, attendance distribution, top meetings and people, series comparison) and derived read-outs. Every chart flips to the table behind it and exports to CSV
+- **Series**: Bundle recurring sessions (e.g. a weekend training) into a series. Recurring links are auto-detected; each series has an aggregate **attendance matrix** (people × sessions, with each person's share of every session), per-series roster, and its own report. Click a person to see their exact joins and leaves in each session
+- **Attendance is binary**: whoever was in the call is present. How much of it they were there for is reported as time and share — against the meeting's hours, which are read from the calendar event when Meet shows it and can always be corrected by hand
+- **Editable participants**: fix a scraped display name, or merge two Meet identities into one person — and split them apart again later
+- **Exports**: per-meeting CSV, series CSV (matrix *and* per-session detail), combined CSV, JSON backup, clipboard, and detailed **technical PDF reports** — for a single meeting or a whole series — with every join/leave event, print-ready
+- **Imports**: a JSON backup, a CSV this extension wrote, or a backup from another attendance extension (RollCall / meet-attendance.com) — always merged, never replacing what is already stored
 - **Dark mode**: Follows the browser's light/dark preference, with a System / Light / Dark override in Settings
 - **Localized**: Full English + Polish interface (auto-detected, switchable in Settings)
 - **Local Storage**: Local data storage using the Chrome Storage API
@@ -56,7 +58,39 @@ Each participant's join and leave is recorded as a separate event:
 | Time | Timestamp of the event |
 | Type | `Join` or `Leave` |
 
-CSV export outputs one row per event, making it easy to analyze attendance patterns and exact durations.
+Everything else — sessions, presence, durations, share, series roll-ups — is derived from those
+events, so the whole app reads one consistent model.
+
+### Export & import
+
+Two formats, and they answer different questions.
+
+**CSV** is for a spreadsheet. All three exports (one meeting, a whole series, everything) write
+the same row — one per participant per meeting:
+
+| | |
+|---|---|
+| Meeting | date, title, Meet code, series, start, end, length |
+| Person | participant, e-mail, status, first seen, last left |
+| Presence | `HH:MM:SS`, minutes (for summing), share of the meeting |
+| Detail | presence blocks, **joins & leaves** as a JSON array (`["08:58–17:00","17:10–"]`, an open range means still in the call), merged-from names, and the meeting's `ID` |
+
+The series file carries both readings: the attendance matrix first, then a blank line and the
+per-session detail. Files are UTF-8 with a BOM and CRLF line endings, so Excel opens them
+without mangling anything.
+
+**JSON** is the lossless backup: exact timestamps, groups, and participants exactly as they were
+recorded — a merge travels as the meeting's `nameMap` plus a readable `mergeInto` beside each
+folded entry, so it can still be undone after a restore.
+
+Settings → **Import backup** takes either. A CSV of ours is matched back to the meetings it came
+from by that `ID` column, so re-importing a file you already have adds nothing; its series name is
+matched to an existing series or creates one. What CSV cannot carry: times are minute-resolution
+(so totals can come back up to a minute per session higher), absentees are roster-derived rather
+than data and are skipped, and a merged participant arrives as the one person the file shows.
+
+Settings → **Import from another app** converts a backup written by a different attendance
+extension — currently RollCall (meet-attendance.com) — and merges it in the same way.
 
 ### Google Sheets Integration (Optional)
 
@@ -80,7 +114,9 @@ google-meet-attendance-extension/
 ├── dashboard/                 # Full-page dashboard (also the options page)
 │   ├── dashboard.html
 │   ├── dashboard.css          # Dashboard layout
-│   └── dashboard.js           # ES module: views, timeline, series, charts
+│   ├── dashboard.js           # ES module: router, views, timeline, series, exports
+│   ├── analytics.js           # The Analytics view: filters, KPIs, read-outs
+│   └── charts.js              # Canvas chart primitives (bars, stacked, heatmap, ranked)
 ├── report/                    # Print-ready technical PDF report (meeting or series)
 │   ├── report.html
 │   ├── report.css
@@ -97,6 +133,7 @@ google-meet-attendance-extension/
     └── lib/                   # Shared ES-module data + UI layer
         ├── attendance.js      # Pure derivation & aggregation (sessions, status, groups)
         ├── storage.js         # chrome.storage CRUD (history, series, settings) + migration
+        ├── importers.js       # Read our own CSV and other extensions' backups
         ├── i18n.js            # Runtime i18n (EN/PL)
         ├── translations.js    # EN + PL string tables
         ├── sheets-api.js      # Google Sheets API
@@ -155,8 +192,13 @@ link never overwrite each other, and can be recognised as a series.
   roster: ["Anna Kowalska", "…"], createdAt: "2026-02-15T09:00:00Z" }
 ```
 
-Data from older versions (a `meetings` object, or v2 records without `sessions`/`meetingCode`)
-is migrated automatically on update.
+A meeting can also carry `scheduledStart` / `scheduledEnd` (its official hours, editable in the
+dashboard) and a `nameMap` — the renames and merges the user made, kept as aliases and applied on
+read rather than written into `attendance`, which is what keeps a merge undoable.
+
+Data from older versions (a `meetings` object, v2 records without `sessions`/`meetingCode`, or v3
+records with merges already folded into `attendance`) is migrated automatically on update; raw
+`events` are preserved and everything is re-derived.
 
 ## Google Cloud Console Setup (For Sheets Integration)
 

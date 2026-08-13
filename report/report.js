@@ -10,19 +10,18 @@ function fmtDur(secs) { secs = Math.floor(secs || 0); if (secs <= 0) return '0m'
 function fmtHMS(secs) { secs = Math.floor(secs || 0); const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60), s = secs % 60; return [h, m, s].map(v => String(v).padStart(2, '0')).join(':'); }
 const time = iso => i18n.formatTime(iso);
 
-function statusChip(a, m, threshold) {
-  const st = A.statusFor(a, m, threshold);
-  if (st.late) return `<span class="rep-status late">${t('lateBy', { n: st.lateMinutes })}</span>`;
-  if (a.present) return `<span class="rep-status present">${t('inCall')}</span>`;
-  return `<span class="rep-status left">${t('left')}</span>`;
+// Attendance is binary: whoever was in the call is present, whether or not they arrived late
+// or stayed to the end. How much of it they were there for is the time and share columns.
+function statusChip() {
+  return `<span class="rep-status present">${t('present')}</span>`;
 }
 
-function attendanceTable(m, roster, threshold) {
+function attendanceTable(m, roster) {
   const rows = Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).map(([name, a]) => {
-    const st = A.statusFor(a, m, threshold);
+    const st = A.statusFor(a, m);
     return `<tr><td><b>${esc(name)}</b>${a.email ? ` <span class="mono" style="color:var(--ink-3)">${esc(a.email)}</span>` : ''}</td>
       <td class="mono">${time(a.firstSeen)}</td><td class="mono">${a.present ? esc(t('stillInCall')) : time(a.lastLeft)}</td>
-      <td class="num mono">${fmtHMS(st.seconds)}</td><td class="num mono">${st.sharePct}%</td><td>${statusChip(a, m, threshold)}</td></tr>`;
+      <td class="num mono">${fmtHMS(st.seconds)}</td><td class="num mono">${st.sharePct}%</td><td>${statusChip()}</td></tr>`;
   }).join('');
   const absentRows = A.absenteesFor(m, roster).sort((a, b) => a.localeCompare(b)).map(name =>
     `<tr><td><b>${esc(name)}</b></td><td class="mono">—</td><td class="mono">—</td><td class="num mono">00:00:00</td><td class="num mono">0%</td><td><span class="rep-status absent">${t('absent')}</span></td></tr>`).join('');
@@ -46,14 +45,14 @@ function eventLog(m) {
   }).join('') + `</div>`;
 }
 
-function summaryStats(m, roster, threshold) {
+function summaryStats(m, roster) {
   const people = Object.entries(m.attendance);
   const avg = people.length ? Math.round(people.reduce((s, [, a]) => s + A.liveSecondsFor(a, m), 0) / people.length) : 0;
-  const late = people.filter(([, a]) => A.isLate(a, m, threshold)).length;
+  const share = people.length ? Math.round(people.reduce((s, [, a]) => s + A.sharePct(a, m), 0) / people.length) : 0;
   const absent = A.absenteesFor(m, roster).length;
   return statGrid([
-    [people.length, t('reportPeople')], [fmtDur(avg), t('reportAvg')],
-    [late, t('reportLate')], [absent, t('reportAbsentees')], [fmtDur(A.meetingDurationSeconds(m)), t('statLength')]
+    [people.length, t('reportPeople')], [fmtDur(avg), t('reportAvg')], [share + '%', t('statAvgShare')],
+    [absent, t('reportAbsentees')], [fmtDur(A.meetingDurationSeconds(m)), t('statLength')]
   ]);
 }
 function statGrid(items) {
@@ -75,7 +74,7 @@ function footer() {
 }
 
 /* ---------------- single meeting ---------------- */
-function renderMeeting(m, roster, threshold) {
+function renderMeeting(m, roster) {
   const doc = `<div class="doc">
     <div class="rep-eyebrow">GM · ${t('reportSubtitle')}</div>
     <h1>${esc(m.meetingTitle)}</h1>
@@ -84,8 +83,8 @@ function renderMeeting(m, roster, threshold) {
       <span><b>${time(A.meetingStartIso(m))}</b> – <b>${time(A.meetingEndIso(m))}</b></span>
       ${m.meetingCode ? `<span>${esc(m.meetingCode)}</span>` : ''}
     </div>
-    ${summaryStats(m, roster, threshold)}
-    <div class="rep-sect"><h2>${t('attendanceTitle')}</h2>${attendanceTable(m, roster, threshold)}</div>
+    ${summaryStats(m, roster)}
+    <div class="rep-sect"><h2>${t('attendanceTitle')}</h2>${attendanceTable(m, roster)}</div>
     <div class="rep-sect"><h2>${t('eventLogTitle')}</h2><p class="rep-hint">${t('eventLogHint')}</p>${eventLog(m)}</div>
     <div class="rep-sect"><h2>${t('rosterReconTitle')}</h2>${reconciliation(m, roster)}</div>
   </div>${footer()}`;
@@ -94,28 +93,32 @@ function renderMeeting(m, roster, threshold) {
 }
 
 /* ---------------- group series ---------------- */
-function renderGroup(group, meetings, threshold) {
+function renderGroup(group, meetings) {
   const ms = meetings.slice().sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
-  const agg = A.aggregateGroup(ms, group.roster, threshold);
+  const agg = A.aggregateGroup(ms, group.roster);
   const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
   const first = ms[0], last = ms[ms.length - 1];
 
+  // Each cell carries both readings: the dot keeps a row scannable, the share under it says how
+  // much of that session the person was there for. Last column: presence across the whole
+  // series against the summed meeting hours — a missed session pulls it down, which is what the
+  // per-session average cannot show.
   const matrix = `<table class="rep-matrix"><thead><tr><th>${t('colParticipant')}</th>
     ${agg.sessions.map(s => `<th>${esc(i18n.formatDate(s.date, { day: 'numeric', month: 'short' }))}</th>`).join('')}
-    <th>${t('colAttendedShare')}</th><th>${t('colTotalTime')}</th></tr></thead><tbody>
+    <th>${t('colAttendedShare')}</th><th>${t('colTotalTime')}</th><th>${t('colTotalShare')}</th></tr></thead><tbody>
     ${agg.people.map(p => `<tr><td style="text-align:left"><b>${esc(p.name)}</b></td>
-      ${agg.sessions.map(s => `<td><span class="dot ${p.perSession[s.id].state}"></span></td>`).join('')}
-      <td class="mono">${p.attendedCount}/${agg.sessionCount}</td><td class="mono">${fmtHMS(p.totalSeconds)}</td></tr>`).join('')}
+      ${agg.sessions.map(s => { const c = p.perSession[s.id]; return `<td><span class="dot ${c.state}"></span><span class="pct ${c.state}">${c.state === 'absent' ? '–' : c.sharePct + '%'}</span></td>`; }).join('')}
+      <td class="mono">${p.attendedCount}/${agg.sessionCount}</td><td class="mono">${fmtHMS(p.totalSeconds)}</td>
+      <td class="mono"><b>${p.totalShare}%</b></td></tr>`).join('')}
     </tbody></table>`;
 
   const sessionBlocks = ms.map(m => {
     const people = Object.keys(m.attendance).length;
-    const late = Object.values(m.attendance).filter(a => A.isLate(a, m, threshold)).length;
     const absent = A.absenteesFor(m, group.roster).length;
     return `<div class="sess-block">
       <div class="sb-head"><div class="sb-title">${esc(m.meetingTitle)}</div>
-        <div class="sb-meta">${esc(i18n.formatDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${time(m.date)} · ${people} ${t('reportPeople').toLowerCase()} · ${late} ${t('late').toLowerCase()} · ${absent} ${t('absent').toLowerCase()}</div></div>
-      ${attendanceTable(m, group.roster, threshold)}
+        <div class="sb-meta">${esc(i18n.formatDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${time(m.date)} · ${people} ${t('reportPeople').toLowerCase()} · ${absent} ${t('absent').toLowerCase()}</div></div>
+      ${attendanceTable(m, group.roster)}
       <div class="rep-sect"><h2>${t('eventLogTitle')}</h2>${eventLog(m)}</div>
     </div>`;
   }).join('');
@@ -129,7 +132,7 @@ function renderGroup(group, meetings, threshold) {
     <h1>${esc(group.name)}</h1>
     <div class="rep-meta"><span><b>${agg.sessionCount}</b> ${t('colSessions').toLowerCase()}</span><span>${range}</span><span><b>${agg.peopleCount}</b> ${t('colGroupPeople').toLowerCase()}</span></div>
     ${statGrid([[agg.sessionCount, t('colSessions')], [agg.peopleCount, t('reportPeople')], [avgAtt + '%', t('statAvgAttendance')], [fmtDur(agg.sessionCount ? Math.round(agg.totalDurationSeconds / agg.sessionCount) : 0), t('statAvgLength')], [fmtDur(agg.totalDurationSeconds), t('colTotalTime')]])}
-    <div class="rep-sect"><h2>${t('matrixTitle')}</h2><p class="rep-hint">${t('perSessionHint')}</p>${matrix}</div>
+    <div class="rep-sect"><h2>${t('matrixTitle')}</h2><p class="rep-hint">${t('perSessionHint')} · ${t('totalShareHint')}</p>${matrix}</div>
     <div class="rep-sect"><h2>${t('sessionsBreakdown')}</h2>${sessionBlocks}</div>
   </div>${footer()}`;
   document.title = `${group.name} — Attendance Tracker`;
@@ -140,16 +143,27 @@ function notFound() {
 }
 
 /* ---------------- boot ---------------- */
+/**
+ * The report opens in the same tab, so it owns the way back. Stepping through history returns
+ * the dashboard exactly as it was left; a report opened cold (a bookmarked hash, a fresh tab)
+ * has nothing to step back to, so it rebuilds the matching dashboard route instead.
+ */
+function backToApp(params) {
+  if (window.history.length > 1) { window.history.back(); return; }
+  const kind = params.get('meeting') ? 'meeting' : 'group';
+  const id = params.get(kind);
+  const hash = id ? `#${kind}=${encodeURIComponent(id)}` : '';
+  location.href = chrome.runtime.getURL('dashboard/dashboard.html') + hash;
+}
+
 (async function () {
   await i18n.initI18n();
-  document.getElementById('btn-print').addEventListener('click', () => window.print());
-
   const params = new URLSearchParams((location.hash || '').slice(1));
+  document.getElementById('btn-print').addEventListener('click', () => window.print());
+  document.getElementById('btn-back').addEventListener('click', () => backToApp(params));
+
   const meetingId = params.get('meeting');
   const groupId = params.get('group');
-  const settings = await store.getSettings();
-  const threshold = Number(settings.lateThresholdMinutes) || 5;
-
   let ok = false;
   if (meetingId) {
     const raw = await store.getMeetingById(meetingId);
@@ -158,13 +172,13 @@ function notFound() {
       const groups = await store.getGroups();
       const g = m.groupId ? groups.find(x => x.id === m.groupId) : null;
       const roster = (g && g.roster && g.roster.length) ? g.roster : await store.getRoster();
-      renderMeeting(m, roster, threshold); ok = true;
+      renderMeeting(m, roster); ok = true;
     }
   } else if (groupId) {
     const g = await store.getGroupById(groupId);
     if (g) {
       const meetings = (await store.getHistory()).map(A.normalizeMeeting).filter(m => m.groupId === g.id);
-      renderGroup(g, meetings, threshold); ok = true;
+      renderGroup(g, meetings); ok = true;
     }
   }
   if (!ok) notFound();

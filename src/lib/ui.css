@@ -99,6 +99,9 @@
 
 /* ------------------------------- base ------------------------------- */
 *{box-sizing:border-box}
+/* `hidden` is how the pages show and hide things; a class that sets `display` outranks the
+   UA rule for it, so state it here with the weight to win. */
+[hidden]{display:none!important}
 html{color-scheme:light dark}
 body{
   margin:0; background:var(--surface); color:var(--ink);
@@ -138,9 +141,7 @@ a{color:var(--accent);text-decoration:none}
   white-space:nowrap}
 .status::before{content:"";width:6px;height:6px;border-radius:50%;flex:none}
 .status--present{background:var(--present-2);color:var(--present)} .status--present::before{background:var(--present)}
-.status--late{background:var(--late-2);color:var(--late)} .status--late::before{background:var(--late)}
 .status--absent{background:var(--absent-2);color:var(--ink-3)} .status--absent::before{background:var(--absent)}
-.status--left{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line)} .status--left::before{background:var(--ink-3)}
 .status--info{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line)} .status--info::before{display:none}
 
 /* ------------------------------ fields ------------------------------ */
@@ -209,7 +210,6 @@ select.field{cursor:pointer;appearance:none;
 .evt{position:absolute;top:-4px;bottom:-4px;width:3px;border-radius:2px;transform:translateX(-1.5px);z-index:2}
 .evt::after{content:"";position:absolute;left:50%;top:-4px;width:7px;height:7px;border-radius:50%;
   transform:translateX(-50%);background:inherit;border:1.5px solid var(--panel)}
-.evt.late{background:var(--late)}
 .evt.early{background:var(--red)}
 .tl-lane.absent .tl-track{background:repeating-linear-gradient(-45deg,var(--absent-2),var(--absent-2) 6px,transparent 6px,transparent 12px)}
 .tl-abs{position:absolute;inset:0;display:flex;align-items:center;padding-left:10px;font-family:var(--mono);

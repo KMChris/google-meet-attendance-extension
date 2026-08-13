@@ -59,6 +59,9 @@
   border-radius:10px;background:var(--panel-2);border:1px solid var(--line);line-height:1}
 .date-badge .day{font-family:var(--disp);font-weight:700;font-size:17px;color:var(--ink)}
 .date-badge .mon{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin-top:2px}
+/* the title column must be allowed to shrink, or its nowrap text sets the column width
+   and pushes the rest of the grid off the card instead of ellipsing */
+.col-title{min-width:0}
 .m-title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .m-sub{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .row-action{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);
@@ -84,13 +87,40 @@
   font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:24px 0 16px;padding:4px 0}
 .back:hover{color:var(--ink)}
 .detail-card{overflow:visible}
-.detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:24px 26px 20px;border-bottom:1px solid var(--line)}
-.detail-headings{min-width:0}
-.detail-headings h1{font-size:26px;margin-top:8px}
-.rename-input{font-family:var(--disp);font-weight:700;font-size:24px;margin-top:6px;max-width:420px}
-.detail-meta{margin-top:9px;color:var(--ink-2);font-size:12.5px}
+/* A long meeting title must never squeeze the actions: the headings get a capped, shrinkable
+   column and the buttons keep their size — below ~340px of headings the whole action row
+   wraps under them instead. */
+.detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px 24px;
+  padding:24px 26px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.detail-headings{min-width:0;flex:1 1 340px;max-width:min(640px,100%)}
+.detail-headings h1{font-size:26px;overflow-wrap:anywhere;min-width:0;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+/* renaming is a pencil beside the name, not a button in the action row — same gesture as the
+   participant rows, and it leaves the action row for what you do *with* the meeting */
+.title-line{display:flex;align-items:flex-start;gap:6px;margin-top:8px}
+.title-edit{display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;
+  color:var(--ink-3);padding:5px;margin-top:2px;border-radius:7px;flex:none;opacity:.45;
+  transition:opacity .12s,background .12s,color .12s}
+.detail-headings:hover .title-edit,.title-edit:focus-visible{opacity:1}
+.title-edit:hover{background:var(--panel-2);color:var(--ink)}
+.rename-input{font-family:var(--disp);font-weight:700;font-size:24px;margin-top:6px;max-width:100%}
+.detail-badges{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:11px}
+.detail-meta{color:var(--ink-2);font-size:12.5px}
 .detail-meta b{color:var(--ink);font-weight:500}
-.detail-actions{display:flex;align-items:center;gap:8px;position:relative;flex-wrap:wrap;justify-content:flex-end}
+/* the meeting hours read as a badge under the title; the pencil sits in the layout at rest and
+   only fades in on hover, so pointing at it never shifts the line */
+.hours-badge{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--mono);
+  font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-2);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:999px;padding:5px 11px;
+  transition:border-color .12s,color .12s,background .12s}
+.hours-badge:hover{border-color:var(--ink-3);color:var(--ink)}
+.hours-badge .hb-ic{color:var(--ink-3);flex:none}
+.hours-badge .hb-edit{flex:none;opacity:0;transition:opacity .12s}
+.hours-badge:hover .hb-edit,.hours-badge:focus-visible .hb-edit{opacity:1}
+.hours-badge.pinned{background:var(--present-2);border-color:color-mix(in srgb,var(--present) 35%,transparent);color:var(--present)}
+.hours-badge.pinned .hb-ic{color:var(--present)}
+.detail-actions{display:flex;align-items:center;gap:8px;position:relative;flex-wrap:wrap;
+  justify-content:flex-end;flex:0 0 auto;margin-left:auto}
 .btn.icon{padding:8px}
 
 /* sections inside detail */
@@ -106,13 +136,17 @@
 .share-bar > i{display:block;height:100%;border-radius:3px;background:var(--present)}
 .share-cell .pct{font-family:var(--mono);font-size:12px;color:var(--ink-2);width:34px;text-align:right}
 
-/* meeting hours */
+/* meeting hours — a datetime-local needs ~210px before it starts clipping its own value,
+   so the card is a little wider than the default modal and the pair drops to one column
+   rather than shrinking below that */
 .btn.pinned{border-color:var(--present);color:var(--present)}
-.sched-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#schedule-modal .modal-card{max-width:540px}
+.sched-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(212px,1fr));gap:4px 14px}
+.sched-grid > div{min-width:0}
+.sched-grid .field{min-width:0}
 .sched-grid .modal-label{margin-top:16px}
 .sched-observed{margin-top:14px;font-size:11.5px;color:var(--ink-3)}
 .sched-observed:empty{display:none}
-@media (max-width:520px){.sched-grid{grid-template-columns:1fr}}
 
 /* participant rename / merge */
 .rc-table th.cell-actions,.rc-table td.cell-actions{width:40px;text-align:right;padding-left:0;padding-right:12px}
@@ -123,6 +157,18 @@
 .merge-note{display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:10px 12px;border-radius:var(--radius-sm);
   background:var(--late-2);color:var(--late);font-size:12.5px;line-height:1.45}
 .merge-note svg{flex:none;margin-top:2px}
+
+/* merged rows carry a count of the identities behind them — and the way back */
+.merged-chip{display:inline-flex;align-items:center;gap:4px;flex:none;margin-left:7px;padding:2px 7px 2px 5px;
+  border-radius:999px;background:var(--panel-2);border:1px solid var(--line);
+  font-family:var(--mono);font-size:10.5px;color:var(--ink-2);cursor:help}
+.merged-chip svg{flex:none;color:var(--ink-3)}
+.unmerge{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.unmerge .modal-label{margin-top:0}
+.unmerge-row{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.unmerge-names{display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1 1 200px}
+.unmerge-names .chip{font-size:12px;padding:4px 10px;max-width:100%}
+.unmerge-names .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .merge-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
 .merge-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:1.5px solid var(--line);
   border-radius:var(--radius-sm);cursor:pointer;background:var(--panel);text-align:left;font-size:13px}
@@ -159,13 +205,54 @@
 .matrix .col-session{font-family:var(--mono);font-size:10px;color:var(--ink-3);font-weight:500}
 .matrix .col-session .ds{display:block;color:var(--ink-2);font-size:11px;margin-bottom:2px}
 .matrix td{padding:9px 10px;border-bottom:1px solid var(--line)}
-.cell-dot{display:inline-block;width:14px;height:14px;border-radius:5px}
+.cell-dot{display:block;margin:0 auto;width:14px;height:14px;border-radius:5px}
 .cell-dot.present{background:var(--present)}
-.cell-dot.late{background:var(--late)}
 .cell-dot.absent{background:var(--absent-2);border:1.5px solid var(--line-2)}
+/* the dot carries the pattern down a column, the share says how much of the session it was */
+.cell-pct{display:block;margin-top:4px;font-family:var(--mono);font-size:10.5px;
+  font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.cell-pct.absent{color:var(--ink-3)}
 .matrix .m-name{display:flex;align-items:center;gap:9px}
 .matrix .m-total{font-family:var(--mono);font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .matrix .m-att{font-family:var(--disp);font-weight:700;font-variant-numeric:tabular-nums}
+/* a row is a person: click it to read their exact presence session by session */
+.matrix tbody tr{cursor:pointer}
+.matrix tbody tr:hover td,.matrix tbody tr:focus-visible td{background:var(--panel-2)}
+.matrix tbody tr:focus-visible{outline:none;box-shadow:var(--focus)}
+.matrix .m-name .go{opacity:0;color:var(--ink-3);flex:none;transition:opacity .12s}
+.matrix tbody tr:hover .go,.matrix tbody tr:focus-visible .go{opacity:1}
+
+/* one person across a series — wider than the default modal: every session is a lane */
+.modal-card.person-modal-card{max-width:660px;max-height:86vh;overflow-y:auto}
+.pm-head{display:flex;align-items:center;gap:13px}
+.pm-head .avatar{width:42px;height:42px;border-radius:12px;font-size:14px}
+.pm-id{min-width:0;flex:1}
+.pm-id h2{font-size:21px;overflow-wrap:anywhere}
+.pm-sub{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.pm-stats{display:flex;gap:24px;flex-wrap:wrap;margin:16px 0 18px;padding:14px 0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.pm-stat .n{font-family:var(--disp);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.pm-stat .n small{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--ink-3)}
+.pm-stat .l{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin-top:3px}
+.pm-sessions{display:flex;flex-direction:column;gap:6px}
+.pm-sess{padding:12px 0;border-bottom:1px solid var(--line)}
+.pm-sess:last-child{border-bottom:none}
+.pm-sess-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:7px}
+.pm-open{display:flex;align-items:baseline;gap:9px;min-width:0;background:none;border:none;padding:0;cursor:pointer;text-align:left;color:var(--ink)}
+.pm-open .pm-date{font-family:var(--mono);font-size:11px;color:var(--ink-3);white-space:nowrap}
+.pm-open .pm-title{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-open:hover .pm-title{color:var(--accent)}
+.pm-share{font-family:var(--mono);font-size:12px;color:var(--ink-2);flex:none}
+.pm-sess.absent .pm-share{color:var(--ink-3)}
+/* the lane reuses the timeline primitives: the track is the meeting, the blocks are the person */
+.pm-line{height:26px;gap:9px}
+.pm-line .pm-edge{font-family:var(--mono);font-size:10px;color:var(--ink-3);flex:none;width:38px}
+.pm-line .pm-edge.r{text-align:right}
+.pm-ranges{display:flex;flex-wrap:wrap;gap:5px 16px;margin:8px 0 0 47px}
+.pm-range{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+.pm-range .rdot{width:6px;height:6px;border-radius:2px;background:var(--present);flex:none}
+.pm-range .rdot.open{background:var(--late)}
+.pm-range b{color:var(--ink);font-weight:500}
 
 /* people panel (person detail) */
 #people-panel:not(:empty){margin-bottom:16px}
@@ -331,7 +418,7 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 .modal-card{width:100%;max-width:440px;padding:24px}
 .modal-card h2{font-family:var(--disp);font-size:20px;margin-bottom:6px}
 .modal-label{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin:16px 0 7px}
-.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+.modal-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px;margin-top:20px}
 .modal textarea.field{resize:vertical;font-family:var(--sans)}
 .color-picker{display:flex;gap:9px}
 .color-picker button{width:30px;height:30px;border-radius:9px;border:2px solid transparent;cursor:pointer}

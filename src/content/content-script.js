@@ -115,7 +115,7 @@
    * Scheduled hours of the calendar event, as Meet prints them ("10:00 – 11:00").
    *
    * Worth scraping because the tracked start time is merely when the tab was opened —
-   * joining early would otherwise mark everyone who arrives on time as late. Best-effort
+   * joining early would otherwise stretch the meeting past its real hours. Best-effort
    * only: heavily validated, never overwrites a value the user set, and the dashboard
    * always allows fixing the hours by hand.
    */

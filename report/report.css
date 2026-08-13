@@ -7,6 +7,7 @@
 .report-toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;
   padding:12px 20px;background:var(--panel);border-bottom:1.5px solid var(--line)}
 .tb-brand{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:700;font-size:16px;color:var(--ink)}
+.tb-actions{display:flex;align-items:center;gap:9px}
 
 /* The report itself pins a light palette so PDFs never come out dark. */
 .report-root{
@@ -44,9 +45,7 @@
   text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:999px}
 .rep-status::before{content:"";width:5px;height:5px;border-radius:50%}
 .rep-status.present{background:var(--present-2);color:var(--present)} .rep-status.present::before{background:var(--present)}
-.rep-status.late{background:var(--late-2);color:var(--late)} .rep-status.late::before{background:var(--late)}
 .rep-status.absent{background:var(--absent-2);color:var(--ink-3)} .rep-status.absent::before{background:var(--absent)}
-.rep-status.left{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line)} .rep-status.left::before{background:var(--ink-3)}
 
 /* event log */
 .evlog{display:flex;flex-direction:column;gap:2px}
@@ -84,9 +83,12 @@
 .rep-matrix th,.rep-matrix td{text-align:center;padding:8px 8px;border-bottom:1px solid var(--line)}
 .rep-matrix th:first-child,.rep-matrix td:first-child{text-align:left}
 .rep-matrix thead th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
-.rep-matrix .dot{display:inline-block;width:13px;height:13px;border-radius:4px}
-.rep-matrix .dot.present{background:var(--present)} .rep-matrix .dot.late{background:var(--late)}
+.rep-matrix .dot{display:block;margin:0 auto;width:13px;height:13px;border-radius:4px}
+.rep-matrix .dot.present{background:var(--present)}
 .rep-matrix .dot.absent{background:var(--absent-2);border:1.5px solid var(--line-2)}
+.rep-matrix .pct{display:block;margin-top:3px;font-family:var(--mono);font-size:9px;
+  font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.rep-matrix .pct.absent{color:var(--ink-3)}
 
 .rep-footer{border-top:1.5px solid var(--line);padding:20px 44px;display:flex;justify-content:space-between;
   font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap;gap:8px}
@@ -102,6 +104,11 @@
   .report-root{max-width:none;margin:0;border:none;border-radius:0;box-shadow:none}
   .report-root .doc{padding:0}
   .rep-footer{padding:20px 0}
+  /* the matrix carries a column per session plus three totals, each with a share under the dot —
+     on paper that width has to come out of the padding and the share type, or a long name wraps
+     onto two lines in a dense series */
+  .rep-matrix th,.rep-matrix td{padding:7px 4px}
+  .rep-matrix .pct{font-size:8px;margin-top:2px}
   .sess-block{break-inside:avoid}
   .ev-person,.rep-table tr{break-inside:avoid}
   thead{display:table-header-group}
