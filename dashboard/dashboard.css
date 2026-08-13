@@ -368,6 +368,8 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 0;border-bottom:1px solid var(--line)}
 .setting-card .setting-row:last-child{border-bottom:none}
 .setting-row.block{display:block}
+/* a stacked row reads as heading + control, so the control needs air under the hint */
+.setting-row.block > .setting-text{margin-bottom:14px}
 .setting-text{min-width:0}
 .setting-title{font-weight:600;font-size:14px}
 .setting-hint{color:var(--ink-2);font-size:12.5px;margin-top:3px;max-width:520px}
@@ -406,7 +408,7 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 .roster-editor .field{flex:1;min-width:180px}
 
 /* sheets */
-.sheets{margin-top:14px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.sheets{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .sheets-actions{display:flex;gap:8px}
 .sheets-config{display:flex;flex-direction:column;gap:12px;width:100%;max-width:560px}
 .link{color:var(--accent);font-size:12.5px}
