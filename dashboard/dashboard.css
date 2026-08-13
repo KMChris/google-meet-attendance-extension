@@ -1,6 +1,7 @@
 /* Attendance Tracker — dashboard layout (built on ui.css primitives) */
 
 .app{max-width:1120px;margin:0 auto;padding:30px 26px 80px}
+[hidden]{display:none!important}
 
 /* masthead */
 .masthead{display:flex;justify-content:space-between;align-items:center;gap:16px}
@@ -175,11 +176,105 @@
 .person-top .p-stats{display:flex;gap:16px;margin-top:5px;font-family:var(--mono);font-size:12px;color:var(--ink-2);flex-wrap:wrap}
 .person-meetings{margin-top:18px}
 
-/* charts */
+/* ===================================================================
+   Analytics — filter row, KPI strip, chart grid, read-outs
+   =================================================================== */
+
+/* filter row — one row above everything it scopes */
+.filterbar{padding:14px 18px;margin-bottom:18px;display:flex;flex-direction:column;gap:11px}
+.fb-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-key{flex:none;color:var(--ink-3)}
+.fb-dates{display:flex;align-items:center;gap:7px}
+.fb-dates .field{height:34px;padding:6px 9px;width:auto;font-size:12px}
+.fb-dash{color:var(--ink-3)}
+.filterbar.custom .fb-dates .field{border-color:var(--accent);color:var(--ink)}
+.fb-summary{font-size:11.5px;color:var(--ink-3);letter-spacing:.03em;border-top:1px solid var(--line);padding-top:10px}
+
+/* multi-select popover — nothing picked means "all" */
+.picker{position:relative}
+.pick-btn{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 11px;cursor:pointer;
+  background:var(--panel);color:var(--ink);border:1.5px solid var(--line-2);border-radius:9px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;max-width:230px}
+.pick-btn:hover{border-color:var(--ink-3);background:var(--panel-2)}
+.pick-btn .pick-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-btn svg{flex:none;color:var(--ink-3)}
+.picker.active .pick-btn{border-color:var(--accent);color:var(--accent)}
+.picker.active .pick-btn svg{color:var(--accent)}
+.pick-menu{position:absolute;left:0;top:calc(100% + 6px);z-index:60;width:290px;max-width:80vw;
+  background:var(--panel);border:1.5px solid var(--line-2);border-radius:var(--radius-sm);box-shadow:var(--shadow)}
+.pick-search{padding:8px;border-bottom:1px solid var(--line)}
+.pick-search .field{height:32px;padding:6px 10px;font-size:12.5px}
+.pick-list{max-height:262px;overflow-y:auto;padding:5px}
+.pick-item{display:flex;align-items:center;gap:9px;width:100%;padding:7px 8px;border:none;border-radius:6px;
+  background:none;cursor:pointer;text-align:left;font-size:13px;color:var(--ink)}
+.pick-item:hover{background:var(--panel-2)}
+.pick-box{width:15px;height:15px;flex:none;border:1.5px solid var(--line-2);border-radius:4px;position:relative}
+.pick-item.on .pick-box{background:var(--accent);border-color:var(--accent)}
+.pick-item.on .pick-box::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+  border:solid var(--on-accent);border-width:0 2px 2px 0;transform:rotate(42deg)}
+.pick-item .gdot{width:8px;height:8px;border-radius:50%;flex:none}
+.pick-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-hint{flex:none;font-size:11px;color:var(--ink-3)}
+.pick-none{padding:16px 12px;text-align:center;font-size:12.5px;color:var(--ink-3)}
+.pick-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-top:1px solid var(--line)}
+.pick-count{font-size:11px;color:var(--ink-3)}
+
+/* KPI strip — hairline gaps double as the dividers, so it wraps cleanly */
+.stats.kpi{grid-template-columns:repeat(5,1fr);gap:1.5px;background:var(--line)}
+.stats.kpi .stat{padding:15px 16px;border-right:none;background:var(--panel)}
+.stats.kpi .k{font-size:25px}
+.delta{margin-top:7px;font-size:11px;letter-spacing:.02em;color:var(--ink-2)}
+.delta.muted{color:var(--ink-3)}
+.delta.up{color:var(--present)}
+.delta.down{color:var(--red)}
+
+/* chart grid */
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .chart-card{padding:18px 20px}
+.chart-card.wide{grid-column:1 / -1}
 .chart-card canvas{width:100%;margin-top:12px;display:block}
-@media (max-width:820px){.charts{grid-template-columns:1fr}}
+.cc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.cc-sub{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-3);margin-top:5px}
+.cc-sub:empty{display:none}
+.cc-toggle{flex:none;display:inline-flex;align-items:center;justify-content:center;padding:5px;cursor:pointer;
+  background:none;border:1.5px solid transparent;border-radius:7px;color:var(--ink-3);opacity:.55;transition:opacity .12s,background .12s,color .12s}
+.cc-toggle:hover{opacity:1;background:var(--panel-2);color:var(--ink)}
+.chart-card.as-table .cc-toggle{opacity:1;color:var(--ink);background:var(--panel-2);border-color:var(--line-2)}
+.cc-table{margin-top:14px;max-height:330px;overflow:auto}
+.cc-table .rc-table thead th{position:sticky;top:0;background:var(--panel);z-index:1;padding-top:2px}
+
+/* read-outs */
+.insights{padding:18px 20px;margin-top:16px}
+.insights .sect-head{margin-bottom:14px}
+.ins-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(186px,1fr));gap:11px}
+.ins{min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel-2);text-align:left}
+button.ins{width:100%;font:inherit;color:inherit;cursor:pointer}
+button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
+.ins-value{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:-.01em;margin-top:7px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ins.up .ins-value{color:var(--present)}
+.ins.down .ins-value{color:var(--red)}
+.ins-hint{font-size:11.5px;color:var(--ink-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* chart tooltip — one element, reused by every canvas */
+.chart-tip{position:fixed;z-index:900;pointer-events:none;max-width:280px;padding:9px 11px;
+  background:var(--panel);border:1.5px solid var(--line-2);border-radius:var(--radius-sm);box-shadow:var(--shadow)}
+.ct-title{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct-title:empty{display:none}
+.ct-rows{margin-top:5px}
+.ct-row{display:flex;align-items:center;gap:8px;margin-top:3px}
+.ct-key{width:11px;height:2.5px;border-radius:2px;flex:none}
+.ct-val{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ct-lbl{font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+@media (max-width:980px){
+  .stats.kpi{grid-template-columns:repeat(3,1fr)}
+  .pick-btn{max-width:170px}
+}
+@media (max-width:820px){
+  .charts{grid-template-columns:1fr}
+  .chart-card.wide{grid-column:auto}
+}
 
 /* settings */
 .setting-card{padding:6px 24px;margin-bottom:16px}
@@ -249,8 +344,9 @@
 
 @media (max-width:720px){
   .stats{grid-template-columns:repeat(2,1fr)}
-  .stat:nth-child(2){border-right:none}
-  .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+  .stats:not(.kpi) .stat:nth-child(2){border-right:none}
+  .stats:not(.kpi) .stat:nth-child(1),.stats:not(.kpi) .stat:nth-child(2){border-bottom:1px solid var(--line)}
+  .fb-key{width:100%}
   .meetings-grid{grid-template-columns:50px 1fr 60px 60px}
   .meetings-grid > :nth-child(3),.meetings-grid > :nth-child(5){display:none}
   .row.meetings-grid > .col-group,.row.meetings-grid > .col-avg{display:none}

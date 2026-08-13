@@ -2,6 +2,7 @@ import * as store from '../src/lib/storage.js';
 import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 import * as sheets from '../src/lib/sheets-api.js';
+import { initAnalytics, renderAnalytics } from './analytics.js';
 
 const { t } = i18n;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -31,21 +32,13 @@ function avatarStyle(name) {
   const v = GRP_COLORS[GRP_KEYS[hash(name) % GRP_KEYS.length]];
   return `background:color-mix(in srgb, var(${v}) 16%, var(--panel));color:var(${v})`;
 }
-function fmtDur(secs) {
-  secs = Math.floor(secs || 0);
-  if (secs <= 0) return '0m';
-  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
-  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
-  if (m > 0) return `${m}m`;
-  return `${s}s`;
-}
+const fmtDur = i18n.formatDuration;
 function fmtHMS(secs) {
   secs = Math.floor(secs || 0);
   const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
   return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
 }
 function setStat(el, value, unit) { el.innerHTML = unit ? `${value}<span class="u">${esc(unit)}</span>` : `${value}`; }
-function cssVar(name) { return getComputedStyle(document.body).getPropertyValue(name).trim() || '#888'; }
 
 let toastTimer;
 function toast(msg) {
@@ -527,7 +520,7 @@ function renderGroup(g) {
 function renderMatrix(agg) {
   if (!agg.sessions.length) { $('#group-matrix').innerHTML = `<tbody><tr><td class="mono" style="color:var(--ink-3);padding:16px">—</td></tr></tbody>`; return; }
   const head = `<thead><tr>
-    <th>${t('matrixPerson') || t('colParticipant')}</th>
+    <th>${t('matrixPerson')}</th>
     ${agg.sessions.map(s => `<th class="col-session"><span class="ds">${esc(i18n.formatDate(s.date, { day: 'numeric', month: 'short' }))}</span>${esc((s.title || '').slice(0, 10))}</th>`).join('')}
     <th class="num">${t('colAttendedShare')}</th><th class="num">${t('colTotalTime')}</th>
   </tr></thead>`;
@@ -649,67 +642,13 @@ function openPerson(name, map) {
 $('#people-search').addEventListener('input', e => renderPeople(e.target.value.trim()));
 
 /* ============================ ANALYTICS ============================ */
-function last7() { const days = []; const now = new Date(); for (let i = 6; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0); days.push(d); } return days; }
-function meetingsOn(day) { const end = new Date(day); end.setDate(end.getDate() + 1); return history.filter(m => { const d = new Date(m.date); return d >= day && d < end; }); }
-
-function renderAnalytics() {
-  const empty = $('#analytics-empty'), charts = $('#charts');
-  if (!history.length) { charts.style.display = 'none'; empty.classList.add('visible'); return; }
-  charts.style.display = ''; empty.classList.remove('visible');
-
-  const days = last7();
-  const labels = days.map(d => i18n.monthShort(d) + ' ' + d.getDate());
-  const ink = cssVar('--ink-2'), grid = cssVar('--line'), present = cssVar('--present'), late = cssVar('--late');
-
-  drawBars('chart-meetings', labels, days.map(d => meetingsOn(d).length), { color: present, ink, grid });
-
-  const dur = days.map(d => { const ms = meetingsOn(d); return ms.length ? Math.round(ms.reduce((s, m) => s + A.meetingDurationSeconds(m), 0) / ms.length / 60) : 0; });
-  const pres = days.map(d => { const ms = meetingsOn(d); let tot = 0, n = 0; ms.forEach(m => Object.values(m.attendance).forEach(a => { tot += A.liveSecondsFor(a, m); n++; })); return n ? Math.round(tot / n / 60) : 0; });
-  drawGrouped('chart-duration', labels, [{ data: dur, color: present, label: t('chartLegendAvgDuration') }, { data: pres, color: late, label: t('chartLegendAvgTimeInCall') }], { ink, grid });
-
-  drawBars('chart-people', labels, days.map(d => { const ms = meetingsOn(d); return ms.length ? Math.round(ms.reduce((s, m) => s + Object.keys(m.attendance).length, 0) / ms.length) : 0; }), { color: cssVar('--grp-sky'), ink, grid });
-
-  const counts = {}; history.forEach(m => { const k = m.meetingTitle || '—'; counts[k] = (counts[k] || 0) + 1; });
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const palette = ['--grp-teal', '--grp-amber', '--grp-violet', '--grp-rose', '--grp-sky', '--grp-lime'].map(cssVar);
-  drawHBars('chart-top', top.map(([k]) => k.length > 18 ? k.slice(0, 18) + '…' : k), top.map(([, v]) => v), { colors: palette, ink, grid });
+// The view itself lives in ./analytics.js; this page only supplies the data and the
+// handful of dashboard actions it needs to call back into.
+function groupColorVar(g) { return GRP_COLORS[(g && g.color) || 'teal'] || '--grp-teal'; }
+function exportCSV(rows, filename) {
+  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\n')], { type: 'text/csv;charset=utf-8;' }), filename);
 }
 
-function prep(id, height) {
-  const c = document.getElementById(id); if (!c) return null;
-  const dpr = window.devicePixelRatio || 1; const W = c.offsetWidth || 300;
-  c.width = W * dpr; c.height = height * dpr; c.style.height = height + 'px';
-  const ctx = c.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, height);
-  ctx.font = '11px "IBM Plex Mono", monospace';
-  return { ctx, W, H: height };
-}
-function roundedBar(ctx, x, y, w, h, r) { if (h < r * 2) r = h / 2; if (w < r * 2) r = w / 2; if (h <= 0 || w <= 0) return; ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath(); ctx.fill(); }
-
-function drawBars(id, labels, data, o) {
-  const p = prep(id, 190); if (!p) return; const { ctx, W, H } = p;
-  const pl = 32, pr = 8, pt = 12, pb = 26, cw = W - pl - pr, ch = H - pt - pb;
-  const max = Math.max(...data, 1), step = Math.ceil(max / 4) || 1;
-  ctx.strokeStyle = o.grid; ctx.fillStyle = o.ink; ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) { const val = i * step; const y = pt + ch - (val / (step * 4)) * ch; ctx.beginPath(); ctx.moveTo(pl, y); ctx.lineTo(W - pr, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(val, pl - 6, y + 4); }
-  const bw = Math.min(30, (cw / labels.length) * 0.6), gap = (cw - bw * labels.length) / (labels.length + 1);
-  data.forEach((val, i) => { const x = pl + gap + i * (bw + gap); const bh = (val / (step * 4)) * ch; const y = pt + ch - bh; ctx.fillStyle = o.color; roundedBar(ctx, x, y, bw, bh, 4); ctx.fillStyle = o.ink; ctx.textAlign = 'center'; if (val > 0) ctx.fillText(val, x + bw / 2, y - 5); ctx.fillText(labels[i], x + bw / 2, H - 8); });
-}
-function drawGrouped(id, labels, series, o) {
-  const p = prep(id, 190); if (!p) return; const { ctx, W, H } = p;
-  const pl = 32, pr = 8, pt = 20, pb = 26, cw = W - pl - pr, ch = H - pt - pb;
-  const max = Math.max(...series.flatMap(s => s.data), 1), step = Math.ceil(max / 4) || 1;
-  ctx.strokeStyle = o.grid; ctx.fillStyle = o.ink; ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) { const val = i * step; const y = pt + ch - (val / (step * 4)) * ch; ctx.beginPath(); ctx.moveTo(pl, y); ctx.lineTo(W - pr, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(val, pl - 6, y + 4); }
-  const sbw = Math.min(13, (cw / labels.length) / (series.length + 1)), gw = sbw * series.length + 3, gap = (cw - gw * labels.length) / (labels.length + 1);
-  labels.forEach((lb, gi) => { series.forEach((s, si) => { const val = s.data[gi]; const gx = pl + gap + gi * (gw + gap); const x = gx + si * (sbw + 2); const bh = (val / (step * 4)) * ch; ctx.fillStyle = s.color; roundedBar(ctx, x, pt + ch - bh, sbw, bh, 3); }); const gx = pl + gap + gi * (gw + gap); ctx.fillStyle = o.ink; ctx.textAlign = 'center'; ctx.fillText(lb, gx + gw / 2, H - 8); });
-  series.forEach((s, i) => { const lx = pl + i * 150; ctx.fillStyle = s.color; ctx.fillRect(lx, 3, 9, 9); ctx.fillStyle = o.ink; ctx.textAlign = 'left'; ctx.fillText(s.label, lx + 13, 11); });
-}
-function drawHBars(id, labels, data, o) {
-  const bh = 22, gap = 9, H = Math.max(150, labels.length * (bh + gap) + 16);
-  const p = prep(id, H); if (!p) return; const { ctx, W } = p;
-  const pl = 122, pr = 30, cw = W - pl - pr, max = Math.max(...data, 1);
-  labels.forEach((lb, i) => { const y = 8 + i * (bh + gap); const bw = (data[i] / max) * cw; ctx.fillStyle = o.colors[i % o.colors.length]; roundedBar(ctx, pl, y, bw, bh, 4); ctx.fillStyle = o.ink; ctx.textAlign = 'right'; ctx.fillText(lb, pl - 8, y + bh / 2 + 4); ctx.textAlign = 'left'; ctx.fillText(data[i], pl + bw + 6, y + bh / 2 + 4); });
-}
 let resizeTimer;
 window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if ($('#view-analytics').classList.contains('on')) renderAnalytics(); }, 200); });
 
@@ -968,6 +907,16 @@ i18n.onLocaleChange(() => {
 /* ============================ boot ============================ */
 (async function boot() {
   await i18n.initI18n();
+  await initAnalytics({
+    history: () => history,
+    groups: () => groups,
+    groupById,
+    groupColorVar,
+    rosterFor: effectiveRoster,
+    lateThreshold: () => lateThreshold,
+    openMeeting,
+    exportCSV
+  });
   await load();
   refreshSheets();
 })();

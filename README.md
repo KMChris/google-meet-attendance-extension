@@ -10,6 +10,7 @@ every time they left and rejoined.
 - **Real-time Participant Detection**: Track participant join/leave events using MutationObserver and polling
 - **Event-based Tracking**: Records each join and leave as a separate event with timestamp; presence, sessions, durations and lateness are all derived from those raw events
 - **Full Dashboard** (Meetings · Series · People · Analytics · Settings): search, rename, native canvas charts, and the presence timeline — opens as the extension's options page
+- **Analytics**: filter by date range, series and meeting, then read the slice as headline numbers with period-over-period deltas, charts (activity over time, length vs. presence, punctuality, a weekday × hour heatmap, attendance distribution, top meetings and people, series comparison) and derived read-outs. Every chart flips to the table behind it and exports to CSV
 - **Series**: Bundle recurring sessions (e.g. a weekend training) into a series. Recurring links are auto-detected; each series has an aggregate **attendance matrix** (people × sessions), per-series roster, and its own report
 - **Roster & Status**: Expected-attendee rosters flag who was **Late** or **Absent** (configurable late threshold, measured from the meeting start)
 - **Exports**: Per-meeting CSV, combined CSV, JSON backup/restore, clipboard, and detailed **technical PDF reports** — for a single meeting or a whole series — with attendance and every join/leave event, print-ready

@@ -2,6 +2,34 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Analytics is now a filtered workbench.** One filter row scopes everything below it:
+  a **date range** (7 / 30 / 90 days, 12 months, everything, or a custom from–to), a
+  **series** picker and a **meeting** picker — both multi-select popovers that list only
+  what the other filters still allow, with live counts. The slice is remembered between
+  sessions and exports to CSV.
+- **Headline numbers** — meetings, total time, people, average attendance and average meeting
+  size, each against the previous period of the same length.
+- **New charts** — meeting activity over time (buckets switch between day / week / month with
+  the range), average length vs. presence, a **weekday × hour heatmap** of when meetings start,
+  the distribution of attendance share,
+  most frequent meetings, most present people, and a series comparison.
+- **Read-outs** — busiest day, peak hour, longest meeting, biggest turnout, the most regular
+  person, and the attendance trend.
+- Every chart card flips to the **table it was drawn from**, so no value is only reachable
+  by hovering, and each chart has a hover read-out.
+
+### Fixed
+- **Long meeting names are no longer sliced off** in "Most frequent meetings". Labels used a
+  fixed 122px gutter and a blind 18-character cut, so a long title ran off the left edge of
+  the canvas ("…kolenie - AI w p…"). The gutter is now measured from the actual labels and
+  each one is fitted to the width it really has, with the full title in the hover read-out
+  and the table view.
+- The series attendance matrix header showed the raw string `matrixPerson` instead of
+  "Person" / "Osoba".
+
 ## [1.2.1] 2026-08-12
 
 ### Added

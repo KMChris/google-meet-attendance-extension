@@ -109,3 +109,12 @@ export function formatDate(iso, opts) {
 export function monthShort(date) {
   return date.toLocaleDateString(localeTag(), { month: 'short' });
 }
+/** Compact duration: `2h 05m`, `47m`, `12s`. Zero and negatives read as `0m`. */
+export function formatDuration(seconds) {
+  const secs = Math.floor(seconds || 0);
+  if (secs <= 0) return '0m';
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m > 0) return `${m}m`;
+  return `${secs}s`;
+}

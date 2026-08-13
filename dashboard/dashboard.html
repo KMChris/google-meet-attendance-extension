@@ -215,13 +215,123 @@
 
     <!-- ============ ANALYTICS ============ -->
     <section class="view" id="view-analytics">
-      <div class="view-head"><div><div class="eyebrow" data-i18n="navAnalytics">Analytics</div><p class="lede" data-i18n="analyticsSubtitle"></p></div></div>
-      <div class="charts" id="charts">
-        <div class="card chart-card"><div class="eyebrow" data-i18n="chartMeetingsPerDay"></div><canvas id="chart-meetings"></canvas></div>
-        <div class="card chart-card"><div class="eyebrow" data-i18n="chartAvgDuration"></div><canvas id="chart-duration"></canvas></div>
-        <div class="card chart-card"><div class="eyebrow" data-i18n="chartParticipants"></div><canvas id="chart-people"></canvas></div>
-        <div class="card chart-card"><div class="eyebrow" data-i18n="chartTopMeetings"></div><canvas id="chart-top"></canvas></div>
+      <div class="view-head">
+        <div>
+          <div class="eyebrow" data-i18n="navAnalytics">Analytics</div>
+          <p class="lede" data-i18n="analyticsSubtitle"></p>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost sm" id="btn-analytics-csv" data-i18n="exportCsv">Export CSV</button>
+        </div>
       </div>
+
+      <div id="analytics-body">
+        <!-- one filter row, scoping every chart and read-out below it -->
+        <div class="card filterbar" id="filterbar">
+          <div class="fb-line">
+            <span class="fb-key eyebrow" data-i18n="filterRange"></span>
+            <div class="segmented" id="range-seg">
+              <button type="button" data-preset="7d" data-i18n="range7"></button>
+              <button type="button" data-preset="30d" data-i18n="range30"></button>
+              <button type="button" data-preset="90d" data-i18n="range90"></button>
+              <button type="button" data-preset="365d" data-i18n="range365"></button>
+              <button type="button" data-preset="all" data-i18n="rangeAll"></button>
+            </div>
+            <div class="fb-dates">
+              <input class="field mono" type="date" id="range-from" data-i18n-aria="filterFrom" data-i18n-title="filterFrom">
+              <span class="fb-dash">–</span>
+              <input class="field mono" type="date" id="range-to" data-i18n-aria="filterTo" data-i18n-title="filterTo">
+            </div>
+          </div>
+          <div class="fb-line">
+            <span class="fb-key eyebrow" data-i18n="filterSeries"></span>
+            <div class="picker" id="pick-series"></div>
+            <span class="fb-key eyebrow" data-i18n="filterMeetings"></span>
+            <div class="picker" id="pick-titles"></div>
+            <button class="btn subtle sm" id="filters-reset" data-i18n="filterReset" hidden></button>
+          </div>
+          <div class="fb-summary mono" id="filter-summary"></div>
+        </div>
+
+        <div class="stats kpi" id="analytics-kpi"></div>
+
+        <div class="charts" id="charts">
+          <div class="card chart-card wide" data-chart="activity">
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartActivity"></div><div class="cc-sub mono" id="sub-activity"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-activity"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+
+          <div class="card chart-card" data-chart="duration">
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartAvgDuration"></div><div class="cc-sub mono" id="sub-duration"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-duration"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+
+          <div class="card chart-card wide" data-chart="rhythm">
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartRhythm"></div><div class="cc-sub mono" data-i18n="chartRhythmHint"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-rhythm"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+
+          <div class="card chart-card" data-chart="share">
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartShare"></div><div class="cc-sub mono" data-i18n="chartShareHint"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-share"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+
+          <div class="card chart-card" data-chart="top">
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartTopMeetings"></div><div class="cc-sub mono" data-i18n="chartTopMeetingsHint"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-top"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+
+          <div class="card chart-card" data-chart="people">
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartTopPeople"></div><div class="cc-sub mono" data-i18n="chartTopPeopleHint"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-people"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+
+          <div class="card chart-card" data-chart="series" hidden>
+            <div class="cc-head">
+              <div><div class="eyebrow" data-i18n="chartSeries"></div><div class="cc-sub mono" data-i18n="chartSeriesHint"></div></div>
+              <button class="cc-toggle" type="button" aria-pressed="false" data-i18n-title="tableView" data-i18n-aria="tableView"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></button>
+            </div>
+            <canvas id="chart-series"></canvas>
+            <div class="cc-table" hidden></div>
+          </div>
+        </div>
+
+        <div class="card insights" id="insights">
+          <div class="sect-head"><div class="eyebrow" data-i18n="insightsTitle"></div><div class="eyebrow soft" data-i18n="insightsHint"></div></div>
+          <div class="ins-grid" id="insights-grid"></div>
+        </div>
+
+        <div class="empty" id="analytics-none">
+          <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+          <h3 data-i18n="analyticsNoneTitle"></h3>
+          <p data-i18n="analyticsNoneBody"></p>
+        </div>
+      </div>
+
       <div class="empty" id="analytics-empty">
         <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
         <h3 data-i18n="emptyAnalyticsTitle"></h3>

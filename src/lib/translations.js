@@ -74,6 +74,7 @@ export const TRANSLATIONS = {
     groupRosterHint: 'Anyone here who misses a session is marked absent for that session.',
     matrixTitle: 'Attendance matrix',
     matrixHint: 'a column per session — read across to follow one person',
+    matrixPerson: 'Person',
     colTotalTime: 'Total', colAttendedShare: 'Attended',
     groupSavePdf: 'Series PDF report', groupExportCsv: 'Export CSV',
     createGroupTitle: 'New series', groupNameLabel: 'Name', groupNamePlaceholder: 'e.g. Weekend Training',
@@ -92,14 +93,48 @@ export const TRANSLATIONS = {
     personMeetingsN: '{n} meetings', personMeetingOne: '1 meeting',
     personTotal: 'total', personAvg: 'avg attendance',
 
-    /* analytics */
-    analyticsSubtitle: 'The last 7 days at a glance',
-    chartMeetingsPerDay: 'Meetings per day',
+    /* analytics — filters */
+    analyticsSubtitle: 'Trends, rhythm and attendance across a slice of your meetings',
+    filterRange: 'Range', filterSeries: 'Series', filterMeetings: 'Meetings',
+    filterReset: 'Clear filters', filterFrom: 'From', filterTo: 'To',
+    range7: '7 d', range30: '30 d', range90: '90 d', range365: '12 mo', rangeAll: 'All',
+    pickAllSeries: 'All series', pickAllMeetings: 'All meetings',
+    pickSelected: '{n} selected', pickNone: 'No series', pickClear: 'Clear',
+    pickSearch: 'Search…', pickEmpty: 'Nothing to pick',
+    summaryMeetings: '{n} meetings', summaryPeople: '{n} people',
+    analyticsNoneTitle: 'Nothing in this slice',
+    analyticsNoneBody: 'Widen the range or clear the filters to see meetings again.',
+
+    /* analytics — headline numbers */
+    kpiMeetings: 'Meetings', kpiHours: 'Total time', kpiPeople: 'People',
+    kpiAttendance: 'Avg attendance', kpiSize: 'Avg size',
+    kpiVsPrev: 'vs the previous period of the same length',
+    kpiNoPrev: 'No data for the previous period',
+    deltaSame: 'no change', unitPoints: 'pts',
+
+    /* analytics — charts */
+    chartActivity: 'Meeting activity',
     chartAvgDuration: 'Average length & presence',
-    chartParticipants: 'People per meeting',
-    chartTopMeetings: 'Most frequent meetings',
-    chartLegendMeetings: 'Meetings', chartLegendAvgDuration: 'Length (min)',
-    chartLegendAvgTimeInCall: 'Presence (min)', chartLegendParticipants: 'People',
+    chartRhythm: 'Weekly rhythm', chartRhythmHint: 'when meetings start',
+    chartShare: 'Attendance distribution', chartShareHint: 'how much of a meeting people sit through',
+    chartTopMeetings: 'Most frequent meetings', chartTopMeetingsHint: 'by title',
+    chartTopPeople: 'Most present people', chartTopPeopleHint: 'by time in call',
+    chartSeries: 'Series compared', chartSeriesHint: 'avg attendance per series',
+    chartLegendAvgDuration: 'Length (min)', chartLegendAvgTimeInCall: 'Presence (min)',
+    legendAbsentP: 'Absent',
+    bucketDaily: 'per day', bucketWeekly: 'per week', bucketMonthly: 'per month',
+    unitMeetings: 'meetings', unitPeople: 'people', unitTotalTime: 'total time',
+    unitMin: 'min', unitParticipations: 'participations',
+    colBucket: 'Period', colWeekday: 'Day', colParticipations: 'Participations',
+    tableView: 'Show the numbers', chartView: 'Show the chart',
+
+    /* analytics — read-outs */
+    insightsTitle: 'Read-outs', insightsHint: 'what the slice says',
+    insightBusiestDay: 'Busiest day', insightPeakHour: 'Peak hour',
+    insightLongest: 'Longest meeting', insightLargest: 'Biggest turnout',
+    insightRegular: 'Most regular', insightTrend: 'Attendance trend',
+    insightAttendedOf: 'attended {n} of {m}',
+
     emptyAnalyticsTitle: 'Nothing to chart yet',
     emptyAnalyticsBody: 'Track a few meetings and trends appear here.',
 
@@ -247,6 +282,7 @@ export const TRANSLATIONS = {
     groupRosterHint: 'Każdy z tej listy, kto opuści sesję, jest w niej oznaczony jako nieobecny.',
     matrixTitle: 'Macierz frekwencji',
     matrixHint: 'kolumna na sesję — czytaj w poziomie, aby prześledzić jedną osobę',
+    matrixPerson: 'Osoba',
     colTotalTime: 'Łącznie', colAttendedShare: 'Obecność',
     groupSavePdf: 'Raport PDF cyklu', groupExportCsv: 'Eksport CSV',
     createGroupTitle: 'Nowy cykl', groupNameLabel: 'Nazwa', groupNamePlaceholder: 'np. Szkolenie weekendowe',
@@ -265,14 +301,48 @@ export const TRANSLATIONS = {
     personMeetingsN: '{n} spotkań', personMeetingOne: '1 spotkanie',
     personTotal: 'łącznie', personAvg: 'śr. frekwencja',
 
-    /* analytics */
-    analyticsSubtitle: 'Ostatnie 7 dni w skrócie',
-    chartMeetingsPerDay: 'Spotkania dziennie',
+    /* analytics — filtry */
+    analyticsSubtitle: 'Trendy, rytm i frekwencja w wybranym wycinku spotkań',
+    filterRange: 'Zakres', filterSeries: 'Cykle', filterMeetings: 'Spotkania',
+    filterReset: 'Wyczyść filtry', filterFrom: 'Od', filterTo: 'Do',
+    range7: '7 dni', range30: '30 dni', range90: '90 dni', range365: '12 mies.', rangeAll: 'Całość',
+    pickAllSeries: 'Wszystkie cykle', pickAllMeetings: 'Wszystkie spotkania',
+    pickSelected: 'Wybrano: {n}', pickNone: 'Bez cyklu', pickClear: 'Wyczyść',
+    pickSearch: 'Szukaj…', pickEmpty: 'Brak pozycji',
+    summaryMeetings: 'spotkań: {n}', summaryPeople: 'osób: {n}',
+    analyticsNoneTitle: 'Brak danych dla tych filtrów',
+    analyticsNoneBody: 'Poszerz zakres dat albo wyczyść filtry, aby znów zobaczyć spotkania.',
+
+    /* analytics — liczby nagłówkowe */
+    kpiMeetings: 'Spotkania', kpiHours: 'Łączny czas', kpiPeople: 'Osoby',
+    kpiAttendance: 'Śr. frekwencja', kpiSize: 'Śr. wielkość',
+    kpiVsPrev: 'wobec poprzedniego okresu tej samej długości',
+    kpiNoPrev: 'Brak danych z poprzedniego okresu',
+    deltaSame: 'bez zmian', unitPoints: 'pkt',
+
+    /* analytics — wykresy */
+    chartActivity: 'Aktywność spotkań',
     chartAvgDuration: 'Średnia długość i obecność',
-    chartParticipants: 'Osoby na spotkanie',
-    chartTopMeetings: 'Najczęstsze spotkania',
-    chartLegendMeetings: 'Spotkania', chartLegendAvgDuration: 'Długość (min)',
-    chartLegendAvgTimeInCall: 'Obecność (min)', chartLegendParticipants: 'Osoby',
+    chartRhythm: 'Rytm tygodnia', chartRhythmHint: 'o której zaczynają się spotkania',
+    chartShare: 'Rozkład frekwencji', chartShareHint: 'jaką część spotkania zajmuje obecność',
+    chartTopMeetings: 'Najczęstsze spotkania', chartTopMeetingsHint: 'wg nazwy',
+    chartTopPeople: 'Najbardziej obecni', chartTopPeopleHint: 'wg czasu w rozmowie',
+    chartSeries: 'Porównanie cykli', chartSeriesHint: 'śr. frekwencja w cyklu',
+    chartLegendAvgDuration: 'Długość (min)', chartLegendAvgTimeInCall: 'Obecność (min)',
+    legendAbsentP: 'Nieobecni',
+    bucketDaily: 'dziennie', bucketWeekly: 'tygodniowo', bucketMonthly: 'miesięcznie',
+    unitMeetings: 'spotkań', unitPeople: 'osób', unitTotalTime: 'łączny czas',
+    unitMin: 'min', unitParticipations: 'uczestnictw',
+    colBucket: 'Okres', colWeekday: 'Dzień', colParticipations: 'Uczestnictwa',
+    tableView: 'Pokaż liczby', chartView: 'Pokaż wykres',
+
+    /* analytics — odczyty */
+    insightsTitle: 'Odczyty', insightsHint: 'co mówi ten wycinek',
+    insightBusiestDay: 'Najbardziej zajęty dzień', insightPeakHour: 'Godzina szczytu',
+    insightLongest: 'Najdłuższe spotkanie', insightLargest: 'Najliczniejsze spotkanie',
+    insightRegular: 'Najbardziej regularni', insightTrend: 'Trend frekwencji',
+    insightAttendedOf: 'obecność na {n} z {m}',
+
     emptyAnalyticsTitle: 'Brak danych do wykresów',
     emptyAnalyticsBody: 'Prześledź kilka spotkań, a pojawią się tu trendy.',
 
