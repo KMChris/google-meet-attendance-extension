@@ -452,10 +452,21 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 .roster-editor{display:flex;align-items:center;gap:9px;flex-wrap:wrap;max-width:560px}
 .roster-editor .field{flex:1;min-width:180px}
 
-/* sheets */
-.sheets{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
-.sheets-actions{display:flex;gap:8px}
-.sheets-config{display:flex;flex-direction:column;gap:12px;width:100%;max-width:560px}
+/* sheets — three steps, all on screen, the ones you cannot reach yet dimmed */
+.sheets-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.sheets-step{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+.sheets-step:first-child{border-top:none;padding-top:0}
+.sheets-step.off{opacity:.45;pointer-events:none}
+.step-n{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--panel-2);border:1.5px solid var(--line-2)}
+.sheets-step.done .step-n{background:var(--present-2);border-color:var(--present);color:var(--present)}
+.step-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.step-title{font-weight:600;font-size:13.5px}
+.step-state{font-size:12px;color:var(--ink-2);margin-top:-4px;overflow-wrap:anywhere}
+.step-body .inline-field{max-width:520px}
+.step-body .inline-field .field{flex:1;min-width:180px}
+.step-body .switch-row{margin-top:2px}
+.step-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .link{color:var(--accent);font-size:12.5px}
 
 /* modals */

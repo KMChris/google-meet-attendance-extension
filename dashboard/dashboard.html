@@ -389,22 +389,46 @@
       <div class="card setting-card">
         <div class="setting-row block">
           <div class="setting-text"><div class="setting-title" data-i18n="sheetsTitle"></div><div class="setting-hint" data-i18n="sheetsHint"></div></div>
-          <div class="sheets">
-            <div class="sheets-status"><span class="status status--info" id="sheets-status" data-i18n="sheetsNotConnected"></span></div>
-            <div class="sheets-actions">
-              <button class="btn ghost" id="sheets-connect" data-i18n="sheetsConnect"></button>
-              <button class="btn subtle" id="sheets-disconnect" data-i18n="sheetsDisconnect" hidden></button>
-            </div>
-            <div class="sheets-config" id="sheets-config" hidden>
-              <div class="inline-field">
-                <input class="field mono" id="spreadsheet-id" data-i18n-placeholder="spreadsheetIdPlaceholder">
-                <button class="btn ghost" id="sheets-save" data-i18n="sheetsSave"></button>
-                <button class="btn ghost" id="sheets-create" data-i18n="sheetsCreate"></button>
+          <ol class="sheets-steps">
+            <li class="sheets-step" id="sheets-step-account">
+              <span class="step-n">1</span>
+              <div class="step-body">
+                <div class="step-title" data-i18n="sheetsStepAccount"></div>
+                <div class="step-state mono" id="sheets-account-state"></div>
               </div>
-              <a id="sheets-open" class="link mono" target="_blank" rel="noopener" data-i18n="sheetsOpen" hidden></a>
-              <label class="switch-row" id="autosync-row" hidden><input type="checkbox" id="set-autosync"><span class="track"></span><span data-i18n="autoSync"></span></label>
-            </div>
-          </div>
+              <div class="step-act">
+                <button class="btn ghost" id="sheets-connect" data-i18n="sheetsConnect"></button>
+                <button class="btn subtle" id="sheets-disconnect" data-i18n="sheetsDisconnect" hidden></button>
+              </div>
+            </li>
+            <li class="sheets-step" id="sheets-step-sheet">
+              <span class="step-n">2</span>
+              <div class="step-body">
+                <div class="step-title" data-i18n="sheetsStepSheet"></div>
+                <div class="step-state mono" id="sheets-sheet-state"></div>
+                <div class="inline-field">
+                  <input class="field mono" id="spreadsheet-id" data-i18n-placeholder="spreadsheetIdPlaceholder">
+                  <button class="btn ghost" id="sheets-save" data-i18n="sheetsSave"></button>
+                </div>
+              </div>
+              <div class="step-act">
+                <button class="btn ghost" id="sheets-create" data-i18n="sheetsCreate"></button>
+                <a class="link mono" id="sheets-open" target="_blank" rel="noopener" data-i18n="sheetsOpen" hidden></a>
+              </div>
+            </li>
+            <li class="sheets-step" id="sheets-step-data">
+              <span class="step-n">3</span>
+              <div class="step-body">
+                <div class="step-title" data-i18n="sheetsStepData"></div>
+                <div class="step-state" data-i18n="sheetsStepDataHint"></div>
+                <label class="switch-row"><input type="checkbox" id="set-autosync"><span class="track"></span><span data-i18n="autoSync"></span></label>
+              </div>
+              <div class="step-act">
+                <button class="btn ghost" id="sheets-push" data-i18n="sheetsPush"></button>
+                <button class="btn ghost" id="sheets-restore" data-i18n="sheetsRestore"></button>
+              </div>
+            </li>
+          </ol>
         </div>
       </div>
 

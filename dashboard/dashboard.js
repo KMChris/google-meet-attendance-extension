@@ -1395,21 +1395,39 @@ $('#btn-clear-all').addEventListener('click', async () => {
   await store.clearHistory(); await load(); go('meetings', { replace: true });
 });
 
-/* ---- Sheets ---- */
+/* ---- Sheets ----
+ * Three steps, always all three on screen: connect an account, point at a sheet, then use it.
+ * A step you cannot reach yet is dimmed rather than hidden, so the whole path is legible
+ * before you start.
+ */
 async function refreshSheets() {
   let connected = false;
   try { connected = await sheets.isAuthenticated(); } catch { connected = false; }
+  const linked = !!settings.spreadsheetId;
+
   $('#sheets-connect').hidden = connected;
   $('#sheets-disconnect').hidden = !connected;
-  $('#sheets-config').hidden = !connected;
-  $('#sheets-status').textContent = connected ? t('sheetsConnected') : t('sheetsNotConnected');
-  $('#sheets-status').className = 'status ' + (connected ? 'status--present' : 'status--info');
-  if (settings.spreadsheetId) {
-    $('#spreadsheet-id').value = settings.spreadsheetId;
-    $('#sheets-open').href = 'https://docs.google.com/spreadsheets/d/' + settings.spreadsheetId + '/edit';
-    $('#sheets-open').hidden = false; $('#autosync-row').hidden = false;
-  } else { $('#sheets-open').hidden = true; }
+  $('#sheets-account-state').textContent = connected ? t('sheetsConnected') : t('sheetsNotConnected');
+  $('#sheets-step-account').classList.toggle('done', connected);
+
+  $('#sheets-step-sheet').classList.toggle('off', !connected);
+  $('#sheets-step-sheet').classList.toggle('done', linked);
+  $('#sheets-sheet-state').textContent = linked ? (settings.spreadsheetName || settings.spreadsheetId) : t('sheetsNoSheet');
+  $('#spreadsheet-id').value = settings.spreadsheetId || '';
+  $('#sheets-open').hidden = !linked;
+  if (linked) $('#sheets-open').href = 'https://docs.google.com/spreadsheets/d/' + settings.spreadsheetId + '/edit';
+
+  $('#sheets-step-data').classList.toggle('off', !linked);
   $('#set-autosync').checked = !!settings.autoSync;
+}
+
+/** Remember the sheet's own title, so step 2 can name it instead of showing a raw id. */
+async function linkSpreadsheet(id) {
+  const ss = await sheets.getSpreadsheet(id);
+  settings = await store.updateSettings({
+    spreadsheetId: id,
+    spreadsheetName: (ss.properties && ss.properties.title) || null
+  });
 }
 $('#sheets-connect').addEventListener('click', async () => {
   $('#sheets-connect').disabled = true;
@@ -1420,21 +1438,56 @@ $('#sheets-connect').addEventListener('click', async () => {
 $('#sheets-disconnect').addEventListener('click', async () => {
   if (!confirm(t('confirmSheetsDisconnect'))) return;
   try { const tok = await sheets.getAuthToken(false); if (tok) await sheets.removeCachedToken(tok); } catch {}
-  settings = await store.updateSettings({ spreadsheetId: null, autoSync: false });
+  settings = await store.updateSettings({ spreadsheetId: null, spreadsheetName: null, autoSync: false });
   toast(t('sheetsDisconnectedToast')); refreshSheets();
 });
 $('#sheets-create').addEventListener('click', async () => {
   $('#sheets-create').disabled = true;
-  try { const ss = await sheets.createSpreadsheet(); settings = await store.updateSettings({ spreadsheetId: ss.spreadsheetId }); toast(t('sheetsCreatedToast')); window.open('https://docs.google.com/spreadsheets/d/' + ss.spreadsheetId + '/edit', '_blank'); }
-  catch (e) { console.error('[GM Attendance] create spreadsheet failed:', (e && e.message) || e); toast(t('sheetsCreateFailed')); }
+  try {
+    const ss = await sheets.createSpreadsheet();
+    settings = await store.updateSettings({ spreadsheetId: ss.spreadsheetId, spreadsheetName: (ss.properties && ss.properties.title) || null });
+    toast(t('sheetsCreatedToast'));
+    window.open('https://docs.google.com/spreadsheets/d/' + ss.spreadsheetId + '/edit', '_blank');
+  } catch (e) { console.error('[GM Attendance] create spreadsheet failed:', (e && e.message) || e); toast(t('sheetsCreateFailed')); }
   $('#sheets-create').disabled = false; refreshSheets();
 });
 $('#sheets-save').addEventListener('click', async () => {
   const id = $('#spreadsheet-id').value.trim(); if (!id) { toast(t('sheetsIdRequired')); return; }
   $('#sheets-save').disabled = true;
-  try { await sheets.getSpreadsheet(id); settings = await store.updateSettings({ spreadsheetId: id }); toast(t('sheetsSavedToast')); }
+  try { await linkSpreadsheet(id); toast(t('sheetsSavedToast')); }
   catch (e) { console.error('[GM Attendance] open spreadsheet failed:', (e && e.message) || e); toast(t('sheetsSaveFailed')); }
   $('#sheets-save').disabled = false; refreshSheets();
+});
+
+// the sheet becomes a full backup: every stored record goes in, replacing what was there
+$('#sheets-push').addEventListener('click', async () => {
+  if (!settings.spreadsheetId) return;
+  $('#sheets-push').disabled = true;
+  try {
+    const stored = await store.getHistory();      // raw records, merges unbaked
+    const res = await sheets.pushAll(settings.spreadsheetId, { meetings: stored, groups });
+    toast(t('sheetsPushedToast', { n: res.meetings }));
+  } catch (e) { console.error('[GM Attendance] push to Sheets failed:', (e && e.message) || e); toast(t('sheetsPushFailed')); }
+  $('#sheets-push').disabled = false;
+});
+
+// and back again: whatever the sheet holds that is not here yet is added, nothing is removed
+$('#sheets-restore').addEventListener('click', async () => {
+  if (!settings.spreadsheetId) return;
+  if (!confirm(t('confirmSheetsRestore'))) return;
+  $('#sheets-restore').disabled = true;
+  try {
+    const { meetings, groups: restoredGroups } = await sheets.restoreAll(settings.spreadsheetId);
+    if (!meetings.length && !restoredGroups.length) { toast(t('sheetsNoBackup')); }
+    else {
+      const known = new Set(groups.map(g => g.id));
+      const fresh = restoredGroups.filter(g => g && g.id && !known.has(g.id));
+      if (fresh.length) { groups = groups.concat(fresh); await store.saveGroups(groups); }
+      const added = await mergeImportedMeetings(meetings);
+      toast(added || fresh.length ? t('sheetsRestoredToast', { n: added }) : t('importNothingNew'));
+    }
+  } catch (e) { console.error('[GM Attendance] restore from Sheets failed:', (e && e.message) || e); toast(t('sheetsRestoreFailed')); }
+  $('#sheets-restore').disabled = false;
 });
 $('#set-autosync').addEventListener('change', async () => { settings = await store.updateSettings({ autoSync: $('#set-autosync').checked }); toast(t('savedToast')); });
 

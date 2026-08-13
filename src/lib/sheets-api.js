@@ -6,6 +6,23 @@
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 /**
+ * The two readable tabs are for people; `Backup` is for the extension. It carries the stored
+ * record of every meeting and series verbatim as JSON, which is what makes a spreadsheet a
+ * complete backup: raw Join/Leave events, e-mails, meeting hours, merges (nameMap) and all.
+ * A cell tops out at 50k characters, so a long record is split over numbered parts.
+ */
+const SHEET_MEETINGS = 'Meetings';
+const SHEET_PARTICIPANTS = 'Participants';
+const SHEET_BACKUP = 'Backup';
+const CELL_CHUNK = 40000;
+
+const HEADERS = {
+  [SHEET_MEETINGS]: ['Meeting ID', 'Title', 'Start Time', 'End Time', 'Duration (min)', 'Participant Count', 'URL'],
+  [SHEET_PARTICIPANTS]: ['Meeting ID', 'Name', 'Email', 'Time', 'Type'],
+  [SHEET_BACKUP]: ['Kind', 'ID', 'Part', 'JSON — written by the extension, do not edit']
+};
+
+/**
  * Get OAuth2 token using Chrome Identity API
  */
 export async function getAuthToken(interactive = true) {
@@ -88,63 +105,47 @@ async function apiRequest(url, options = {}) {
  * Create a new spreadsheet for attendance tracking
  */
 export async function createSpreadsheet(title = 'Google Meet Attendance') {
-  const data = {
-    properties: {
-      title
-    },
-    sheets: [
-      {
-        properties: {
-          title: 'Meetings',
-          gridProperties: {
-            frozenRowCount: 1
-          }
-        }
-      },
-      {
-        properties: {
-          title: 'Participants',
-          gridProperties: {
-            frozenRowCount: 1
-          }
-        }
-      }
-    ]
-  };
-
   const spreadsheet = await apiRequest(SHEETS_API_BASE, {
     method: 'POST',
-    body: JSON.stringify(data)
+    body: JSON.stringify({
+      properties: { title },
+      sheets: Object.keys(HEADERS).map(t => ({
+        properties: { title: t, gridProperties: { frozenRowCount: 1 } }
+      }))
+    })
   });
 
-  // Initialize headers
-  await initializeSpreadsheetHeaders(spreadsheet.spreadsheetId);
-
+  await writeHeaders(spreadsheet.spreadsheetId, Object.keys(HEADERS));
   return spreadsheet;
 }
 
+/** Structural changes (adding a tab) go to a different endpoint than cell values. */
+async function structureUpdate(spreadsheetId, requests) {
+  return apiRequest(`${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({ requests })
+  });
+}
+
+async function writeHeaders(spreadsheetId, titles) {
+  await batchUpdate(spreadsheetId, titles.map(t => ({ range: `${t}!A1`, values: [HEADERS[t]] })));
+}
+
 /**
- * Initialize spreadsheet with headers
+ * Make sure the tabs we write to exist. A sheet the user picked by hand, or one an older
+ * version created, will be missing some — add them rather than failing the whole sync.
  */
-async function initializeSpreadsheetHeaders(spreadsheetId) {
-  const meetingsHeaders = [
-    ['Meeting ID', 'Title', 'Start Time', 'End Time', 'Duration (min)', 'Participant Count', 'URL']
-  ];
-
-  const participantsHeaders = [
-    ['Meeting ID', 'Name', 'Email', 'Time', 'Type']
-  ];
-
-  await batchUpdate(spreadsheetId, [
-    {
-      range: 'Meetings!A1:G1',
-      values: meetingsHeaders
-    },
-    {
-      range: 'Participants!A1:E1',
-      values: participantsHeaders
-    }
-  ]);
+export async function ensureSheets(spreadsheetId) {
+  const ss = await getSpreadsheet(spreadsheetId);
+  const have = new Set((ss.sheets || []).map(s => s.properties && s.properties.title));
+  const missing = Object.keys(HEADERS).filter(t => !have.has(t));
+  if (missing.length) {
+    await structureUpdate(spreadsheetId, missing.map(title => ({
+      addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } }
+    })));
+    await writeHeaders(spreadsheetId, missing);
+  }
+  return ss;
 }
 
 /**
@@ -204,111 +205,105 @@ export async function getData(spreadsheetId, range) {
   return apiRequest(url);
 }
 
+/* ------------------------- what a meeting looks like in the sheet ------------------------- */
+
+function meetingRow(meeting) {
+  const names = Object.keys(meeting.attendance || {});
+  const duration = meeting.date && meeting.endedAt
+    ? Math.round((new Date(meeting.endedAt) - new Date(meeting.date)) / 60000).toString()
+    : '';
+  return [meeting.id, meeting.meetingTitle || '', meeting.date || '', meeting.endedAt || '',
+    duration, names.length, meeting.url || ''];
+}
+
+/** One row per raw Join/Leave event — a summary row only when a record carries no events. */
+function participantRows(meeting) {
+  const attendance = meeting.attendance || {};
+  return Object.keys(attendance).flatMap(name => {
+    const p = attendance[name] || {};
+    const events = Array.isArray(p.events) ? p.events : [];
+    if (events.length) return events.map(e => [meeting.id, name, p.email || '', e.time || '', e.type]);
+    return [[meeting.id, name, p.email || '', p.joinedAt || '', p.present ? 'In call' : 'Left']];
+  });
+}
+
+/** The verbatim record, split into cell-sized parts. */
+function backupRows(kind, id, obj) {
+  const json = JSON.stringify(obj);
+  const parts = Math.max(1, Math.ceil(json.length / CELL_CHUNK));
+  return Array.from({ length: parts }, (_, i) => [kind, id, i, json.slice(i * CELL_CHUNK, (i + 1) * CELL_CHUNK)]);
+}
+
 /**
- * Sync a meeting (attendanceHistory record) to Google Sheets.
- * record = { id, date, endedAt, meetingTitle, url, attendance: { name: {email, present, events, ...} } }
+ * Sync one meeting (an attendanceHistory record) — the readable rows plus the backup rows
+ * that make it restorable.
  */
 export async function syncMeeting(spreadsheetId, meeting) {
-  const meetingId = meeting.id;
-  const startTime = meeting.date ? new Date(meeting.date).toLocaleString() : '';
-  const endTime = meeting.endedAt ? new Date(meeting.endedAt).toLocaleString() : '';
+  await ensureSheets(spreadsheetId);
+  await appendData(spreadsheetId, `${SHEET_MEETINGS}!A:G`, [meetingRow(meeting)]);
 
-  // Calculate duration
-  let duration = '';
-  if (meeting.date && meeting.endedAt) {
-    const durationMs = new Date(meeting.endedAt) - new Date(meeting.date);
-    duration = Math.round(durationMs / 60000).toString();
-  }
+  const rows = participantRows(meeting);
+  if (rows.length) await appendData(spreadsheetId, `${SHEET_PARTICIPANTS}!A:E`, rows);
+  await appendData(spreadsheetId, `${SHEET_BACKUP}!A:D`, backupRows('meeting', meeting.id, meeting));
 
-  const attendance = meeting.attendance || {};
-  const names = Object.keys(attendance);
+  return { success: true, meetingId: meeting.id, participantCount: Object.keys(meeting.attendance || {}).length };
+}
 
-  // Append meeting summary row
-  const meetingRow = [
-    [meetingId, meeting.meetingTitle || '', startTime, endTime, duration, names.length, meeting.url || '']
+/**
+ * Write the whole local store to the sheet, replacing what is there. This is the operation
+ * that makes the spreadsheet a full backup: after it, `restoreAll` can rebuild everything.
+ */
+export async function pushAll(spreadsheetId, { meetings = [], groups = [] } = {}) {
+  await ensureSheets(spreadsheetId);
+  await clearValues(spreadsheetId, [`${SHEET_MEETINGS}!A2:Z`, `${SHEET_PARTICIPANTS}!A2:Z`, `${SHEET_BACKUP}!A2:D`]);
+
+  const backup = [
+    ...groups.flatMap(g => backupRows('series', g.id, g)),
+    ...meetings.flatMap(m => backupRows('meeting', m.id, m))
   ];
-  await appendData(spreadsheetId, 'Meetings!A:G', meetingRow);
+  const data = [
+    { range: `${SHEET_MEETINGS}!A2`, values: meetings.map(meetingRow) },
+    { range: `${SHEET_PARTICIPANTS}!A2`, values: meetings.flatMap(participantRows) },
+    { range: `${SHEET_BACKUP}!A2`, values: backup }
+  ].filter(d => d.values.length);
+  if (data.length) await batchUpdate(spreadsheetId, data);
 
-  // Append one row per raw Join/Leave event (falls back to a summary row if none)
-  if (names.length > 0) {
-    const participantRows = [];
-    for (const name of names) {
-      const p = attendance[name] || {};
-      const events = Array.isArray(p.events) ? p.events : [];
-      if (events.length) {
-        for (const event of events) {
-          participantRows.push([
-            meetingId,
-            name,
-            p.email || '',
-            event.time ? new Date(event.time).toLocaleString() : '',
-            event.type
-          ]);
-        }
-      } else {
-        participantRows.push([
-          meetingId,
-          name,
-          p.email || '',
-          p.joinedAt ? new Date(p.joinedAt).toLocaleString() : '',
-          p.present ? 'In call' : 'Left'
-        ]);
-      }
-    }
-
-    if (participantRows.length > 0) {
-      await appendData(spreadsheetId, 'Participants!A:E', participantRows);
-    }
-  }
-
-  return { success: true, meetingId, participantCount: names.length };
+  return { meetings: meetings.length, groups: groups.length };
 }
 
 /**
- * Sync all meetings to Google Sheets
+ * Read everything back out of the sheet. Rows are read in order and a part 0 starts a fresh
+ * record, so a meeting appended several times restores as the last version written.
  */
-export async function syncAllMeetings(spreadsheetId, meetings) {
-  const results = [];
-
-  for (const meeting of meetings) {
-    try {
-      const result = await syncMeeting(spreadsheetId, meeting);
-      results.push(result);
-    } catch (error) {
-      results.push({
-        success: false,
-        meetingId: meeting.meetingId,
-        error: error.message
-      });
-    }
-  }
-
-  return results;
-}
-
-/**
- * Check if a meeting has already been synced
- */
-export async function isMeetingSynced(spreadsheetId, meetingId) {
+export async function restoreAll(spreadsheetId) {
+  let rows = [];
   try {
-    const data = await getData(spreadsheetId, 'Meetings!A:A');
-    const values = data.values || [];
-    return values.some(row => row[0] === meetingId);
-  } catch {
-    return false;
-  }
+    const data = await getData(spreadsheetId, `${SHEET_BACKUP}!A2:D`);
+    rows = data.values || [];
+  } catch { rows = []; }               // no Backup tab: nothing was ever written for restore
+
+  const byKey = new Map();
+  rows.forEach(([kind, id, part, json]) => {
+    if (!kind || !id) return;
+    const key = `${kind} ${id}`;
+    const idx = Number(part) || 0;
+    if (idx === 0 || !byKey.has(key)) byKey.set(key, { kind, id, parts: new Map() });
+    byKey.get(key).parts.set(idx, json || '');
+  });
+
+  const meetings = [], groups = [];
+  byKey.forEach(rec => {
+    const json = Array.from(rec.parts.keys()).sort((a, b) => a - b).map(i => rec.parts.get(i)).join('');
+    let obj;
+    try { obj = JSON.parse(json); } catch { return; }
+    if (!obj || !obj.id) return;
+    (rec.kind === 'series' ? groups : meetings).push(obj);
+  });
+  return { meetings, groups };
 }
 
-/**
- * Get synced meeting IDs
- */
-export async function getSyncedMeetingIds(spreadsheetId) {
-  try {
-    const data = await getData(spreadsheetId, 'Meetings!A:A');
-    const values = data.values || [];
-    // Skip header row
-    return values.slice(1).map(row => row[0]).filter(Boolean);
-  } catch {
-    return [];
-  }
+async function clearValues(spreadsheetId, ranges) {
+  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values:batchClear`;
+  return apiRequest(url, { method: 'POST', body: JSON.stringify({ ranges }) });
 }
+
