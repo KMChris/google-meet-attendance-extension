@@ -18,6 +18,16 @@ export const TRANSLATIONS = {
     /* masthead readout */
     readoutMeetings: 'Meetings', readoutPeople: 'People', readoutPresent: 'Attendance',
 
+    /* batch selection */
+    selectHint: 'Pick for a batch action',
+    selCount: '{n} selected', selClear: 'Clear the selection',
+    selAddRoster: 'Add to roster', selRemoveRoster: 'Remove from roster',
+    selCopyNames: 'Copy names',
+    rosterAddedToast: 'Added {n} to the roster', rosterAlreadyThere: 'Already on the roster',
+    rosterRemovedToast: 'Removed {n} from the roster', rosterNotThere: 'Not on the roster',
+    confirmDeleteMeetings: 'Delete {n} meetings permanently?',
+    deletedMeetingsToast: 'Deleted {n} meetings',
+
     /* meetings list */
     meetingsSubtitle: 'Your tracked Google Meet sessions',
     searchMeetings: 'Search meetings or people…',
@@ -246,6 +256,16 @@ export const TRANSLATIONS = {
 
     /* masthead readout */
     readoutMeetings: 'Spotkania', readoutPeople: 'Osoby', readoutPresent: 'Frekwencja',
+
+    /* zaznaczanie zbiorcze */
+    selectHint: 'Zaznacz do operacji zbiorczej',
+    selCount: 'zaznaczono: {n}', selClear: 'Wyczyść zaznaczenie',
+    selAddRoster: 'Dodaj do listy', selRemoveRoster: 'Usuń z listy',
+    selCopyNames: 'Kopiuj nazwiska',
+    rosterAddedToast: 'Dodano do listy: {n}', rosterAlreadyThere: 'Już są na liście',
+    rosterRemovedToast: 'Usunięto z listy: {n}', rosterNotThere: 'Nie ma ich na liście',
+    confirmDeleteMeetings: 'Trwale usunąć spotkania ({n})?',
+    deletedMeetingsToast: 'Usunięto spotkania: {n}',
 
     /* meetings list */
     meetingsSubtitle: 'Twoje śledzone sesje Google Meet',

@@ -54,6 +54,37 @@
 .meetings-grid{grid-template-columns:58px 1fr 130px 64px 84px 72px}
 .people-grid{grid-template-columns:1fr 84px 108px 150px 108px}
 
+/* ===================================================================
+   Batch selection — the badge a row already has becomes its checkbox,
+   and the toolbar takes over the list header, so nothing shifts.
+   =================================================================== */
+.pick{position:relative;display:inline-flex;flex:none;cursor:pointer;border-radius:10px}
+.name-cell .pick,.m-name .pick{border-radius:8px}
+.pick-mark{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  border-radius:inherit;background:var(--panel);border:1.5px solid var(--line-2);color:transparent}
+.pick:hover .pick-mark,.pick:focus-visible .pick-mark{display:flex}
+.pick:hover .pick-mark{border-color:var(--ink-3)}
+.selecting .pick .pick-mark{display:flex}
+/* visibility, not display: the badge keeps its box so the row height never moves */
+.selecting .pick > :not(.pick-mark){visibility:hidden}
+.pick.on .pick-mark{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.pick:focus-visible{outline:none;box-shadow:var(--focus)}
+
+.list-head,.sect-head{position:relative}
+.sect-head{min-height:36px}
+.sel-bar{position:absolute;inset:0;z-index:5;display:flex;align-items:center;gap:12px;
+  background:var(--panel);border-radius:inherit}
+.list-head .sel-bar{padding:0 20px}
+.sel-count{font-size:11.5px;letter-spacing:.04em;color:var(--ink);text-transform:none;white-space:nowrap}
+.sel-acts{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+.sel-act{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);
+  background:var(--panel);border:1.5px solid var(--line-2);border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.sel-act:hover{border-color:var(--ink-3);color:var(--ink)}
+.sel-act.danger:hover{border-color:var(--red);color:var(--red)}
+.sel-close{margin-left:auto;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  background:none;border:none;cursor:pointer;color:var(--ink-3);padding:5px;border-radius:7px}
+.sel-close:hover{background:var(--panel-2);color:var(--ink)}
+
 /* date badge */
 .date-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:46px;
   border-radius:10px;background:var(--panel-2);border:1px solid var(--line);line-height:1}

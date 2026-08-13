@@ -16,7 +16,7 @@ let settings = {};
 let roster = [];          // global default roster
 let curMeetingId = null;
 let curGroupId = null;
-let assignContextId = null; // meeting id awaiting group assignment
+let assignContextIds = []; // meeting ids awaiting a series assignment
 
 const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-violet', rose: '--grp-rose', sky: '--grp-sky', lime: '--grp-lime' };
 const GRP_KEYS = Object.keys(GRP_COLORS);
@@ -111,7 +111,7 @@ function goBack(fallback) {
 function route(force) {
   const hash = currentHash();
   if (!force && hash === renderedRoute) return;
-  if (hash !== renderedRoute) previousRoute = renderedRoute;
+  if (hash !== renderedRoute) { previousRoute = renderedRoute; selectionReset(); }
   renderedRoute = hash;
   const r = parseRoute(hash);
 
@@ -180,6 +180,113 @@ function renderReadout() {
     `${t('readoutMeetings').toUpperCase()} <b>${history.length}</b> · ${t('readoutPeople').toUpperCase()} <b>${people.size}</b> · ${t('readoutPresent').toUpperCase()} <b>${att}%</b>`;
 }
 
+/* ========================= BATCH SELECTION =========================
+ * Selecting starts on the handle a row already carries — a meeting's date badge, a person's
+ * avatar — which turns into a checkbox inside the very same box. The toolbar then takes over
+ * the list's own header row, so entering and leaving selection never moves anything below.
+ */
+const selection = { scope: null, keys: new Set(), repaint: null };
+
+function selectionReset() { selection.scope = null; selection.keys.clear(); }
+
+/**
+ * Once something is selected the whole row joins in, so a stray click adds to the batch
+ * instead of navigating away and losing it. Returns true when the click was consumed.
+ */
+function selectionClick(key) {
+  if (!selection.keys.size) return false;
+  if (selection.keys.has(key)) selection.keys.delete(key); else selection.keys.add(key);
+  if (selection.repaint) selection.repaint();
+  return true;
+}
+
+/** The handle that stands in for a badge or avatar while selecting. */
+function pickHandle(key, inner) {
+  return `<span class="pick" data-key="${esc(key)}" role="checkbox" aria-checked="false" tabindex="0"
+    title="${esc(t('selectHint'))}"><span class="pick-mark"><svg width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L19 7"/></svg></span>${inner}</span>`;
+}
+
+/**
+ * Wire the handles rendered inside `root` and the toolbar that lives in `head`.
+ * Call it at the end of every render of the list — handles are recreated each time, the
+ * toolbar is not. `actions` are `{ label(), run(keys), min?, danger? }`.
+ */
+function mountSelection({ scope, head, root, actions }) {
+  if (!head || !root) return;
+  if (selection.scope !== scope) { selection.scope = scope; selection.keys.clear(); }
+
+  const handles = $$('.pick', root);
+  const present = new Set(handles.map(p => p.dataset.key));
+  // a filtered-out or deleted row must not keep voting for the count
+  Array.from(selection.keys).forEach(k => { if (!present.has(k)) selection.keys.delete(k); });
+
+  let bar = head.querySelector(':scope > .sel-bar');
+  if (!bar) { bar = document.createElement('div'); bar.className = 'sel-bar'; bar.hidden = true; head.appendChild(bar); }
+
+  const paint = () => {
+    const on = selection.keys.size > 0;
+    root.classList.toggle('selecting', on);
+    head.classList.toggle('selecting', on);
+    handles.forEach(p => {
+      const picked = selection.keys.has(p.dataset.key);
+      p.classList.toggle('on', picked);
+      p.setAttribute('aria-checked', String(picked));
+    });
+    bar.hidden = !on;
+    if (on) drawSelectionBar(bar, actions, paint);
+  };
+  selection.repaint = paint;
+
+  handles.forEach(p => {
+    const toggle = e => {
+      e.preventDefault(); e.stopPropagation();
+      const k = p.dataset.key;
+      if (selection.keys.has(k)) selection.keys.delete(k); else selection.keys.add(k);
+      paint();
+    };
+    p.addEventListener('click', toggle);
+    p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') toggle(e); });
+  });
+  paint();
+}
+
+function drawSelectionBar(bar, actions, paint) {
+  const n = selection.keys.size;
+  const shown = actions.filter(a => n >= (a.min || 1));
+  bar.innerHTML = `<span class="sel-count mono">${esc(t('selCount', { n }))}</span>
+    <div class="sel-acts">${shown.map((a, i) =>
+      `<button class="sel-act${a.danger ? ' danger' : ''}" data-i="${i}">${esc(a.label())}</button>`).join('')}</div>
+    <button class="sel-close" title="${esc(t('selClear'))}" aria-label="${esc(t('selClear'))}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>`;
+  $$('.sel-act', bar).forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation();
+    await shown[Number(b.dataset.i)].run(Array.from(selection.keys));
+  }));
+  $('.sel-close', bar).addEventListener('click', e => { e.stopPropagation(); selection.keys.clear(); paint(); });
+}
+
+/** The roster a meeting is measured against: its series' own list, or the default one. */
+async function addNamesToRoster(names, group) {
+  const list = group ? (group.roster || []).slice() : roster.slice();
+  let added = 0;
+  names.forEach(n => {
+    if (!list.some(x => x.toLowerCase() === n.toLowerCase())) { list.push(n); added++; }
+  });
+  if (group) await store.updateGroup(group.id, { roster: list });
+  else { roster = list; await store.saveRoster(list); }
+  return added;
+}
+async function removeNamesFromRoster(names, group) {
+  const drop = new Set(names.map(n => n.toLowerCase()));
+  const before = group ? (group.roster || []) : roster;
+  const list = before.filter(n => !drop.has(n.toLowerCase()));
+  const removed = before.length - list.length;
+  if (group) await store.updateGroup(group.id, { roster: list });
+  else { roster = list; await store.saveRoster(list); }
+  return removed;
+}
+
 /* ============================ MEETINGS ============================ */
 function meetingMatches(m, q) {
   if (m.meetingTitle.toLowerCase().includes(q)) return true;
@@ -215,8 +322,9 @@ function renderMeetings(filter = '') {
       ? `<span class="group-pill"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span><span class="gname">${esc(g.name)}</span></span>`
       : '';
     const live = A.isInProgress(m) ? `<span class="status status--present" style="margin-left:6px">${t('inCall')}</span>` : '';
+    const badge = `<div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div>`;
     return `<div class="row meetings-grid" data-id="${esc(m.id)}">
-      <div class="col-date"><div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div></div>
+      <div class="col-date">${pickHandle(m.id, badge)}</div>
       <div class="col-title"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(startIso)}</div></div>
       <div class="col-group">${groupCell}</div>
       <div class="col-people num">${people}</div>
@@ -225,8 +333,28 @@ function renderMeetings(filter = '') {
     </div>`;
   }).join('');
 
-  $$('#meetings-body .row').forEach(row => row.addEventListener('click', () => go('meeting=' + encodeURIComponent(row.dataset.id))));
+  $$('#meetings-body .row').forEach(row => row.addEventListener('click', () => {
+    if (selectionClick(row.dataset.id)) return;
+    go('meeting=' + encodeURIComponent(row.dataset.id));
+  }));
   $$('#meetings-body [data-act="export"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); downloadMeetingCSV(b.dataset.id); }));
+
+  mountSelection({
+    scope: 'meetings', head: $('#meetings-table .list-head'), root: $('#meetings-body'),
+    actions: [
+      { label: () => t('addToGroup'), run: ids => openAssignModal(ids.map(id => history.find(m => m.id === id)).filter(Boolean)) },
+      { label: () => t('exportCsv'), run: ids => downloadSelectionCSV(ids) },
+      {
+        label: () => t('delete'), danger: true,
+        run: async ids => {
+          if (!confirm(t('confirmDeleteMeetings', { n: ids.length }))) return;
+          for (const id of ids) await store.deleteMeetingById(id);
+          selectionReset(); await load();
+          toast(t('deletedMeetingsToast', { n: ids.length }));
+        }
+      }
+    ]
+  });
 }
 $('#meeting-search').addEventListener('input', e => renderMeetings(e.target.value.trim()));
 
@@ -331,8 +459,9 @@ function renderAttendance(m, filter) {
     // attendance is binary — being in the call at all is the whole story
     const st = A.statusFor(a, m);
     const chip = `<span class="status status--present">${t('present')}</span>`;
+    const avatar = `<span class="avatar" style="${avatarStyle(name)}">${esc(initials(name))}</span>`;
     return `<tr>
-      <td><div class="name-cell"><span class="avatar" style="${avatarStyle(name)}">${esc(initials(name))}</span><span class="nm">${esc(name)}</span>${mergedChip(a)}</div></td>
+      <td><div class="name-cell">${pickHandle(name, avatar)}<span class="nm">${esc(name)}</span>${mergedChip(a)}</div></td>
       <td class="mono">${i18n.formatTime(a.firstSeen)}</td>
       <td class="mono">${a.present ? '<span class="mono">'+esc(t('inCall'))+'</span>' : i18n.formatTime(a.lastLeft)}</td>
       <td class="num mono">${fmtHMS(st.seconds)}</td>
@@ -357,6 +486,31 @@ function renderAttendance(m, filter) {
   $('#attendance-table').innerHTML = thead + `<tbody id="attendance-body">${rows}</tbody>`;
   $$('#attendance-table .edit-name').forEach(b =>
     b.addEventListener('click', () => openParticipantModal(people[Number(b.dataset.i)][0])));
+
+  const g = m.groupId ? groupById(m.groupId) : null;
+  mountSelection({
+    scope: 'participants', head: $('#attendance-head'), root: $('#attendance-table'),
+    actions: [
+      {
+        label: () => t('merge'), min: 2,
+        run: async names => {
+          // the first pick is the one everyone else folds into, so the reading stays predictable
+          const [target, ...rest] = names;
+          for (const from of rest) await store.renameParticipant(m.id, from, target);
+          selectionReset(); await load();
+          toast(t('mergedToast'));
+        }
+      },
+      {
+        label: () => t('selAddRoster'),
+        run: async names => {
+          const added = await addNamesToRoster(names, g);
+          selectionReset(); await load();
+          toast(added ? t('rosterAddedToast', { n: added }) : t('rosterAlreadyThere'));
+        }
+      }
+    ]
+  });
 }
 $('#participant-search').addEventListener('input', e => { const m = currentMeeting(); if (m) renderAttendance(m, e.target.value.trim()); });
 
@@ -521,7 +675,7 @@ $('#btn-export').addEventListener('click', () => { if (curMeetingId) downloadMee
 $('#btn-pdf').addEventListener('click', () => { if (curMeetingId) openReport('meeting', curMeetingId); });
 
 // assign to group
-$('#btn-group').addEventListener('click', () => { assignContextId = curMeetingId; openAssignModal(currentMeeting()); });
+$('#btn-group').addEventListener('click', () => openAssignModal(currentMeeting()));
 
 /* ============================ GROUPS ============================ */
 function renderGroups() {
@@ -631,7 +785,7 @@ function renderMatrix(agg) {
   </tr></thead>`;
   const chevron = `<svg class="go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>`;
   const body = '<tbody>' + agg.people.map(p => `<tr data-name="${esc(p.name)}" tabindex="0" title="${esc(t('personSessionsTitle', { name: p.name }))}">
-    <td><div class="m-name"><span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span><span class="nm">${esc(p.name)}</span>${chevron}</div></td>
+    <td><div class="m-name">${pickHandle(p.name, `<span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span>`)}<span class="nm">${esc(p.name)}</span>${chevron}</div></td>
     ${agg.sessions.map(s => {
       const c = p.perSession[s.id];
       // the dot keeps the pattern readable across a row; the number says how much of it
@@ -645,11 +799,35 @@ function renderMatrix(agg) {
 
   $$('#group-matrix tbody tr').forEach(tr => {
     const toggle = () => {
+      if (selectionClick(tr.dataset.name)) return;
       if (tr.classList.contains('expanded')) goBack('group=' + encodeURIComponent(curGroupId));
       else go(`group=${encodeURIComponent(curGroupId)}&person=${encodeURIComponent(tr.dataset.name)}`);
     };
     tr.addEventListener('click', toggle);
     tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+
+  const g = groupById(curGroupId);
+  mountSelection({
+    scope: 'series-people', head: $('#matrix-head'), root: $('#group-matrix'),
+    actions: [
+      {
+        label: () => t('selAddRoster'),
+        run: async names => {
+          const added = await addNamesToRoster(names, g);
+          selectionReset(); await load();
+          toast(added ? t('rosterAddedToast', { n: added }) : t('rosterAlreadyThere'));
+        }
+      },
+      {
+        label: () => t('selRemoveRoster'),
+        run: async names => {
+          const removed = await removeNamesFromRoster(names, g);
+          selectionReset(); await load();
+          toast(removed ? t('rosterRemovedToast', { n: removed }) : t('rosterNotThere'));
+        }
+      }
+    ]
   });
 }
 
@@ -781,7 +959,7 @@ $('#btn-group-delete').addEventListener('click', async () => {
 });
 $('#btn-group-pdf').addEventListener('click', () => { if (curGroupId) openReport('group', curGroupId); });
 $('#btn-group-export').addEventListener('click', () => downloadGroupCSV(curGroupId));
-$('#btn-new-group').addEventListener('click', () => openGroupModal(null));
+$('#btn-new-group').addEventListener('click', () => openGroupModal([]));
 
 /* ============================ PEOPLE ============================ */
 function aggregatePeople() {
@@ -812,8 +990,9 @@ function renderPeople(filter = '') {
 
   $('#people-body').innerHTML = entries.map(p => {
     const avg = p.shares.length ? Math.round(p.shares.reduce((s, r) => s + r, 0) / p.shares.length) : 0;
+    const avatar = `<span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span>`;
     return `<div class="row people-grid" data-name="${esc(p.name)}">
-      <div class="col-name"><div class="name-cell"><span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span><span class="nm">${esc(p.name)}</span></div></div>
+      <div class="col-name"><div class="name-cell">${pickHandle(p.name, avatar)}<span class="nm">${esc(p.name)}</span></div></div>
       <div class="num">${p.count}</div>
       <div class="num mono">${fmtDur(p.total)}</div>
       <div class="col-rate"><div class="share-cell"><div class="share-bar"><i style="width:${avg}%"></i></div><span class="pct">${avg}%</span></div></div>
@@ -821,9 +1000,28 @@ function renderPeople(filter = '') {
     </div>`;
   }).join('');
   $$('#people-body .row').forEach(r => r.addEventListener('click', () => {
+    if (selectionClick(r.dataset.name)) return;
     if (r.classList.contains('expanded')) goBack('people');
     else go('people&person=' + encodeURIComponent(r.dataset.name));
   }));
+
+  mountSelection({
+    scope: 'people', head: $('#people-table .list-head'), root: $('#people-body'),
+    actions: [
+      {
+        label: () => t('selAddRoster'),
+        run: async names => {
+          const added = await addNamesToRoster(names, null);
+          selectionReset(); await load();
+          toast(added ? t('rosterAddedToast', { n: added }) : t('rosterAlreadyThere'));
+        }
+      },
+      {
+        label: () => t('selCopyNames'),
+        run: names => navigator.clipboard.writeText(names.join('\n')).then(() => toast(t('copiedToast')))
+      }
+    ]
+  });
 }
 
 /**
@@ -939,6 +1137,14 @@ function downloadMeetingCSV(id) {
   downloadCSV([csvDetailHeader(), ...csvDetailRows(m)],
     `${safe(m.meetingTitle)}-${localDay(A.meetingStartIso(m))}.csv`);
 }
+/** A hand-picked set of meetings, oldest first — the same columns as every other export. */
+function downloadSelectionCSV(ids) {
+  const ms = ids.map(id => history.find(m => m.id === id)).filter(Boolean)
+    .sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
+  if (!ms.length) return;
+  downloadCSV([csvDetailHeader(), ...ms.flatMap(m => csvDetailRows(m))],
+    `gm-attendance-${ms.length}-${localDay(new Date().toISOString())}.csv`);
+}
 /** The series file carries both readings: the matrix to scan, the detail to work with. */
 function downloadGroupCSV(id) {
   const g = groupById(id); if (!g) return;
@@ -991,8 +1197,8 @@ function toggleMenu(btnSel, menuSel) {
 document.addEventListener('click', () => $$('.menu').forEach(m => m.hidden = true));
 
 let groupModalColor = 'teal';
-function openGroupModal(assignId) {
-  assignContextId = assignId;
+function openGroupModal(assignIds) {
+  assignContextIds = assignIds || [];
   $('#group-modal-name').value = '';
   groupModalColor = GRP_KEYS[groups.length % GRP_KEYS.length];
   $('#group-modal-colors').innerHTML = GRP_KEYS.map(k => `<button data-c="${k}" style="background:var(${GRP_COLORS[k]})" class="${k === groupModalColor ? 'on' : ''}"></button>`).join('');
@@ -1003,32 +1209,41 @@ $('#group-modal-cancel').addEventListener('click', () => $('#group-modal').hidde
 $('#group-modal-save').addEventListener('click', async () => {
   const name = $('#group-modal-name').value.trim(); if (!name) return;
   const g = await store.createGroup({ name, color: groupModalColor });
-  if (assignContextId) await store.assignMeetingToGroup(assignContextId, g.id);
+  const assigned = assignContextIds;
+  if (assigned.length) await store.assignMeetingsToGroup(assigned, g.id);
   $('#group-modal').hidden = true;
-  const openMeetingAfter = assignContextId;
-  assignContextId = null;
+  assignContextIds = [];
+  selectionReset();
   await load();
   toast(t('groupCreatedToast'));
-  if (openMeetingAfter) go('meeting=' + encodeURIComponent(openMeetingAfter));
+  // one meeting came here from its own page, so go back to it; a batch belongs in the series
+  if (assigned.length === 1) go('meeting=' + encodeURIComponent(assigned[0]));
   else go('group=' + encodeURIComponent(g.id));
 });
 
-function openAssignModal(m) {
-  if (!m) return;
+/** Assign one meeting or a hand-picked batch; the current series is only marked if they share one. */
+function openAssignModal(meetings) {
+  const ms = (Array.isArray(meetings) ? meetings : [meetings]).filter(Boolean);
+  if (!ms.length) return;
+  assignContextIds = ms.map(m => m.id);
+  const shared = ms.every(m => m.groupId === ms[0].groupId) ? ms[0].groupId : null;
+
   const list = $('#assign-list');
-  list.innerHTML = groups.map(g => `<div class="assign-item ${m.groupId === g.id ? 'current' : ''}" data-id="${esc(g.id)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>${esc(g.name)}</div>`).join('')
-    + (m.groupId ? `<div class="assign-item" data-id="__none"><span class="gdot" style="background:var(--absent)"></span>${t('removeFromGroup')}</div>` : '');
+  list.innerHTML = groups.map(g => `<div class="assign-item ${shared === g.id ? 'current' : ''}" data-id="${esc(g.id)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>${esc(g.name)}</div>`).join('')
+    + (ms.some(m => m.groupId) ? `<div class="assign-item" data-id="__none"><span class="gdot" style="background:var(--absent)"></span>${t('removeFromGroup')}</div>` : '');
   if (!groups.length) list.innerHTML = `<p class="hint">${t('emptyGroupsBody')}</p>`;
   $$('#assign-list .assign-item').forEach(it => it.addEventListener('click', async () => {
     const gid = it.dataset.id === '__none' ? null : it.dataset.id;
-    await store.assignMeetingToGroup(m.id, gid);
+    await store.assignMeetingsToGroup(assignContextIds, gid);
     $('#assign-modal').hidden = true;
+    assignContextIds = [];
+    selectionReset();
     await load(); toast(t('assignedToast'));
   }));
   $('#assign-modal').hidden = false;
 }
 $('#assign-cancel').addEventListener('click', () => $('#assign-modal').hidden = true);
-$('#assign-new').addEventListener('click', () => { $('#assign-modal').hidden = true; openGroupModal(assignContextId); });
+$('#assign-new').addEventListener('click', () => { $('#assign-modal').hidden = true; openGroupModal(assignContextIds); });
 
 function dismissModal(mod) { mod.hidden = true; }
 $$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target === mod) dismissModal(mod); }));
