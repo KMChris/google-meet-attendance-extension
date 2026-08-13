@@ -382,53 +382,6 @@ export function grouped(canvas, o) {
   });
 }
 
-/** Part-to-whole per bucket. Segments are separated by a 2px gap in the surface colour. */
-export function stacked(canvas, o) {
-  const pal = o.pal || palette();
-  const labels = o.labels, series = o.series;
-  const fmt = o.fmt || NOOP_FMT;
-  const height = o.height || 210;
-  const { ctx, W, H } = prep(canvas, height);
-
-  const totals = labels.map((_, i) => series.reduce((s, sr) => s + (sr.values[i] || 0), 0));
-  const sc = scaleFor(Math.max(...totals, 0), { integer: o.integer });
-  const axisFmt = o.axisFmt || fmt;
-  const padL = Math.round(measureMax(ctx, [0, sc.top].map(axisFmt)) + 12);
-  const g = { left: padL, top: 30, w: W - padL - 8, h: H - 30 - 26 };
-  legend(ctx, series, padL, 12, pal);
-  gridY(ctx, g, sc, axisFmt, pal);
-
-  const slot = g.w / Math.max(1, labels.length);
-  const bw = Math.max(4, Math.min(BAR_MAX, slot * 0.62));
-  const stride = labelStride(ctx, labels, slot);
-
-  labels.forEach((lb, i) => {
-    const cx = g.left + slot * (i + 0.5);
-    let acc = 0;
-    series.forEach((s, si) => {
-      const val = s.values[i] || 0;
-      if (val <= 0) return;
-      const y0 = g.top + g.h - (acc / sc.top) * g.h;
-      const y1 = g.top + g.h - ((acc + val) / sc.top) * g.h;
-      const top = si === series.length - 1 || acc + val >= totals[i] - 1e-9;
-      const gap = si === 0 ? 0 : 2;                    // surface gap, not a stroke
-      ctx.fillStyle = s.color;
-      fillRound(ctx, cx - bw / 2, y1, bw, Math.max(0, y0 - y1 - gap), top ? [4, 4, 0, 0] : [0, 0, 0, 0]);
-      acc += val;
-    });
-    if (i % stride === 0) {
-      ctx.fillStyle = pal.ink3; ctx.textAlign = 'center';
-      ctx.fillText(lb, cx, H - 8);
-    }
-    spots(canvas).push({
-      x: cx - Math.max(HIT_MIN, slot) / 2, y: g.top, w: Math.max(HIT_MIN, slot), h: g.h,
-      title: (o.titles && o.titles[i]) || lb,
-      rows: series.map(s => ({ color: s.color, value: fmt(s.values[i] || 0), label: s.label }))
-        .filter(r => !o.hideZeroRows || parseFloat(r.value) !== 0)
-    });
-  });
-}
-
 /**
  * Ranked horizontal bars. The name gutter is measured from the actual labels and
  * capped at 40% of the canvas, then every label is fitted to it — which is why a long
