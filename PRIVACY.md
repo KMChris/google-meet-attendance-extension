@@ -2,21 +2,26 @@
 
 **Google Meet Attendance Tracker**
 
-Last updated: 2026-07-24
+Last updated: 2026-08-14
 
 ## Data Collection
 
-This extension does **not** collect, transmit, or store any user data on external servers.
+The extension records attendance in the Google Meet calls the user takes part in. What it stores:
 
-All data (participant names, timestamps, meeting records) is stored **locally** on the user's device using Chrome's `chrome.storage.local` API.
+- participant display names, as shown by Google Meet
+- participant e-mail addresses, when Meet displays them (usually only for people in the same organisation)
+- join and leave timestamps, plus the meeting's link, code, title and hours
+- settings and any corrections the user makes (renamed or merged participants, series)
+
+All of it is written to `chrome.storage.local` on the user's own device. Nothing is sent to us. There is no server behind this extension and no account to create.
 
 ## Google Sheets Sync (Optional)
 
-If the user enables Google Sheets sync, attendance data is sent **only** to the user's own Google Spreadsheet. The extension does not have access to any other user's data.
+Off until the user turns it on. If the user connects a Google account and enables sync, finished meetings, including the names and e-mail addresses listed above, are written to a spreadsheet the user owns. The extension requests the `spreadsheets` OAuth scope only, reads no other Google data, and the access token is issued and held by Chrome.
 
 ## Data Sharing
 
-- We do **not** collect any user data.
+- We do **not** receive any of this data. It stays on the device unless the user enables Sheets sync.
 - We do **not** sell, share, or transfer any data to third parties.
 - We do **not** use any data for advertising or analytics.
 

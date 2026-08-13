@@ -2,6 +2,44 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] 2026-08-14
+
+### Added
+- **Batch actions.** Click a meeting's date badge or a person's avatar and it becomes a checkbox,
+  with a toolbar over the list header — the page does not move, nothing is pushed down. Meetings
+  can be added to a series, exported to one CSV or deleted together; participants of a meeting can
+  be merged into one person or added to the roster; people in a series can be added to or removed
+  from its roster; people in the list can be added to the default roster or copied out. Once
+  something is picked, clicking a row adds it to the batch instead of navigating away.
+- **A series lists its sessions**, each a row straight into that meeting, with its hours, size,
+  length and average attendance.
+- **The spreadsheet is a real backup.** Alongside the readable *Meetings* and *Participants* tabs,
+  a *Backup* tab now carries every stored record verbatim — raw joins and leaves, e-mails, meeting
+  hours, merges and series — split across cells when a record is long. **Send everything** writes
+  the whole register to the sheet and **Restore from the sheet** brings it back, adding what is
+  missing and leaving what is already here untouched.
+
+### Changed
+- **A person unfolds in place.** In *People* and in a series' attendance matrix, clicking someone
+  opens their detail under their own row and folds the previous one away, instead of a panel at the
+  top of the page or a modal over it. Both are still URLs, so back and forward work as before.
+- **Google Sheets setup is three visible steps** — connect an account, point at a spreadsheet, use
+  it — with the steps you cannot reach yet dimmed rather than hidden, and the linked sheet named
+  rather than shown as a raw id.
+- **One button size.** The small variant sat too low beside a text field, so it is gone.
+- The person's meetings table has fixed column widths, so a long meeting title can no longer
+  squeeze the date out of its column.
+- Timestamps written to Sheets are ISO instants rather than locale-formatted text.
+
+### Removed
+- The timeline's **left early** marker and its legend entry. Attendance has been binary since 1.3.0;
+  how much of a meeting someone was there for is reported as time and share.
+- The series matrix hint, replaced by the session list above.
+- Unused code: the stacked bar chart helper and two unreferenced Sheets lookups.
+
+### Fixed
+- A stray NUL byte in `sheets-api.js` made Git treat the file as binary.
+
 ## [1.3.0] 2026-08-13
 
 ### Added

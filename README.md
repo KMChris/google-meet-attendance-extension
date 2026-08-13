@@ -14,12 +14,13 @@ every time they left and rejoined.
 - **Series**: Bundle recurring sessions (e.g. a weekend training) into a series. Recurring links are auto-detected; each series has an aggregate **attendance matrix** (people × sessions, with each person's share of every session), per-series roster, and its own report. Click a person to see their exact joins and leaves in each session
 - **Attendance is binary**: whoever was in the call is present. How much of it they were there for is reported as time and share — against the meeting's hours, which are read from the calendar event when Meet shows it and can always be corrected by hand
 - **Editable participants**: fix a scraped display name, or merge two Meet identities into one person — and split them apart again later
+- **Batch actions**: click a meeting's date badge or a person's avatar to select it, then act on the whole selection — add meetings to a series, export or delete them, merge participants, or add people to a roster
 - **Exports**: per-meeting CSV, series CSV (matrix *and* per-session detail), combined CSV, JSON backup, clipboard, and detailed **technical PDF reports** — for a single meeting or a whole series — with every join/leave event, print-ready
 - **Imports**: a JSON backup, a CSV this extension wrote, or a backup from another attendance extension (RollCall / meet-attendance.com) — always merged, never replacing what is already stored
 - **Dark mode**: Follows the browser's light/dark preference, with a System / Light / Dark override in Settings
 - **Localized**: Full English + Polish interface (auto-detected, switchable in Settings)
 - **Local Storage**: Local data storage using the Chrome Storage API
-- **Google Sheets Integration** (Optional): Auto-sync finished meetings to Google Spreadsheets via OAuth2
+- **Google Sheets Integration** (Optional): Sync finished meetings to a spreadsheet of your own via OAuth2 — and restore everything from it, since the sheet keeps the full record
 
 ## Installation
 
@@ -94,10 +95,15 @@ extension — currently RollCall (meet-attendance.com) — and merges it in the 
 
 ### Google Sheets Integration (Optional)
 
-1. Open the extension settings page
-2. Click **Connect Google Account** to link your Google account
-3. Click **Create New Spreadsheet** to create a new spreadsheet, or enter an existing spreadsheet ID
-4. Enable the **Auto-sync** option to automatically sync when meetings end
+Settings walks it in three steps: **connect a Google account**, **create a spreadsheet** (or paste
+the ID of one you already have), then use it — auto-sync when a meeting ends, **Send everything**
+to write the whole register at once, or **Restore from the sheet** to read it back.
+
+The sheet has three tabs. *Meetings* and *Participants* are for reading: one row per meeting and
+one row per join or leave. *Backup* is for the extension — it holds every record verbatim, which is
+what makes the spreadsheet a complete backup: restoring from it brings back raw events, e-mails,
+meeting hours, merges and series. Restoring only adds what is missing; meetings already here are
+left as they are.
 
 > ⚠️ Google Sheets sync needs an OAuth client ID **bound to your own extension ID**. The `oauth2.client_id`
 > in `manifest.json` is a placeholder (`YOUR_OAUTH_CLIENT_ID…`) — create your own and paste it in, registering

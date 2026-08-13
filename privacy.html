@@ -30,20 +30,28 @@
 <body>
   <div class="eyebrow">Google Meet Attendance Tracker</div>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: 2026-07-24</p>
+  <p class="updated">Last updated: 2026-08-14</p>
 
   <h2>Data collection</h2>
-  <p>This extension does <strong>not</strong> collect, transmit, or store any user data on external servers.
-    All data (participant names, timestamps, meeting records) is stored <strong>locally</strong> on your device
-    using Chrome's <code>chrome.storage.local</code> API.</p>
+  <p>The extension records attendance in the Google Meet calls you take part in. What it stores:</p>
+  <ul>
+    <li>participant display names, as shown by Google Meet</li>
+    <li>participant e-mail addresses, when Meet displays them (usually only for people in your organisation)</li>
+    <li>join and leave timestamps, plus the meeting's link, code, title and hours</li>
+    <li>your settings and any corrections you make (renamed or merged participants, series)</li>
+  </ul>
+  <p>All of it is written to <code>chrome.storage.local</code> on your own device. Nothing is sent to us.
+    There is no server behind this extension and no account to create.</p>
 
   <h2>Google Sheets sync (optional)</h2>
-  <p>If you enable Google Sheets sync, attendance data is sent <strong>only</strong> to your own Google
-    Spreadsheet. The extension has no access to anyone else's data.</p>
+  <p>Off until you turn it on. If you connect a Google account and enable sync, finished meetings, including
+    the names and e-mail addresses listed above, are written to a spreadsheet you own. The extension requests
+    the <code>spreadsheets</code> OAuth scope only, reads no other Google data, and the access token is issued
+    and held by Chrome.</p>
 
   <h2>Data sharing</h2>
   <ul>
-    <li>We do <strong>not</strong> collect any user data.</li>
+    <li>We do <strong>not</strong> receive any of this data. It stays on your device unless you enable Sheets sync.</li>
     <li>We do <strong>not</strong> sell, share, or transfer any data to third parties.</li>
     <li>We do <strong>not</strong> use any data for advertising or analytics.</li>
   </ul>
