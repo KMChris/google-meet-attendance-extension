@@ -232,15 +232,14 @@
 .cell-go .go{opacity:0;color:var(--ink-3);transition:opacity .12s}
 tr:hover .cell-go .go,tr:focus-visible .cell-go .go{opacity:1}
 
-/* one person across a series — wider than the default modal: every session is a lane */
-.modal-card.person-modal-card{max-width:660px;max-height:86vh;overflow-y:auto}
-.pm-head{display:flex;align-items:center;gap:13px}
-.pm-head .avatar{width:42px;height:42px;border-radius:12px;font-size:14px}
-.pm-id{min-width:0;flex:1}
-.pm-id h2{font-size:21px;overflow-wrap:anywhere}
-.pm-sub{font-size:11.5px;color:var(--ink-3);margin-top:3px}
-.pm-stats{display:flex;gap:24px;flex-wrap:wrap;margin:16px 0 18px;padding:14px 0;
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+/* one person unfolded under their matrix row — every session of the series is a lane */
+/* the panel spans every column, so it must opt out of the sticky first-column rule */
+.matrix tr.person-expand td{padding:0;background:var(--panel-2);position:static}
+.matrix tr.person-expand .pm{padding:4px 14px 18px}
+.matrix tbody tr.expanded td{background:var(--panel-2)}
+.matrix tbody tr.expanded .go{opacity:1;transform:rotate(90deg)}
+.matrix .m-name .go{transition:opacity .12s,transform .12s}
+.pm-stats{display:flex;gap:24px;flex-wrap:wrap;margin:0 0 14px;padding:14px 0 0}
 .pm-stat .n{font-family:var(--disp);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
 .pm-stat .n small{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--ink-3)}
 .pm-stat .l{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin-top:3px}
@@ -264,14 +263,19 @@ tr:hover .cell-go .go,tr:focus-visible .cell-go .go{opacity:1}
 .pm-range .rdot.open{background:var(--late)}
 .pm-range b{color:var(--ink);font-weight:500}
 
-/* people panel (person detail) */
-#people-panel:not(:empty){margin-bottom:16px}
-.person-card{padding:20px 22px}
-.person-top{display:flex;align-items:center;gap:14px}
-.person-top .avatar{width:46px;height:46px;border-radius:12px;font-size:15px}
-.person-top h2{font-family:var(--disp);font-size:22px}
-.person-top .p-stats{display:flex;gap:16px;margin-top:5px;font-family:var(--mono);font-size:12px;color:var(--ink-2);flex-wrap:wrap}
-.person-meetings{margin-top:18px}
+/* a person unfolded under their row in the people list */
+.row.expanded{background:var(--panel-2);border-bottom-color:transparent}
+.row-panel{padding:2px 20px 18px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.row-panel .p-stats{display:flex;gap:16px;font-family:var(--mono);font-size:12px;color:var(--ink-2);flex-wrap:wrap}
+.person-meetings{margin-top:14px;table-layout:fixed}
+/* fixed widths so a long meeting title can never squeeze the date out of its column */
+.person-meetings th:nth-child(2),.person-meetings td:nth-child(2){width:124px}
+.person-meetings th:nth-child(3),.person-meetings td:nth-child(3){width:96px}
+.person-meetings th:nth-child(4),.person-meetings td:nth-child(4){width:132px}
+.person-meetings td.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person-meetings tbody tr{cursor:pointer}
+.person-meetings tbody tr:hover td{background:var(--panel)}
+.person-meetings tbody tr:focus-visible{outline:none;box-shadow:var(--focus)}
 
 /* ===================================================================
    Analytics — filter row, KPI strip, chart grid, read-outs

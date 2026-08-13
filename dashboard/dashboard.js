@@ -119,7 +119,6 @@ function route(force) {
     const m = history.find(x => x.id === r.id);
     if (!m) { go('meetings', { replace: true }); return; }
     curMeetingId = r.id; curGroupId = null;
-    hidePersonModal();
     renderDetail(m);
     switchView('detail');
     return;
@@ -128,15 +127,14 @@ function route(force) {
     const g = groupById(r.id);
     if (!g) { go('groups', { replace: true }); return; }
     curGroupId = r.id; curMeetingId = null;
-    renderGroup(g);
+    renderGroup(g);                    // rebuilds the matrix, so any open row folds away
     switchView('group');
-    if (r.person) renderPersonModal(g, r.person); else hidePersonModal();
+    if (r.person) expandSeriesPerson(g, r.person);
     return;
   }
   curMeetingId = null; curGroupId = null;
-  hidePersonModal();
   switchView(r.view);
-  if (r.view === 'people' && r.person) openPerson(r.person);
+  if (r.view === 'people' && r.person) expandPerson(r.person);
 }
 
 // go() renders straight after pushState; these catch the browser's own moves through history.
@@ -646,9 +644,12 @@ function renderMatrix(agg) {
   $('#group-matrix').innerHTML = head + body;
 
   $$('#group-matrix tbody tr').forEach(tr => {
-    const open = () => go(`group=${encodeURIComponent(curGroupId)}&person=${encodeURIComponent(tr.dataset.name)}`);
-    tr.addEventListener('click', open);
-    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    const toggle = () => {
+      if (tr.classList.contains('expanded')) goBack('group=' + encodeURIComponent(curGroupId));
+      else go(`group=${encodeURIComponent(curGroupId)}&person=${encodeURIComponent(tr.dataset.name)}`);
+    };
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
   });
 }
 
@@ -702,34 +703,37 @@ function personSessionBlock(m, a) {
   </div>`;
 }
 
-function renderPersonModal(g, name) {
+/**
+ * The person unfolds under their own row in the matrix — the row stays where it is, so the
+ * pattern above and below it keeps its place. Opening another person folds this one away,
+ * because the expansion is part of the route and the matrix is rebuilt on every route change.
+ */
+function expandSeriesPerson(g, name) {
   const ms = seriesMeetings(g);
   const agg = A.aggregateGroup(ms, g.roster);
   const key = String(name).trim().toLowerCase();
   const p = agg.people.find(x => x.name.trim().toLowerCase() === key);
-  if (!p) { go('group=' + encodeURIComponent(g.id), { replace: true }); return; }
+  const row = $$('#group-matrix tbody tr').find(tr => tr.dataset.name === name);
+  if (!p || !row) { go('group=' + encodeURIComponent(g.id), { replace: true }); return; }
 
-  const avatar = $('#person-avatar');
-  avatar.textContent = initials(p.name);
-  avatar.setAttribute('style', avatarStyle(p.name));
-  $('#person-name').textContent = p.name;
-  $('#person-sub').textContent = g.name;
-  $('#person-stats').innerHTML = [
+  const stats = [
     [`${p.attendedCount}<small>/${agg.sessionCount}</small>`, t('colAttendedShare')],
     [esc(fmtDur(p.totalSeconds)), t('colTotalTime')],
     [`${p.totalShare}%`, t('colTotalShare')]
   ].map(([n, l]) => `<div class="pm-stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`).join('');
 
-  $('#person-sessions').innerHTML = ms.map(m => personSessionBlock(m, attendeeIn(m, p.name))).join('');
-  $$('#person-sessions .pm-open').forEach(b =>
+  row.classList.add('expanded');
+  const tr = document.createElement('tr');
+  tr.className = 'person-expand';
+  tr.innerHTML = `<td colspan="${row.children.length}"><div class="pm">
+    <div class="pm-stats">${stats}</div>
+    <p class="hint">${esc(t('personSessionsHint'))}</p>
+    <div class="pm-sessions">${ms.map(m => personSessionBlock(m, attendeeIn(m, p.name))).join('')}</div>
+  </div></td>`;
+  row.after(tr);
+  $$('.pm-open', tr).forEach(b =>
     b.addEventListener('click', () => go('meeting=' + encodeURIComponent(b.dataset.id))));
-
-  $('#person-modal').hidden = false;
 }
-function hidePersonModal() { $('#person-modal').hidden = true; }
-/** The panel is a route, so closing it means going back — never just hiding the node. */
-function closePersonModal() { goBack('group=' + encodeURIComponent(curGroupId || '')); }
-$('#person-close').addEventListener('click', closePersonModal);
 
 function renderGroupRoster(g) {
   const box = $('#group-roster-chips');
@@ -797,7 +801,6 @@ function aggregatePeople() {
 }
 function renderPeople(filter = '') {
   const q = filter.toLowerCase();
-  $('#people-panel').innerHTML = '';
   const map = aggregatePeople();
   let entries = Array.from(map.values());
   if (q) entries = entries.filter(p => p.name.toLowerCase().includes(q));
@@ -817,25 +820,42 @@ function renderPeople(filter = '') {
       <div class="col-last num mono">${esc(i18n.formatDate(new Date(p.last).toISOString(), { day: 'numeric', month: 'short', year: 'numeric' }))}</div>
     </div>`;
   }).join('');
-  $$('#people-body .row').forEach(r => r.addEventListener('click', () => go('people&person=' + encodeURIComponent(r.dataset.name))));
+  $$('#people-body .row').forEach(r => r.addEventListener('click', () => {
+    if (r.classList.contains('expanded')) goBack('people');
+    else go('people&person=' + encodeURIComponent(r.dataset.name));
+  }));
 }
-function openPerson(name) {
-  const p = aggregatePeople().get(String(name).toLowerCase()); if (!p) return;
+
+/**
+ * A person unfolds under their own row: their meetings, newest first, each a way into the
+ * meeting. Only one is open at a time — the list is rebuilt from the route on every change.
+ */
+function expandPerson(name) {
+  const p = aggregatePeople().get(String(name).toLowerCase());
+  const row = $$('#people-body .row').find(r => r.dataset.name === name);
+  if (!p || !row) { go('people', { replace: true }); return; }
+
   const avg = p.shares.length ? Math.round(p.shares.reduce((s, r) => s + r, 0) / p.shares.length) : 0;
   const meetings = p.meetings.slice().sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  const panel = $('#people-panel');
-  panel.innerHTML = `<div class="card person-card">
-    <div class="person-top"><span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span>
-      <div><h2>${esc(p.name)}</h2><div class="p-stats">
-        <span>${p.count === 1 ? t('personMeetingOne') : t('personMeetingsN', { n: p.count })}</span>
-        <span>${fmtDur(p.total)} ${t('personTotal')}</span><span>${avg}% ${t('personAvg')}</span></div></div></div>
+
+  row.classList.add('expanded');
+  const panel = document.createElement('div');
+  panel.className = 'row-panel';
+  panel.innerHTML = `<div class="p-stats">
+      <span>${p.count === 1 ? t('personMeetingOne') : t('personMeetingsN', { n: p.count })}</span>
+      <span>${fmtDur(p.total)} ${t('personTotal')}</span><span>${avg}% ${t('personAvg')}</span></div>
     <table class="rc-table person-meetings"><thead><tr><th>${t('colMeeting')}</th><th>${t('colDate')}</th><th class="num">${t('colPresent')}</th><th>${t('colShare')}</th></tr></thead>
-    <tbody>${meetings.map(mm => `<tr data-id="${esc(mm.id)}" style="cursor:pointer">
-      <td class="nm">${esc(mm.title)}</td><td class="mono">${esc(i18n.formatDate(mm.date, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
+    <tbody>${meetings.map(mm => `<tr data-id="${esc(mm.id)}" tabindex="0" title="${esc(t('openMeeting'))}">
+      <td class="nm" title="${esc(mm.title)}">${esc(mm.title)}</td>
+      <td class="mono">${esc(i18n.formatDate(mm.date, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
       <td class="num mono">${fmtHMS(mm.secs)}</td>
-      <td><div class="share-cell"><div class="share-bar"><i style="width:${mm.share}%"></i></div><span class="pct">${mm.share}%</span></div></td></tr>`).join('')}</tbody></table></div>`;
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  $$('#people-panel tbody tr').forEach(tr => tr.addEventListener('click', () => go('meeting=' + encodeURIComponent(tr.dataset.id))));
+      <td><div class="share-cell"><div class="share-bar"><i style="width:${mm.share}%"></i></div><span class="pct">${mm.share}%</span></div></td></tr>`).join('')}</tbody></table>`;
+  row.after(panel);
+  $$('tbody tr', panel).forEach(tr => {
+    const open = () => go('meeting=' + encodeURIComponent(tr.dataset.id));
+    tr.addEventListener('click', open);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  });
 }
 // searching replaces the open person rather than leaving the URL pointing at a hidden panel
 $('#people-search').addEventListener('input', e => {
@@ -1010,11 +1030,7 @@ function openAssignModal(m) {
 $('#assign-cancel').addEventListener('click', () => $('#assign-modal').hidden = true);
 $('#assign-new').addEventListener('click', () => { $('#assign-modal').hidden = true; openGroupModal(assignContextId); });
 
-/** Closing a modal that is part of the URL has to go through the router, not hide the node. */
-function dismissModal(mod) {
-  if (mod.id === 'person-modal') closePersonModal();
-  else mod.hidden = true;
-}
+function dismissModal(mod) { mod.hidden = true; }
 $$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target === mod) dismissModal(mod); }));
 
 /* ============================ SETTINGS ============================ */

@@ -209,7 +209,6 @@
           <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="people-search" data-i18n-placeholder="searchPeople"></div>
         </div>
       </div>
-      <div id="people-panel"></div>
       <div class="card list-card" id="people-table">
         <div class="list-head people-grid">
           <span data-i18n="colName"></span><span class="num" data-i18n="colMeetingsCount"></span>
@@ -512,23 +511,6 @@
         <button class="btn subtle" id="participant-cancel" data-i18n="cancel"></button>
         <button class="btn" id="participant-save" data-i18n="save"></button>
       </div>
-    </div>
-  </div>
-
-  <!-- one participant across a whole series: exact presence, session by session -->
-  <div class="modal" id="person-modal" hidden>
-    <div class="modal-card card person-modal-card">
-      <div class="pm-head">
-        <span class="avatar" id="person-avatar"></span>
-        <div class="pm-id">
-          <h2 id="person-name"></h2>
-          <div class="pm-sub mono" id="person-sub"></div>
-        </div>
-        <button class="btn subtle icon" id="person-close" data-i18n-title="close" data-i18n-aria="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-      </div>
-      <div class="pm-stats" id="person-stats"></div>
-      <p class="hint" data-i18n="personSessionsHint"></p>
-      <div class="pm-sessions" id="person-sessions"></div>
     </div>
   </div>
 
