@@ -85,7 +85,7 @@ function renderMeeting(m, roster) {
     </div>
     ${summaryStats(m, roster)}
     <div class="rep-sect"><h2>${t('attendanceTitle')}</h2>${attendanceTable(m, roster)}</div>
-    <div class="rep-sect"><h2>${t('eventLogTitle')}</h2><p class="rep-hint">${t('eventLogHint')}</p>${eventLog(m)}</div>
+    <div class="rep-sect"><h2>${t('eventLogTitle')}</h2>${eventLog(m)}</div>
     <div class="rep-sect"><h2>${t('rosterReconTitle')}</h2>${reconciliation(m, roster)}</div>
   </div>${footer()}`;
   document.getElementById('report').innerHTML = doc;
@@ -132,7 +132,7 @@ function renderGroup(group, meetings) {
     <h1>${esc(group.name)}</h1>
     <div class="rep-meta"><span><b>${agg.sessionCount}</b> ${t('colSessions').toLowerCase()}</span><span>${range}</span><span><b>${agg.peopleCount}</b> ${t('colGroupPeople').toLowerCase()}</span></div>
     ${statGrid([[agg.sessionCount, t('colSessions')], [agg.peopleCount, t('reportPeople')], [avgAtt + '%', t('statAvgAttendance')], [fmtDur(agg.sessionCount ? Math.round(agg.totalDurationSeconds / agg.sessionCount) : 0), t('statAvgLength')], [fmtDur(agg.totalDurationSeconds), t('colTotalTime')]])}
-    <div class="rep-sect"><h2>${t('matrixTitle')}</h2><p class="rep-hint">${t('perSessionHint')} · ${t('totalShareHint')}</p>${matrix}</div>
+    <div class="rep-sect"><h2>${t('matrixTitle')}</h2>${matrix}</div>
     <div class="rep-sect"><h2>${t('sessionsBreakdown')}</h2>${sessionBlocks}</div>
   </div>${footer()}`;
   document.title = `${group.name} — Attendance Tracker`;

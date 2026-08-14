@@ -905,7 +905,6 @@ function expandSeriesPerson(g, name) {
   tr.className = 'person-expand';
   tr.innerHTML = `<td colspan="${row.children.length}"><div class="pm">
     <div class="pm-stats">${stats}</div>
-    <p class="hint">${esc(t('personSessionsHint'))}</p>
     <div class="pm-sessions">${ms.map(m => personSessionBlock(m, attendeeIn(m, p.name))).join('')}</div>
   </div></td>`;
   row.after(tr);
