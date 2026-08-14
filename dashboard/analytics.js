@@ -207,13 +207,17 @@ const CHEVRON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" str
  */
 function makePicker(sel, { searchable, allLabel, onChange }) {
   const root = $(sel);
+  // the field carries the popover's own id, so it is nameable and the browser can tell the
+  // two pickers apart the way it does with any other named field
+  const searchId = `${root.id}-search`;
   root.innerHTML =
     `<button class="pick-btn" type="button" aria-expanded="false"><span class="pick-label"></span>${CHEVRON}</button>
      <div class="pick-menu" hidden>
-       ${searchable ? '<div class="pick-search"><input class="field" type="search" autocomplete="off"></div>' : ''}
+       ${searchable ? `<div class="pick-search"><input class="field" type="search" id="${searchId}" name="${searchId}" autocomplete="off" data-i18n-aria="pickSearchLabel"></div>` : ''}
        <div class="pick-list"></div>
        <div class="pick-foot"><button class="pick-clear btn subtle" type="button"></button><span class="pick-count mono"></span></div>
      </div>`;
+  i18n.applyI18n(root);   // built after the page-wide pass, so it takes its own strings here
 
   const btn = $('.pick-btn', root);
   const menu = $('.pick-menu', root);

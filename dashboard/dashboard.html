@@ -44,7 +44,7 @@
         <div class="head-actions">
           <div class="search">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings">
+            <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings" data-i18n-aria="searchMeetings">
           </div>
           <button class="btn ghost" id="btn-export-all" data-i18n="export">Export</button>
           <div class="menu" id="export-all-menu" hidden>
@@ -87,7 +87,7 @@
             <div class="title-line">
               <div class="title-slot">
                 <h1 id="detail-title"></h1>
-                <input class="field rename-input" id="rename-input" hidden>
+                <input class="field rename-input" id="rename-input" data-i18n-aria="rename" hidden>
               </div>
               <button class="title-edit" id="btn-rename" data-i18n-title="rename" data-i18n-aria="rename"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             </div>
@@ -131,7 +131,7 @@
 
         <div class="sect">
           <div class="sect-head" id="attendance-head"><div class="eyebrow" data-i18n="attendanceTitle"></div>
-            <div class="search inline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="participant-search" data-i18n-placeholder="searchPeople"></div>
+            <div class="search inline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="participant-search" data-i18n-placeholder="searchPeople" data-i18n-aria="searchPeople"></div>
           </div>
           <table class="rc-table" id="attendance-table"><tbody id="attendance-body"></tbody></table>
         </div>
@@ -168,7 +168,7 @@
             <div class="title-line">
               <div class="title-slot">
                 <h1 id="group-title"></h1>
-                <input class="field rename-input" id="group-rename-input" hidden>
+                <input class="field rename-input" id="group-rename-input" data-i18n-aria="rename" hidden>
               </div>
               <button class="title-edit" id="btn-group-rename" data-i18n-title="rename" data-i18n-aria="rename"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             </div>
@@ -205,7 +205,7 @@
           <div class="sect-head"><div class="eyebrow" data-i18n="groupRosterTitle"></div></div>
           <p class="hint" data-i18n="groupRosterHint"></p>
           <div class="roster-editor">
-            <input class="field" id="group-roster-input" data-i18n-placeholder="rosterPlaceholder">
+            <input class="field" id="group-roster-input" data-i18n-placeholder="rosterPlaceholder" data-i18n-aria="groupRosterTitle">
             <button class="btn ghost" id="group-roster-add" data-i18n="add"></button>
           </div>
           <div class="chips" id="group-roster-chips"></div>
@@ -221,7 +221,7 @@
           <p class="lede" data-i18n="peopleSubtitle"></p>
         </div>
         <div class="head-actions">
-          <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="people-search" data-i18n-placeholder="searchPeople"></div>
+          <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="people-search" data-i18n-placeholder="searchPeople" data-i18n-aria="searchPeople"></div>
         </div>
       </div>
       <div class="card list-card" id="people-table">
@@ -371,7 +371,7 @@
 
       <div class="card setting-card">
         <div class="setting-row">
-          <div class="setting-text"><div class="setting-title" data-i18n="settingTracking"></div><div class="setting-hint" data-i18n="settingTrackingHint"></div></div>
+          <div class="setting-text"><label class="setting-title" for="set-auto-track" data-i18n="settingTracking"></label><div class="setting-hint" data-i18n="settingTrackingHint"></div></div>
           <label class="switch"><input type="checkbox" id="set-auto-track"><span class="track"></span></label>
         </div>
         <div class="setting-row">
@@ -383,14 +383,14 @@
           </div>
         </div>
         <div class="setting-row">
-          <div class="setting-text"><div class="setting-title" data-i18n="settingLanguage"></div><div class="setting-hint" data-i18n="settingLanguageHint"></div></div>
+          <div class="setting-text"><label class="setting-title" for="set-language" data-i18n="settingLanguage"></label><div class="setting-hint" data-i18n="settingLanguageHint"></div></div>
           <select class="field" id="set-language" style="width:180px"></select>
         </div>
       </div>
 
       <div class="card setting-card">
         <div class="setting-row block">
-          <div class="setting-text"><div class="setting-title" data-i18n="settingRoster"></div><div class="setting-hint" data-i18n="settingRosterHint"></div></div>
+          <div class="setting-text"><label class="setting-title" for="roster-input" data-i18n="settingRoster"></label><div class="setting-hint" data-i18n="settingRosterHint"></div></div>
           <div class="roster-editor">
             <input class="field" id="roster-input" data-i18n-placeholder="rosterPlaceholder">
             <button class="btn ghost" id="roster-add" data-i18n="add"></button>
@@ -422,7 +422,7 @@
                 <div class="step-title" data-i18n="sheetsStepSheet"></div>
                 <div class="step-state mono" id="sheets-sheet-state"></div>
                 <div class="inline-field">
-                  <input class="field mono" id="spreadsheet-id" data-i18n-placeholder="spreadsheetIdPlaceholder">
+                  <input class="field mono" id="spreadsheet-id" data-i18n-placeholder="spreadsheetIdPlaceholder" data-i18n-aria="sheetsStepSheet">
                   <button class="btn ghost" id="sheets-save" data-i18n="sheetsSave"></button>
                 </div>
               </div>
@@ -451,18 +451,18 @@
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="importTitle"></div><div class="setting-hint" data-i18n="importHint"></div></div>
           <button class="btn ghost" id="btn-import" data-i18n="importBtn"></button>
-          <input type="file" id="import-file" accept="application/json,.json,text/csv,.csv" hidden>
+          <input type="file" id="import-file" accept="application/json,.json,text/csv,.csv" data-i18n-aria="importBtn" hidden>
         </div>
         <div class="setting-row">
-          <div class="setting-text"><div class="setting-title" data-i18n="importAppsTitle"></div><div class="setting-hint" data-i18n="importAppsHint"></div></div>
+          <div class="setting-text"><label class="setting-title" for="import-source" data-i18n="importAppsTitle"></label><div class="setting-hint" data-i18n="importAppsHint"></div></div>
           <div class="inline-field">
             <select class="field" id="import-source" style="width:230px"></select>
             <button class="btn ghost" id="btn-import-app" data-i18n="importAppsBtn"></button>
-            <input type="file" id="import-app-file" accept="application/json,.json" hidden>
+            <input type="file" id="import-app-file" accept="application/json,.json" data-i18n-aria="importAppsBtn" hidden>
           </div>
         </div>
         <div class="setting-row">
-          <div class="setting-text"><div class="setting-title" data-i18n="maxMeetings"></div><div class="setting-hint" data-i18n="maxMeetingsHint"></div></div>
+          <div class="setting-text"><label class="setting-title" for="set-max" data-i18n="maxMeetings"></label><div class="setting-hint" data-i18n="maxMeetingsHint"></div></div>
           <select class="field" id="set-max" style="width:140px"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="500">500</option><option value="1000">1000</option><option value="0" data-i18n="maxUnlimited"></option></select>
         </div>
         <div class="setting-row">
@@ -480,7 +480,7 @@
     <div class="modal-card card">
       <h2 data-i18n="rosterPasteTitle"></h2>
       <p class="hint" data-i18n="rosterPasteHint"></p>
-      <textarea class="field" id="paste-textarea" rows="7" data-i18n-placeholder="rosterPastePlaceholder"></textarea>
+      <textarea class="field" id="paste-textarea" rows="7" data-i18n-placeholder="rosterPastePlaceholder" data-i18n-aria="rosterPasteTitle"></textarea>
       <div class="modal-actions">
         <button class="btn subtle" id="paste-cancel" data-i18n="cancel"></button>
         <button class="btn" id="paste-add" data-i18n="rosterAddNames"></button>
@@ -491,7 +491,7 @@
   <div class="modal" id="group-modal" hidden>
     <div class="modal-card card">
       <h2 id="group-modal-title" data-i18n="createGroupTitle"></h2>
-      <label class="modal-label" data-i18n="groupNameLabel"></label>
+      <label class="modal-label" for="group-modal-name" data-i18n="groupNameLabel"></label>
       <input class="field" id="group-modal-name" data-i18n-placeholder="groupNamePlaceholder">
       <label class="modal-label" data-i18n="groupColorLabel"></label>
       <div class="color-picker" id="group-modal-colors"></div>
@@ -529,7 +529,7 @@
     <div class="modal-card card">
       <h2 data-i18n="editParticipantTitle"></h2>
       <p class="hint" data-i18n="editParticipantHint"></p>
-      <label class="modal-label" data-i18n="participantNameLabel"></label>
+      <label class="modal-label" for="participant-name" data-i18n="participantNameLabel"></label>
       <input class="field" id="participant-name" autocomplete="off" spellcheck="false">
       <div class="merge-note" id="merge-note" hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>

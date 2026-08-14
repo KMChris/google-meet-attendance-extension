@@ -607,6 +607,9 @@
   "pickSearch": {
     "message": "Szukaj…"
   },
+  "pickSearchLabel": {
+    "message": "Szukaj na liście"
+  },
   "pickEmpty": {
     "message": "Brak pozycji"
   },
