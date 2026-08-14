@@ -67,7 +67,8 @@ function renderRecent(history) {
   await i18n.initI18n();
   const [settings, history] = await Promise.all([store.getSettings(), store.getHistory()]);
   applyTheme(settings.theme || 'system');
-  renderRecent(history.map(A.normalizeMeeting));
+  // the archive is meant to be out of the way, here too
+  renderRecent(history.filter(m => !m.archived).map(A.normalizeMeeting));
   renderLive(await tabStatus());
 
   $('#open-dash').addEventListener('click', () => openDashboard());

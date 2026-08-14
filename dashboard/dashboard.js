@@ -20,6 +20,7 @@ let curMeetingId = null;
 let curGroupId = null;
 let assignContextIds = []; // meeting ids awaiting a series assignment
 let groupsArchive = false; // the series view is showing the archive rather than the active list
+let meetingsArchive = false; // same for the meetings list
 
 const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-violet', rose: '--grp-rose', sky: '--grp-sky', lime: '--grp-lime' };
 const GRP_KEYS = Object.keys(GRP_COLORS);
@@ -97,7 +98,7 @@ function parseRoute(hash) {
   return {
     view,
     person: view === 'people' ? (p.get('person') || null) : null,
-    archive: view === 'groups' && p.has('archive')
+    archive: (view === 'groups' || view === 'meetings') && p.has('archive')
   };
 }
 
@@ -145,7 +146,10 @@ function route(force) {
     return;
   }
   curMeetingId = null; curGroupId = null;
-  groupsArchive = !!r.archive;   // read before the view draws itself
+  // read before the view draws itself
+  groupsArchive = r.view === 'groups' && !!r.archive;
+  if (r.view === 'meetings' && meetingsArchive !== !!r.archive) meetingsPage = 1;
+  meetingsArchive = r.view === 'meetings' && !!r.archive;
   switchView(r.view);
   if (r.view === 'people' && r.person) expandPerson(r.person);
 }
@@ -351,7 +355,16 @@ let meetingsPage = 1;
 
 function renderMeetings(filter = '') {
   const q = filter.toLowerCase();
-  const list = q ? history.filter(m => meetingMatches(m, q)) : history;
+  // the archive is a list of its own: set aside, still counted everywhere else
+  const scope = history.filter(m => !!m.archived === meetingsArchive);
+  const list = q ? scope.filter(m => meetingMatches(m, q)) : scope;
+
+  const archivedCount = history.filter(m => m.archived).length;
+  const archBtn = $('#btn-meetings-archive');
+  archBtn.textContent = `${t('meetingsArchive')} (${archivedCount})`;
+  archBtn.hidden = !archivedCount && !meetingsArchive;
+  archBtn.classList.toggle('on', meetingsArchive);
+  archBtn.setAttribute('aria-pressed', String(meetingsArchive));
 
   // stats
   const people = new Set(); let durSum = 0, shareSum = 0, shareN = 0;
@@ -366,7 +379,10 @@ function renderMeetings(filter = '') {
   setStat($('#stat-attendance'), shareN ? Math.round(shareSum / shareN) : 0, '%');
 
   const table = $('#meetings-table'), empty = $('#meetings-empty');
-  if (!list.length) { table.style.display = 'none'; empty.classList.add('visible'); return; }
+  setI18nText($('#meetings-empty-title'), meetingsArchive ? 'emptyArchiveTitle' : 'emptyMeetingsTitle');
+  setI18nText($('#meetings-empty-body'), meetingsArchive ? 'emptyMeetingsArchiveBody' : 'emptyMeetingsBody');
+  // the rows go too, or a later selection would still find the ones that are no longer listed
+  if (!list.length) { $('#meetings-body').innerHTML = ''; table.style.display = 'none'; empty.classList.add('visible'); return; }
   table.style.display = ''; empty.classList.remove('visible');
 
   // clamped rather than reset: deleting the last record of page 4 lands on page 3, not page 1
@@ -412,6 +428,7 @@ function renderMeetings(filter = '') {
     actions: [
       { label: () => t('addToGroup'), run: ids => openAssignModal(ids.map(id => history.find(m => m.id === id)).filter(Boolean)) },
       { label: () => t('exportCsv'), run: ids => downloadSelectionCSV(ids) },
+      { label: () => t(meetingsArchive ? 'unarchive' : 'archive'), run: ids => archiveMeetings(ids, !meetingsArchive) },
       {
         label: () => t('delete'), danger: true,
         run: async ids => {
@@ -426,6 +443,14 @@ function renderMeetings(filter = '') {
 }
 // a new filter is a new list, so it starts at its first page
 $('#meeting-search').addEventListener('input', e => { meetingsPage = 1; renderMeetings(e.target.value.trim()); });
+$('#btn-meetings-archive').addEventListener('click', () => go(meetingsArchive ? 'meetings' : 'meetings&archive'));
+
+/** Put meetings aside, or bring them back. Used by the toolbar and by the detail header. */
+async function archiveMeetings(ids, archived) {
+  const n = await store.setMeetingsArchived(ids, archived);
+  selectionReset(); await load();
+  toast(t(archived ? 'archivedMeetingsToast' : 'unarchivedMeetingsToast', { count: n }));
+}
 
 /* ============================ MEETING DETAIL ============================ */
 function currentMeeting() { return history.find(m => m.id === curMeetingId) || null; }
@@ -442,6 +467,10 @@ function renderDetail(m) {
   // clamped to two lines in CSS — the full title stays reachable on hover
   $('#detail-title').textContent = m.meetingTitle;
   $('#detail-title').title = m.meetingTitle;
+  // the archive box beside the name is both the state and the switch for it
+  const arch = $('#btn-meeting-archive'), archLabel = t(m.archived ? 'unarchive' : 'archive');
+  arch.classList.toggle('on', !!m.archived);
+  arch.title = archLabel; arch.setAttribute('aria-label', archLabel);
   $('#detail-meta').innerHTML =
     `<b>${people.length}</b> ${t('metaAttended')} · <b>${absentees.length}</b> ${t('metaAbsent')}`;
 
@@ -629,6 +658,10 @@ $('#rename-input').addEventListener('keydown', e => {
   else if (e.key === 'Escape') { setTitleEditing($('#rename-input'), false); }
 });
 $('#rename-input').addEventListener('blur', commitRename);
+
+$('#btn-meeting-archive').addEventListener('click', () => {
+  const m = currentMeeting(); if (m) archiveMeetings([m.id], !m.archived);
+});
 
 /* ---- meeting hours ---- */
 // <input type="datetime-local"> speaks local wall time; storage speaks ISO.

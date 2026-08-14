@@ -46,6 +46,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings" data-i18n-aria="searchMeetings">
           </div>
+          <button class="btn ghost" id="btn-meetings-archive" aria-pressed="false"></button>
           <button class="btn ghost" id="btn-export-all" data-i18n="export">Export</button>
           <div class="menu" id="export-all-menu" hidden>
             <button class="menu-item" data-format="json">JSON</button>
@@ -72,8 +73,8 @@
       </div>
       <div class="empty" id="meetings-empty">
         <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div>
-        <h3 data-i18n="emptyMeetingsTitle"></h3>
-        <p data-i18n="emptyMeetingsBody"></p>
+        <h3 data-i18n="emptyMeetingsTitle" id="meetings-empty-title"></h3>
+        <p data-i18n="emptyMeetingsBody" id="meetings-empty-body"></p>
       </div>
     </section>
 
@@ -91,6 +92,7 @@
                 <input class="field rename-input" id="rename-input" data-i18n-aria="rename" hidden>
               </div>
               <button class="title-edit" id="btn-rename" data-i18n-title="rename" data-i18n-aria="rename"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+              <button class="title-edit" id="btn-meeting-archive"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="5" rx="1.2"/><path d="M5 9v10.5h14V9M10 13h4"/></svg></button>
             </div>
             <div class="detail-badges">
               <button class="badge hours-badge" id="btn-hours">

@@ -145,6 +145,35 @@
   "meetingsSubtitle": {
     "message": "Twoje śledzone sesje Google Meet"
   },
+  "meetingsArchive": {
+    "message": "Archiwum"
+  },
+  "archive": {
+    "message": "Archiwizuj"
+  },
+  "unarchive": {
+    "message": "Przywróć z archiwum"
+  },
+  "archivedMeetingsToast": {
+    "message": "Przeniesiono do archiwum: $COUNT$",
+    "description": "Confirmation after archiving meetings.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "unarchivedMeetingsToast": {
+    "message": "Przywrócono z archiwum: $COUNT$",
+    "description": "Confirmation after restoring meetings from the archive.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
   "searchMeetings": {
     "message": "Szukaj spotkań lub osób…"
   },
@@ -204,6 +233,9 @@
   },
   "emptyMeetingsBody": {
     "message": "Dołącz do Google Meet — Attendance Tracker sam rozpocznie rejestr obecności."
+  },
+  "emptyMeetingsArchiveBody": {
+    "message": "Spotkanie, do którego nie wracasz, odłóż tu ikoną archiwum przy jego nazwie."
   },
   "metaAttended": {
     "message": "obecnych"

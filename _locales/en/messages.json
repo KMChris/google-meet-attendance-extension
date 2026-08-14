@@ -145,6 +145,35 @@
   "meetingsSubtitle": {
     "message": "Your tracked Google Meet sessions"
   },
+  "meetingsArchive": {
+    "message": "Archive"
+  },
+  "archive": {
+    "message": "Archive"
+  },
+  "unarchive": {
+    "message": "Restore from the archive"
+  },
+  "archivedMeetingsToast": {
+    "message": "Archived: $COUNT$",
+    "description": "Confirmation after archiving meetings.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "unarchivedMeetingsToast": {
+    "message": "Restored from the archive: $COUNT$",
+    "description": "Confirmation after restoring meetings from the archive.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
   "searchMeetings": {
     "message": "Search meetings or people…"
   },
@@ -204,6 +233,9 @@
   },
   "emptyMeetingsBody": {
     "message": "Join a Google Meet and Attendance Tracker starts the register automatically."
+  },
+  "emptyMeetingsArchiveBody": {
+    "message": "A meeting you are done with goes here, from the archive icon beside its name."
   },
   "metaAttended": {
     "message": "attended"

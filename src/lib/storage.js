@@ -106,6 +106,20 @@ export async function upsertMeeting(record) {
   return normalizeMeeting(merged);
 }
 
+/** Set aside (or bring back) meetings: a flag on the record, so nothing else about it changes. */
+export async function setMeetingsArchived(ids, archived) {
+  const wanted = new Set(ids);
+  const history = await getHistory();
+  let changed = 0;
+  history.forEach(m => {
+    if (!wanted.has(m.id) || !!m.archived === !!archived) return;
+    if (archived) m.archived = true; else delete m.archived;
+    changed++;
+  });
+  if (changed) await saveHistory(history);
+  return changed;
+}
+
 export async function deleteMeetingById(id) {
   const history = await getHistory();
   const next = history.filter(m => m.id !== id);
