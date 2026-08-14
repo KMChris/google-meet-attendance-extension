@@ -123,6 +123,9 @@
 .group-pill .gdot{width:8px;height:8px;border-radius:50%;flex:none}
 .group-pill .gname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .group-pill.empty-pill{color:var(--ink-3);background:none;border-style:dashed}
+/* the pill in a list is a way into the series, so it answers the pointer like one */
+.group-pill.go{cursor:pointer;line-height:1.55;transition:border-color .12s,color .12s}
+.group-pill.go:hover{border-color:var(--ink-3);color:var(--ink)}
 
 /* menus (dropdowns) */
 .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:var(--panel);border:1.5px solid var(--line-2);
@@ -182,6 +185,10 @@
 .group-badge .gdot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--absent)}
 .group-badge.none{border-style:dashed;color:var(--ink-3)}
 .badge-menu{position:relative;display:inline-flex;min-width:0}
+/* one badge, two controls: the name opens the series, the caret opens the menu that changes it */
+.badge-menu .group-badge:not(.none){border-top-right-radius:0;border-bottom-right-radius:0;border-right:0;padding-right:9px}
+.badge-menu .group-caret{border-top-left-radius:0;border-bottom-left-radius:0;padding:5px 9px 5px 6px;color:var(--ink-3)}
+.badge-menu .group-caret:hover{color:var(--ink)}
 .badge-menu .menu{left:0;right:auto;min-width:200px;max-width:300px;max-height:320px;overflow-y:auto}
 .group-menu .menu-item{display:flex;align-items:center;gap:9px}
 .group-menu .gdot{width:9px;height:9px;border-radius:50%;flex:none}

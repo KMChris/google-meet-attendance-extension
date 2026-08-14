@@ -661,6 +661,12 @@
   "assignTitle": {
     "message": "Add to series"
   },
+  "openGroup": {
+    "message": "Open the series"
+  },
+  "changeGroup": {
+    "message": "Change the series"
+  },
   "assignNew": {
     "message": "New series…"
   },

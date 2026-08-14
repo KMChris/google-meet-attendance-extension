@@ -661,6 +661,12 @@
   "assignTitle": {
     "message": "Dodaj do cyklu"
   },
+  "openGroup": {
+    "message": "Otwórz cykl"
+  },
+  "changeGroup": {
+    "message": "Zmień cykl"
+  },
   "assignNew": {
     "message": "Nowy cykl…"
   },

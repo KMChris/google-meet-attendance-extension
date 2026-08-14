@@ -412,8 +412,9 @@ function renderMeetings(filter = '') {
     const people = Object.keys(m.attendance).length;
     const avg = people ? Math.round(Object.values(m.attendance).reduce((s, a) => s + A.liveSecondsFor(a, m), 0) / people) : 0;
     const g = m.groupId ? groupById(m.groupId) : null;
+    // the pill names the series and leads to it, without opening the meeting under it
     const groupCell = g
-      ? `<span class="group-pill"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span><span class="gname">${esc(g.name)}</span></span>`
+      ? `<button class="group-pill go" data-group="${esc(g.id)}" title="${esc(t('openGroup'))}: ${esc(g.name)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span><span class="gname">${esc(g.name)}</span></button>`
       : '';
     const live = A.isInProgress(m) ? `<span class="status status--present" style="margin-left:6px">${t('inCall')}</span>` : '';
     const badge = `<div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div>`;
@@ -438,6 +439,12 @@ function renderMeetings(filter = '') {
     if (selectionClick(row.dataset.id)) return;
     // a meeting in the trash has no detail page to open — it is not in the history any more
     if (!inTrash) go('meeting=' + encodeURIComponent(row.dataset.id));
+  }));
+  $$('#meetings-body [data-group]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    // while a selection is running the whole row is a checkbox, series pill included
+    if (selectionClick(b.closest('.row').dataset.id)) return;
+    go('group=' + encodeURIComponent(b.dataset.group));
   }));
   $$('#meetings-body [data-act="export"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); downloadMeetingCSV(b.dataset.id); }));
   $$('#meetings-body [data-act="restore"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); restoreMeetings([b.dataset.id]); }));
@@ -851,13 +858,18 @@ $('#btn-export').addEventListener('click', () => { if (curMeetingId) downloadMee
 $('#btn-pdf').addEventListener('click', () => { if (curMeetingId) openReport('meeting', curMeetingId); });
 
 /* ---- the series this meeting belongs to ---- */
-/** The badge reads the series out; the menu under it is where it changes. */
+/**
+ * The badge reads the series out and leads to it; the caret beside it opens the menu where the
+ * series changes. With no series there is nowhere to go, so the badge is the menu on its own and
+ * the caret stays out of the way.
+ */
 function renderGroupBadge(m) {
   const g = m.groupId ? groupById(m.groupId) : null;
   $('#group-badge-name').textContent = g ? g.name : t('addToGroup');
   $('#group-badge-dot').style.background = g ? `var(${groupColorVar(g)})` : 'var(--absent)';
   $('#btn-group').classList.toggle('none', !g);
-  $('#btn-group').title = g ? g.name : t('assignTitle');
+  $('#btn-group').title = g ? `${t('openGroup')}: ${g.name}` : t('assignTitle');
+  $('#btn-group-menu').hidden = !g;
 }
 
 /**
@@ -883,14 +895,19 @@ function setGroupMenu(open) {
   const m = currentMeeting();
   if (open && m) $('#group-menu').innerHTML = groupMenuItems(m);
   $('#group-menu').hidden = !(open && m);
-  $('#btn-group').setAttribute('aria-expanded', String(!!(open && m)));
+  [$('#btn-group'), $('#btn-group-menu')].forEach(b => b.setAttribute('aria-expanded', String(!!(open && m))));
 }
-$('#btn-group').addEventListener('click', e => {
-  e.stopPropagation();
+function toggleGroupMenu() {
   const opening = $('#group-menu').hidden;
   $$('.menu').forEach(mn => mn.hidden = true);
   setGroupMenu(opening);
+}
+$('#btn-group').addEventListener('click', e => {
+  e.stopPropagation();
+  const m = currentMeeting();
+  if (m && m.groupId) go('group=' + encodeURIComponent(m.groupId)); else toggleGroupMenu();
 });
+$('#btn-group-menu').addEventListener('click', e => { e.stopPropagation(); toggleGroupMenu(); });
 $('#group-menu').addEventListener('click', async e => {
   const item = e.target.closest('.menu-item'); if (!item) return;
   e.stopPropagation();
