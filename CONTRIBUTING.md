@@ -36,14 +36,36 @@ See [README → Project Structure](README.md#project-structure). In short:
 
 ## Adding or changing UI text
 
-All strings live in `src/lib/translations.js` as `en` / `pl` tables, keyed the same. Add the key to
-**both** languages, then reference it with `t('key')` in JS or `data-i18n="key"` in HTML. Interpolate
-with `{n}` placeholders: `t('importedToast', { n: 3 })`.
+All strings live in Chrome's message catalogues, `_locales/en/messages.json` and
+`_locales/pl/messages.json`, keyed the same. Add the key to **both** languages, then reference it
+with `t('key')` in JS or `data-i18n="key"` in HTML.
+
+Substitutions use the `messages.json` placeholder contract, so a message declares what it takes:
+
+```json
+"importedToast": {
+  "message": "Imported $COUNT$ meetings",
+  "description": "Confirmation after importing meetings from a file.",
+  "placeholders": { "count": { "content": "$1", "example": "3" } }
+}
+```
+
+and the call passes it by name: `t('importedToast', { count: 3 })`. A value that is missing at
+runtime leaves `$COUNT$` visible rather than blanking out, so the gap is easy to spot.
+
+`manifest.json` reads the same catalogues through `__MSG_extName__`, `__MSG_extShortName__`,
+`__MSG_extDescription__` and `__MSG_extActionTitle__`, which is what localizes the Chrome Web Store
+listing. Keep `extShortName` at 12 characters or fewer and `extDescription` at 132 or fewer;
+Chrome truncates past those limits.
 
 ### Adding a language
 
-1. Add a `<code>: { … }` table to `TRANSLATIONS` in `translations.js` (copy `en`, translate values).
+1. Add `_locales/<code>/messages.json` (copy `en`, translate the `message` values, leave the keys,
+   `description` and `placeholders` alone).
 2. Add the language to `SUPPORTED_LANGUAGES` in `src/lib/i18n.js`.
+
+Pages read these files over `fetch` rather than through `chrome.i18n.getMessage`, because
+`getMessage` is pinned to the browser UI language and Settings lets the user pick a language.
 
 ## Before opening a PR
 

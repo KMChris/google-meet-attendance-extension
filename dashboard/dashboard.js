@@ -254,7 +254,7 @@ function mountSelection({ scope, head, root, actions }) {
 function drawSelectionBar(bar, actions, paint) {
   const n = selection.keys.size;
   const shown = actions.filter(a => n >= (a.min || 1));
-  bar.innerHTML = `<span class="sel-count mono">${esc(t('selCount', { n }))}</span>
+  bar.innerHTML = `<span class="sel-count mono">${esc(t('selCount', { count: n }))}</span>
     <div class="sel-acts">${shown.map((a, i) =>
       `<button class="sel-act${a.danger ? ' danger' : ''}" data-i="${i}">${esc(a.label())}</button>`).join('')}</div>
     <button class="sel-close" title="${esc(t('selClear'))}" aria-label="${esc(t('selClear'))}">
@@ -347,10 +347,10 @@ function renderMeetings(filter = '') {
       {
         label: () => t('delete'), danger: true,
         run: async ids => {
-          if (!confirm(t('confirmDeleteMeetings', { n: ids.length }))) return;
+          if (!confirm(t('confirmDeleteMeetings', { count: ids.length }))) return;
           for (const id of ids) await store.deleteMeetingById(id);
           selectionReset(); await load();
-          toast(t('deletedMeetingsToast', { n: ids.length }));
+          toast(t('deletedMeetingsToast', { count: ids.length }));
         }
       }
     ]
@@ -506,7 +506,7 @@ function renderAttendance(m, filter) {
         run: async names => {
           const added = await addNamesToRoster(names, g);
           selectionReset(); await load();
-          toast(added ? t('rosterAddedToast', { n: added }) : t('rosterAlreadyThere'));
+          toast(added ? t('rosterAddedToast', { count: added }) : t('rosterAlreadyThere'));
         }
       }
     ]
@@ -640,7 +640,7 @@ async function commitUnmerge() {
   const res = await store.unmergeParticipant(m.id, name);
   if (!res) return;
   await load();
-  toast(t('unmergedToast', { n: res.restored.length + 1 }));
+  toast(t('unmergedToast', { count: res.restored.length + 1 }));
 }
 $('#btn-unmerge').addEventListener('click', commitUnmerge);
 
@@ -690,7 +690,7 @@ function renderGroups() {
     const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
     return `<div class="card group-card" data-id="${esc(g.id)}">
       <div class="gc-top"><span class="gc-swatch" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>
-        <div style="min-width:0"><h3>${esc(g.name)}</h3><div class="gc-meta">${ms.length === 1 ? t('sessionOne') : t('sessionsN', { n: ms.length })}</div></div></div>
+        <div style="min-width:0"><h3>${esc(g.name)}</h3><div class="gc-meta">${ms.length === 1 ? t('sessionOne') : t('sessionsN', { count: ms.length })}</div></div></div>
       <div class="gc-stats">
         <div class="gc-stat"><div class="n">${agg.peopleCount}</div><div class="l">${t('colGroupPeople')}</div></div>
         <div class="gc-stat"><div class="n">${avgAtt}%</div><div class="l">${t('colGroupAttendance')}</div></div>
@@ -716,8 +716,8 @@ function renderSeriesSuggestions() {
     const div = document.createElement('div');
     div.className = 'suggest';
     div.innerHTML = `<div class="s-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
-      <div class="s-txt"><div class="s-title">${t('seriesSuggestTitle')}</div><div class="s-sub">${esc(title)} · ${t('seriesSuggestBody', { n: ungrouped.length })}</div></div>
-      <button class="btn">${t('groupThese', { n: ungrouped.length })}</button>`;
+      <div class="s-txt"><div class="s-title">${t('seriesSuggestTitle')}</div><div class="s-sub">${esc(title)} · ${t('seriesSuggestBody', { count: ungrouped.length })}</div></div>
+      <button class="btn">${t('groupThese', { count: ungrouped.length })}</button>`;
     div.querySelector('button').addEventListener('click', async () => {
       const g = await store.createGroup({ name: title });
       await store.assignMeetingsToGroup(ungrouped.map(m => m.id), g.id);
@@ -735,7 +735,7 @@ function renderGroup(g) {
   $('#group-eyebrow').innerHTML = `<span style="color:var(${GRP_COLORS[g.color] || '--grp-teal'})">●</span> ${t('navGroups').toUpperCase()}`;
   $('#group-title').textContent = g.name;
   $('#group-title').title = g.name;
-  $('#group-meta').innerHTML = `${ms.length === 1 ? t('sessionOne') : t('sessionsN', { n: ms.length })} · ${agg.peopleCount === 1 ? t('peopleOne') : t('peopleN', { n: agg.peopleCount })}`;
+  $('#group-meta').innerHTML = `${ms.length === 1 ? t('sessionOne') : t('sessionsN', { count: ms.length })} · ${agg.peopleCount === 1 ? t('peopleOne') : t('peopleN', { count: agg.peopleCount })}`;
 
   setStat($('#g-sessions'), agg.sessionCount, '');
   setStat($('#g-people'), agg.peopleCount, '');
@@ -816,7 +816,7 @@ function renderMatrix(agg) {
         run: async names => {
           const added = await addNamesToRoster(names, g);
           selectionReset(); await load();
-          toast(added ? t('rosterAddedToast', { n: added }) : t('rosterAlreadyThere'));
+          toast(added ? t('rosterAddedToast', { count: added }) : t('rosterAlreadyThere'));
         }
       },
       {
@@ -824,7 +824,7 @@ function renderMatrix(agg) {
         run: async names => {
           const removed = await removeNamesFromRoster(names, g);
           selectionReset(); await load();
-          toast(removed ? t('rosterRemovedToast', { n: removed }) : t('rosterNotThere'));
+          toast(removed ? t('rosterRemovedToast', { count: removed }) : t('rosterNotThere'));
         }
       }
     ]
@@ -1012,7 +1012,7 @@ function renderPeople(filter = '') {
         run: async names => {
           const added = await addNamesToRoster(names, null);
           selectionReset(); await load();
-          toast(added ? t('rosterAddedToast', { n: added }) : t('rosterAlreadyThere'));
+          toast(added ? t('rosterAddedToast', { count: added }) : t('rosterAlreadyThere'));
         }
       },
       {
@@ -1039,7 +1039,7 @@ function expandPerson(name) {
   const panel = document.createElement('div');
   panel.className = 'row-panel';
   panel.innerHTML = `<div class="p-stats">
-      <span>${p.count === 1 ? t('personMeetingOne') : t('personMeetingsN', { n: p.count })}</span>
+      <span>${p.count === 1 ? t('personMeetingOne') : t('personMeetingsN', { count: p.count })}</span>
       <span>${fmtDur(p.total)} ${t('personTotal')}</span><span>${avg}% ${t('personAvg')}</span></div>
     <table class="rc-table person-meetings"><thead><tr><th>${t('colMeeting')}</th><th>${t('colDate')}</th><th class="num">${t('colPresent')}</th><th>${t('colShare')}</th></tr></thead>
     <tbody>${meetings.map(mm => `<tr data-id="${esc(mm.id)}" tabindex="0" title="${esc(t('openMeeting'))}">
@@ -1297,7 +1297,7 @@ $('#paste-add').addEventListener('click', async () => {
   const names = $('#paste-textarea').value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
   for (const n of names) await addRoster(n);
   $('#paste-modal').hidden = true;
-  toast(names.length === 1 ? t('addedNamesOne') : t('addedNamesMany', { n: names.length }));
+  toast(names.length === 1 ? t('addedNamesOne') : t('addedNamesMany', { count: names.length }));
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(dismissModal); });
 
@@ -1360,7 +1360,7 @@ readTextFile($('#import-file'), async text => {
     catch { toast(t('importInvalid')); return; }
     await resolveGroupNames(converted.meetings);
     const added = await mergeImportedMeetings(converted.meetings);
-    toast(added ? t('importedToast', { n: added }) : t('importNothingNew'));
+    toast(added ? t('importedToast', { count: added }) : t('importNothingNew'));
     return;
   }
 
@@ -1373,7 +1373,7 @@ readTextFile($('#import-file'), async text => {
     data.groups.forEach(g => { if (g && g.id && !gids.has(g.id)) groups.push(g); });
     await store.saveGroups(groups);
   }
-  toast(t('importedToast', { n: await mergeImportedMeetings(meetings) }));
+  toast(t('importedToast', { count: await mergeImportedMeetings(meetings) }));
 });
 
 // import from another attendance extension — the file is converted first, then merged as above
@@ -1383,10 +1383,10 @@ readTextFile($('#import-app-file'), async text => {
   const source = importers.getImportSource($('#import-source').value) || importers.IMPORT_SOURCES[0];
   let converted;
   try { converted = source.convert(JSON.parse(text)); }
-  catch { toast(t('importSourceInvalid', { src: source.label })); return; }
+  catch { toast(t('importSourceInvalid', { source: source.label })); return; }
 
   const added = await mergeImportedMeetings(converted.meetings);
-  toast(added ? t('importedConvertedToast', { n: added, src: source.label }) : t('importNothingNew'));
+  toast(added ? t('importedConvertedToast', { count: added, source: source.label }) : t('importNothingNew'));
 });
 
 $('#btn-clear-all').addEventListener('click', async () => {
@@ -1465,7 +1465,7 @@ $('#sheets-push').addEventListener('click', async () => {
   try {
     const stored = await store.getHistory();      // raw records, merges unbaked
     const res = await sheets.pushAll(settings.spreadsheetId, { meetings: stored, groups });
-    toast(t('sheetsPushedToast', { n: res.meetings }));
+    toast(t('sheetsPushedToast', { count: res.meetings }));
   } catch (e) { console.error('[GM Attendance] push to Sheets failed:', (e && e.message) || e); toast(t('sheetsPushFailed')); }
   $('#sheets-push').disabled = false;
 });
@@ -1483,7 +1483,7 @@ $('#sheets-restore').addEventListener('click', async () => {
       const fresh = restoredGroups.filter(g => g && g.id && !known.has(g.id));
       if (fresh.length) { groups = groups.concat(fresh); await store.saveGroups(groups); }
       const added = await mergeImportedMeetings(meetings);
-      toast(added || fresh.length ? t('sheetsRestoredToast', { n: added }) : t('importNothingNew'));
+      toast(added || fresh.length ? t('sheetsRestoredToast', { count: added }) : t('importNothingNew'));
     }
   } catch (e) { console.error('[GM Attendance] restore from Sheets failed:', (e && e.message) || e); toast(t('sheetsRestoreFailed')); }
   $('#sheets-restore').disabled = false;
@@ -1500,6 +1500,8 @@ i18n.onLocaleChange(() => {
 /* ============================ boot ============================ */
 (async function boot() {
   await i18n.initI18n();
+  // A CSV exported in either language has to import, so the reader needs every locale's headers.
+  importers.configureLocaleLabels(await i18n.getAllMessages());
   await initAnalytics({
     history: () => history,
     groups: () => groups,

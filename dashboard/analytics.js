@@ -292,7 +292,7 @@ function drawList(p) {
 }
 
 function syncPickerChrome(p) {
-  txt($('.pick-label', p.root), p.selected.length ? t('pickSelected', { n: p.selected.length }) : p.allLabel);
+  txt($('.pick-label', p.root), p.selected.length ? t('pickSelected', { count: p.selected.length }) : p.allLabel);
   p.root.classList.toggle('active', p.selected.length > 0);
   txt($('.pick-count', p.root), p.items.length ? `${p.items.length}` : '');
   txt($('.pick-clear', p.root), t('pickClear'));
@@ -507,7 +507,7 @@ function renderSummary(scoped, from, to) {
   const people = new Set();
   scoped.forEach(m => Object.keys(m.attendance).forEach(n => people.add(n.toLowerCase())));
   const fmt = ms => i18n.formatDate(new Date(ms).toISOString(), { day: 'numeric', month: 'short', year: 'numeric' });
-  txt($('#filter-summary'), `${fmt(from)} – ${fmt(to)} · ${t('summaryMeetings', { n: scoped.length })} · ${t('summaryPeople', { n: people.size })}`);
+  txt($('#filter-summary'), `${fmt(from)} – ${fmt(to)} · ${t('summaryMeetings', { count: scoped.length })} · ${t('summaryPeople', { count: people.size })}`);
 }
 
 /* ---- KPI strip ---- */
@@ -770,13 +770,13 @@ function renderInsights(scoped, prev) {
   const trend = before ? Math.round(now.avgShare) - Math.round(before.avgShare) : null;
 
   const cards = [
-    perDay[busiestDay] > 0 && { key: 'insightBusiestDay', value: days[busiestDay], hint: t('summaryMeetings', { n: perDay[busiestDay] }) },
-    perHour[peakHour] > 0 && { key: 'insightPeakHour', value: `${pad2(peakHour)}:00`, hint: t('summaryMeetings', { n: perHour[peakHour] }) },
+    perDay[busiestDay] > 0 && { key: 'insightBusiestDay', value: days[busiestDay], hint: t('summaryMeetings', { count: perDay[busiestDay] }) },
+    perHour[peakHour] > 0 && { key: 'insightPeakHour', value: `${pad2(peakHour)}:00`, hint: t('summaryMeetings', { count: perHour[peakHour] }) },
     longest && { key: 'insightLongest', value: i18n.formatDuration(longest.dur), hint: titleOf(longest.m), meeting: longest.m.id },
-    largest && { key: 'insightLargest', value: largest.size === 1 ? t('peopleOne') : t('peopleN', { n: largest.size }), hint: titleOf(largest.m), meeting: largest.m.id },
-    regular && { key: 'insightRegular', value: regular.name, hint: t('insightAttendedOf', { n: regular.meetings, m: scoped.length }) },
-    steady && { key: 'insightSteadiestPerson', value: steady.name, hint: t('insightShareOf', { n: Math.round(steady.avgShare), m: steady.meetings }) },
-    fleeting && { key: 'insightFleetingPerson', value: fleeting.name, hint: t('insightShareOf', { n: Math.round(fleeting.avgShare), m: fleeting.meetings }) },
+    largest && { key: 'insightLargest', value: largest.size === 1 ? t('peopleOne') : t('peopleN', { count: largest.size }), hint: titleOf(largest.m), meeting: largest.m.id },
+    regular && { key: 'insightRegular', value: regular.name, hint: t('insightAttendedOf', { count: regular.meetings, total: scoped.length }) },
+    steady && { key: 'insightSteadiestPerson', value: steady.name, hint: t('insightShareOf', { count: Math.round(steady.avgShare), total: steady.meetings }) },
+    fleeting && { key: 'insightFleetingPerson', value: fleeting.name, hint: t('insightShareOf', { count: Math.round(fleeting.avgShare), total: fleeting.meetings }) },
     trend != null && { key: 'insightTrend', value: `${trend > 0 ? '+' : ''}${num(trend)} ${t('unitPoints')}`, hint: t('kpiVsPrev'), tone: trend === 0 ? '' : (trend > 0 ? 'up' : 'down') }
   ].filter(Boolean);
 

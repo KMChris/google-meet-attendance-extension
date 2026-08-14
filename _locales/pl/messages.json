@@ -1,0 +1,1268 @@
+{
+  "extName": {
+    "message": "Google Meet Attendance Tracker",
+    "description": "Extension name shown in the Chrome Web Store and on chrome://extensions."
+  },
+  "extShortName": {
+    "message": "Obecność",
+    "description": "Short extension name for cramped surfaces. Chrome truncates past 12 characters."
+  },
+  "extDescription": {
+    "message": "Frekwencja w Google Meet na osi czasu: cykle, macierz obecności, raporty PDF i CSV, analityka, tryb ciemny, sync z Google Sheets.",
+    "description": "Chrome Web Store description. Chrome truncates past 132 characters."
+  },
+  "extActionTitle": {
+    "message": "Attendance Tracker"
+  },
+  "appName": {
+    "message": "Attendance Tracker"
+  },
+  "save": {
+    "message": "Zapisz"
+  },
+  "cancel": {
+    "message": "Anuluj"
+  },
+  "delete": {
+    "message": "Usuń"
+  },
+  "close": {
+    "message": "Zamknij"
+  },
+  "add": {
+    "message": "Dodaj"
+  },
+  "create": {
+    "message": "Utwórz"
+  },
+  "rename": {
+    "message": "Zmień nazwę"
+  },
+  "remove": {
+    "message": "Usuń"
+  },
+  "back": {
+    "message": "Wróć"
+  },
+  "export": {
+    "message": "Eksportuj"
+  },
+  "open": {
+    "message": "Otwórz"
+  },
+  "dismiss": {
+    "message": "Odrzuć"
+  },
+  "at": {
+    "message": "o"
+  },
+  "present": {
+    "message": "Obecny"
+  },
+  "absent": {
+    "message": "Nieobecny"
+  },
+  "inCall": {
+    "message": "W rozmowie"
+  },
+  "navMeetings": {
+    "message": "Spotkania"
+  },
+  "navGroups": {
+    "message": "Cykle"
+  },
+  "navPeople": {
+    "message": "Osoby"
+  },
+  "navAnalytics": {
+    "message": "Analityka"
+  },
+  "navSettings": {
+    "message": "Ustawienia"
+  },
+  "readoutMeetings": {
+    "message": "Spotkania"
+  },
+  "readoutPeople": {
+    "message": "Osoby"
+  },
+  "readoutPresent": {
+    "message": "Frekwencja"
+  },
+  "selectHint": {
+    "message": "Zaznacz do operacji zbiorczej"
+  },
+  "selCount": {
+    "message": "zaznaczono: $COUNT$",
+    "description": "Number of rows currently selected in a list.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "selClear": {
+    "message": "Wyczyść zaznaczenie"
+  },
+  "selAddRoster": {
+    "message": "Dodaj do listy"
+  },
+  "selRemoveRoster": {
+    "message": "Usuń z listy"
+  },
+  "selCopyNames": {
+    "message": "Kopiuj nazwiska"
+  },
+  "rosterAddedToast": {
+    "message": "Dodano do listy: $COUNT$",
+    "description": "Confirmation after adding people to the roster.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "rosterAlreadyThere": {
+    "message": "Już są na liście"
+  },
+  "rosterRemovedToast": {
+    "message": "Usunięto z listy: $COUNT$",
+    "description": "Confirmation after removing people from the roster.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "rosterNotThere": {
+    "message": "Nie ma ich na liście"
+  },
+  "confirmDeleteMeetings": {
+    "message": "Trwale usunąć spotkania ($COUNT$)?",
+    "description": "Confirmation prompt before deleting the selected meetings.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "deletedMeetingsToast": {
+    "message": "Usunięto spotkania: $COUNT$",
+    "description": "Confirmation after deleting meetings.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "meetingsSubtitle": {
+    "message": "Twoje śledzone sesje Google Meet"
+  },
+  "searchMeetings": {
+    "message": "Szukaj spotkań lub osób…"
+  },
+  "colDate": {
+    "message": "Data"
+  },
+  "colMeeting": {
+    "message": "Spotkanie"
+  },
+  "colPeople": {
+    "message": "Osoby"
+  },
+  "colAvgTime": {
+    "message": "Śr. czas"
+  },
+  "colGroup": {
+    "message": "Cykl"
+  },
+  "statMeetings": {
+    "message": "Spotkania"
+  },
+  "statPeople": {
+    "message": "Unikalne osoby"
+  },
+  "statAvgLength": {
+    "message": "Śr. długość"
+  },
+  "statAvgAttendance": {
+    "message": "Śr. frekwencja"
+  },
+  "emptyMeetingsTitle": {
+    "message": "Brak śledzonych spotkań"
+  },
+  "emptyMeetingsBody": {
+    "message": "Dołącz do Google Meet — Attendance Tracker sam rozpocznie rejestr obecności."
+  },
+  "tagAuto": {
+    "message": "Auto"
+  },
+  "ungrouped": {
+    "message": "Bez cyklu"
+  },
+  "metaRoster": {
+    "message": "na liście"
+  },
+  "metaAttended": {
+    "message": "obecnych"
+  },
+  "metaAbsent": {
+    "message": "nieobecnych"
+  },
+  "statAttended": {
+    "message": "Obecność"
+  },
+  "statAvgPresence": {
+    "message": "Śr. obecność"
+  },
+  "statAvgShare": {
+    "message": "Śr. udział"
+  },
+  "statLength": {
+    "message": "Długość"
+  },
+  "timelineTitle": {
+    "message": "Oś czasu obecności"
+  },
+  "timelineHint": {
+    "message": "każde wejście i wyjście na zegarze spotkania"
+  },
+  "legendPresent": {
+    "message": "Obecny"
+  },
+  "legendAbsent": {
+    "message": "Nieobecny"
+  },
+  "attendanceTitle": {
+    "message": "Obecność"
+  },
+  "colParticipant": {
+    "message": "Uczestnik"
+  },
+  "colFirstSeen": {
+    "message": "Pierwsze wejście"
+  },
+  "colLastLeft": {
+    "message": "Ostatnie wyjście"
+  },
+  "colPresent": {
+    "message": "Obecność"
+  },
+  "colShare": {
+    "message": "Udział"
+  },
+  "colStatus": {
+    "message": "Status"
+  },
+  "savePdf": {
+    "message": "Raport PDF"
+  },
+  "exportCsv": {
+    "message": "Eksport CSV"
+  },
+  "copyText": {
+    "message": "Kopiuj"
+  },
+  "exportJson": {
+    "message": "JSON"
+  },
+  "addToGroup": {
+    "message": "Dodaj do cyklu"
+  },
+  "inGroup": {
+    "message": "Cykl"
+  },
+  "removeFromGroup": {
+    "message": "Usuń z cyklu"
+  },
+  "confirmDeleteMeeting": {
+    "message": "Trwale usunąć to spotkanie?"
+  },
+  "hoursPinnedTitle": {
+    "message": "Godziny ustawione ręcznie — kliknij, aby edytować"
+  },
+  "hoursAutoTitle": {
+    "message": "Godziny z zarejestrowanej aktywności — kliknij, aby ustawić ręcznie"
+  },
+  "scheduleTitle": {
+    "message": "Godziny spotkania"
+  },
+  "scheduleHint": {
+    "message": "Udział w spotkaniu liczony jest względem tych godzin. Pobierane są z terminu wydarzenia, gdy Meet go pokazuje — w przeciwnym razie z chwili rozpoczęcia śledzenia, dlatego wcześniejsze otwarcie rozmowy potrafi zaniżyć wynik każdego."
+  },
+  "scheduleStart": {
+    "message": "Początek"
+  },
+  "scheduleEnd": {
+    "message": "Koniec"
+  },
+  "scheduleObserved": {
+    "message": "Zarejestrowana aktywność: $RANGE$",
+    "description": "The scheduled time window detected from the calendar event.",
+    "placeholders": {
+      "range": {
+        "content": "$1",
+        "example": "09:00 – 10:30"
+      }
+    }
+  },
+  "scheduleAuto": {
+    "message": "Wróć do automatycznych"
+  },
+  "scheduleInvalid": {
+    "message": "Koniec musi być późniejszy niż początek"
+  },
+  "scheduleClearedToast": {
+    "message": "Godziny znów automatyczne"
+  },
+  "editParticipantTitle": {
+    "message": "Edytuj uczestnika"
+  },
+  "editParticipantHint": {
+    "message": "Popraw wyświetlaną nazwę — albo wpisz nazwę innego uczestnika, aby scalić oba wpisy w jedną osobę."
+  },
+  "participantNameLabel": {
+    "message": "Nazwa"
+  },
+  "mergePickLabel": {
+    "message": "Lub scal z"
+  },
+  "mergeWarning": {
+    "message": "Zostanie scalone z „$NAME$” — wejścia i wyjścia obu wpisów staną się jedną osobą.",
+    "description": "Warning shown before merging a duplicate participant into another name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Anna Kowalska"
+      }
+    }
+  },
+  "merge": {
+    "message": "Scal"
+  },
+  "renamedToast": {
+    "message": "Zmieniono nazwę"
+  },
+  "mergedToast": {
+    "message": "Scalono uczestników"
+  },
+  "mergedFromTitle": {
+    "message": "Jedna osoba, scalona z: $NAMES$",
+    "description": "Tooltip listing the original names merged into this person.",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "Anna K., A. Kowalska"
+      }
+    }
+  },
+  "unmergeLabel": {
+    "message": "Scalono z"
+  },
+  "unmerge": {
+    "message": "Rozdziel"
+  },
+  "unmergedToast": {
+    "message": "Cofnięto scalenie — znów $COUNT$ wpisy",
+    "description": "Confirmation after undoing a merge.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "groupsSubtitle": {
+    "message": "Szkolenia i cykle spotkań"
+  },
+  "newGroup": {
+    "message": "Nowy cykl"
+  },
+  "emptyGroupsTitle": {
+    "message": "Brak cykli"
+  },
+  "emptyGroupsBody": {
+    "message": "Połącz powtarzające się sesje — np. szkolenie weekendowe — w jeden cykl, aby zobaczyć, kto był na całości."
+  },
+  "seriesSuggestTitle": {
+    "message": "To wygląda na cykl spotkań"
+  },
+  "seriesSuggestBody": {
+    "message": "$COUNT$ sesji korzysta z tego samego linku Meet.",
+    "description": "Offers to group meetings that look like one recurring series.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "groupThese": {
+    "message": "Połącz te $COUNT$ w cykl",
+    "description": "Button that groups the suggested meetings into a series.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "colGroupName": {
+    "message": "Cykl"
+  },
+  "colSessions": {
+    "message": "Sesje"
+  },
+  "colGroupPeople": {
+    "message": "Osoby"
+  },
+  "colGroupAttendance": {
+    "message": "Śr. frekwencja"
+  },
+  "sessionsN": {
+    "message": "$COUNT$ sesji",
+    "description": "Plural session count. The singular form is sessionsOne.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "sessionOne": {
+    "message": "1 sesja"
+  },
+  "peopleN": {
+    "message": "$COUNT$ osób",
+    "description": "Plural people count. The singular form is peopleOne.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "peopleOne": {
+    "message": "1 osoba"
+  },
+  "groupRosterTitle": {
+    "message": "Oczekiwani uczestnicy"
+  },
+  "groupRosterHint": {
+    "message": "Każdy z tej listy, kto opuści sesję, jest w niej oznaczony jako nieobecny."
+  },
+  "matrixTitle": {
+    "message": "Macierz frekwencji"
+  },
+  "groupSessionsTitle": {
+    "message": "Spotkania"
+  },
+  "groupSessionsHint": {
+    "message": "otwórz, aby zobaczyć oś obecności"
+  },
+  "personSessionsTitle": {
+    "message": "Obecność — $NAME$ — w każdej sesji",
+    "description": "Heading above one person's presence across every session.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Anna Kowalska"
+      }
+    }
+  },
+  "openMeeting": {
+    "message": "Otwórz spotkanie"
+  },
+  "colTotalTime": {
+    "message": "Łącznie"
+  },
+  "colAttendedShare": {
+    "message": "Obecność"
+  },
+  "colTotalShare": {
+    "message": "% cyklu"
+  },
+  "groupSavePdf": {
+    "message": "Raport PDF cyklu"
+  },
+  "groupExportCsv": {
+    "message": "Eksport CSV"
+  },
+  "createGroupTitle": {
+    "message": "Nowy cykl"
+  },
+  "groupNameLabel": {
+    "message": "Nazwa"
+  },
+  "groupNamePlaceholder": {
+    "message": "np. Szkolenie weekendowe"
+  },
+  "groupColorLabel": {
+    "message": "Kolor"
+  },
+  "assignTitle": {
+    "message": "Dodaj do cyklu"
+  },
+  "assignPick": {
+    "message": "Wybierz cykl"
+  },
+  "assignNew": {
+    "message": "Nowy cykl…"
+  },
+  "confirmDeleteGroup": {
+    "message": "Usunąć ten cykl? Same spotkania zostaną zachowane."
+  },
+  "groupCreatedToast": {
+    "message": "Utworzono cykl"
+  },
+  "assignedToast": {
+    "message": "Dodano do cyklu"
+  },
+  "peopleSubtitle": {
+    "message": "Wszyscy z Twoich spotkań"
+  },
+  "searchPeople": {
+    "message": "Szukaj osób…"
+  },
+  "colName": {
+    "message": "Nazwa"
+  },
+  "colMeetingsCount": {
+    "message": "Spotkania"
+  },
+  "colTotalTimeP": {
+    "message": "Łączny czas"
+  },
+  "colAvgRate": {
+    "message": "Śr. frekwencja"
+  },
+  "colLastSeen": {
+    "message": "Ostatnio"
+  },
+  "emptyPeopleTitle": {
+    "message": "Brak osób"
+  },
+  "emptyPeopleBody": {
+    "message": "Gdy zaczniesz śledzić spotkania, pojawią się tu wszyscy uczestnicy."
+  },
+  "personMeetingsN": {
+    "message": "$COUNT$ spotkań",
+    "description": "Number of meetings a person attended.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "personMeetingOne": {
+    "message": "1 spotkanie"
+  },
+  "personTotal": {
+    "message": "łącznie"
+  },
+  "personAvg": {
+    "message": "śr. frekwencja"
+  },
+  "analyticsSubtitle": {
+    "message": "Trendy, rytm i frekwencja w wybranym wycinku spotkań"
+  },
+  "filterRange": {
+    "message": "Zakres"
+  },
+  "filterSeries": {
+    "message": "Cykle"
+  },
+  "filterMeetings": {
+    "message": "Spotkania"
+  },
+  "filterReset": {
+    "message": "Wyczyść filtry"
+  },
+  "filterFrom": {
+    "message": "Od"
+  },
+  "filterTo": {
+    "message": "Do"
+  },
+  "range7": {
+    "message": "7 dni"
+  },
+  "range30": {
+    "message": "30 dni"
+  },
+  "range90": {
+    "message": "90 dni"
+  },
+  "range365": {
+    "message": "12 mies."
+  },
+  "rangeAll": {
+    "message": "Całość"
+  },
+  "pickAllSeries": {
+    "message": "Wszystkie cykle"
+  },
+  "pickAllMeetings": {
+    "message": "Wszystkie spotkania"
+  },
+  "pickSelected": {
+    "message": "Wybrano: $COUNT$",
+    "description": "Applies an action to the currently selected rows.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "pickNone": {
+    "message": "Bez cyklu"
+  },
+  "pickClear": {
+    "message": "Wyczyść"
+  },
+  "pickSearch": {
+    "message": "Szukaj…"
+  },
+  "pickEmpty": {
+    "message": "Brak pozycji"
+  },
+  "summaryMeetings": {
+    "message": "spotkań: $COUNT$",
+    "description": "Meeting count in an analytics summary.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "summaryPeople": {
+    "message": "osób: $COUNT$",
+    "description": "People count in an analytics summary.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "analyticsNoneTitle": {
+    "message": "Brak danych dla tych filtrów"
+  },
+  "analyticsNoneBody": {
+    "message": "Poszerz zakres dat albo wyczyść filtry, aby znów zobaczyć spotkania."
+  },
+  "kpiMeetings": {
+    "message": "Spotkania"
+  },
+  "kpiHours": {
+    "message": "Łączny czas"
+  },
+  "kpiPeople": {
+    "message": "Osoby"
+  },
+  "kpiAttendance": {
+    "message": "Śr. frekwencja"
+  },
+  "kpiSize": {
+    "message": "Śr. wielkość"
+  },
+  "kpiVsPrev": {
+    "message": "wobec poprzedniego okresu tej samej długości"
+  },
+  "kpiNoPrev": {
+    "message": "Brak danych z poprzedniego okresu"
+  },
+  "deltaSame": {
+    "message": "bez zmian"
+  },
+  "unitPoints": {
+    "message": "pkt"
+  },
+  "chartActivity": {
+    "message": "Aktywność spotkań"
+  },
+  "chartAvgDuration": {
+    "message": "Średnia długość i obecność"
+  },
+  "chartRhythm": {
+    "message": "Rytm tygodnia"
+  },
+  "chartRhythmHint": {
+    "message": "o której zaczynają się spotkania"
+  },
+  "chartShare": {
+    "message": "Rozkład frekwencji"
+  },
+  "chartShareHint": {
+    "message": "jaką część spotkania zajmuje obecność"
+  },
+  "chartTopMeetings": {
+    "message": "Najczęstsze spotkania"
+  },
+  "chartTopMeetingsHint": {
+    "message": "wg nazwy"
+  },
+  "chartTopPeople": {
+    "message": "Najbardziej obecni"
+  },
+  "chartTopPeopleHint": {
+    "message": "wg czasu w rozmowie"
+  },
+  "chartSeries": {
+    "message": "Porównanie cykli"
+  },
+  "chartSeriesHint": {
+    "message": "śr. frekwencja w cyklu"
+  },
+  "chartLegendAvgDuration": {
+    "message": "Długość (min)"
+  },
+  "chartLegendAvgTimeInCall": {
+    "message": "Obecność (min)"
+  },
+  "legendAbsentP": {
+    "message": "Nieobecni"
+  },
+  "bucketDaily": {
+    "message": "dziennie"
+  },
+  "bucketWeekly": {
+    "message": "tygodniowo"
+  },
+  "bucketMonthly": {
+    "message": "miesięcznie"
+  },
+  "unitMeetings": {
+    "message": "spotkań"
+  },
+  "unitPeople": {
+    "message": "osób"
+  },
+  "unitTotalTime": {
+    "message": "łączny czas"
+  },
+  "unitMin": {
+    "message": "min"
+  },
+  "unitParticipations": {
+    "message": "uczestnictw"
+  },
+  "colBucket": {
+    "message": "Okres"
+  },
+  "colWeekday": {
+    "message": "Dzień"
+  },
+  "colParticipations": {
+    "message": "Uczestnictwa"
+  },
+  "tableView": {
+    "message": "Pokaż liczby"
+  },
+  "chartView": {
+    "message": "Pokaż wykres"
+  },
+  "insightsTitle": {
+    "message": "Odczyty"
+  },
+  "insightsHint": {
+    "message": "co mówi ten wycinek"
+  },
+  "insightBusiestDay": {
+    "message": "Najbardziej zajęty dzień"
+  },
+  "insightPeakHour": {
+    "message": "Godzina szczytu"
+  },
+  "insightLongest": {
+    "message": "Najdłuższe spotkanie"
+  },
+  "insightLargest": {
+    "message": "Najliczniejsze spotkanie"
+  },
+  "insightRegular": {
+    "message": "Najbardziej regularni"
+  },
+  "insightTrend": {
+    "message": "Trend frekwencji"
+  },
+  "insightSteadiestPerson": {
+    "message": "Zostaje najdłużej"
+  },
+  "insightFleetingPerson": {
+    "message": "Wychodzi najwcześniej"
+  },
+  "insightAttendedOf": {
+    "message": "obecność na $COUNT$ z $TOTAL$",
+    "description": "How many of the analysed meetings a person attended.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "insightShareOf": {
+    "message": "średnio $COUNT$% z $TOTAL$ spotkań",
+    "description": "A person's average attendance share across their meetings.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "emptyAnalyticsTitle": {
+    "message": "Brak danych do wykresów"
+  },
+  "emptyAnalyticsBody": {
+    "message": "Prześledź kilka spotkań, a pojawią się tu trendy."
+  },
+  "settingsSubtitle": {
+    "message": "Śledzenie, wygląd i dane"
+  },
+  "settingTracking": {
+    "message": "Automatyczne śledzenie"
+  },
+  "settingTrackingHint": {
+    "message": "Rozpocznij rejestr automatycznie po dołączeniu do Google Meet."
+  },
+  "settingTheme": {
+    "message": "Wygląd"
+  },
+  "settingThemeHint": {
+    "message": "„System” podąża za ustawieniem jasny/ciemny w przeglądarce."
+  },
+  "themeSystem": {
+    "message": "System"
+  },
+  "themeLight": {
+    "message": "Jasny"
+  },
+  "themeDark": {
+    "message": "Ciemny"
+  },
+  "settingLanguage": {
+    "message": "Język"
+  },
+  "settingLanguageHint": {
+    "message": "Język interfejsu. „Automatyczny” podąża za językiem przeglądarki."
+  },
+  "languageAuto": {
+    "message": "🌐 Automatyczny"
+  },
+  "settingRoster": {
+    "message": "Domyślna lista"
+  },
+  "settingRosterHint": {
+    "message": "Oczekiwani uczestnicy pojedynczych spotkań. Cykle mają własne listy."
+  },
+  "rosterPlaceholder": {
+    "message": "Wpisz nazwę i naciśnij Enter"
+  },
+  "rosterAdd": {
+    "message": "Dodaj"
+  },
+  "rosterPaste": {
+    "message": "Wklej listę"
+  },
+  "rosterClear": {
+    "message": "Wyczyść"
+  },
+  "rosterPasteTitle": {
+    "message": "Wklej listę nazwisk"
+  },
+  "rosterPasteHint": {
+    "message": "Jedno nazwisko w linii lub oddzielone przecinkami."
+  },
+  "rosterPastePlaceholder": {
+    "message": "Anna Kowalska\nJan Nowak\n…"
+  },
+  "rosterAddNames": {
+    "message": "Dodaj nazwiska"
+  },
+  "sheetsTitle": {
+    "message": "Google Sheets"
+  },
+  "sheetsHint": {
+    "message": "Trzymaj kopię dziennika we własnym arkuszu i odtwarzaj z niego dane."
+  },
+  "sheetsStepAccount": {
+    "message": "Połącz konto Google"
+  },
+  "sheetsStepSheet": {
+    "message": "Wskaż arkusz"
+  },
+  "sheetsStepData": {
+    "message": "Korzystaj"
+  },
+  "sheetsStepDataHint": {
+    "message": "Arkusz przechowuje wszystkie dane spotkania, więc może działać jako kopia zapasowa."
+  },
+  "sheetsNoSheet": {
+    "message": "Brak arkusza"
+  },
+  "sheetsConnect": {
+    "message": "Połącz konto Google"
+  },
+  "sheetsDisconnect": {
+    "message": "Rozłącz"
+  },
+  "sheetsConnected": {
+    "message": "Połączono"
+  },
+  "sheetsNotConnected": {
+    "message": "Nie połączono"
+  },
+  "spreadsheetIdPlaceholder": {
+    "message": "Wklej ID istniejącego arkusza"
+  },
+  "sheetsSave": {
+    "message": "Użyj tego"
+  },
+  "sheetsCreate": {
+    "message": "Utwórz arkusz"
+  },
+  "sheetsOpen": {
+    "message": "Otwórz"
+  },
+  "sheetsPush": {
+    "message": "Wyślij wszystko"
+  },
+  "sheetsRestore": {
+    "message": "Przywróć z arkusza"
+  },
+  "sheetsPushedToast": {
+    "message": "Wysłano do arkusza spotkania: $COUNT$",
+    "description": "Confirmation after sending meetings to Google Sheets.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "sheetsPushFailed": {
+    "message": "Nie udało się zapisać do arkusza"
+  },
+  "sheetsRestoredToast": {
+    "message": "Przywrócono spotkania: $COUNT$",
+    "description": "Confirmation after restoring meetings from Google Sheets.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "sheetsRestoreFailed": {
+    "message": "Nie udało się odczytać arkusza"
+  },
+  "sheetsNoBackup": {
+    "message": "Nie ma czego przywracać — najpierw wyślij wszystko do tego arkusza"
+  },
+  "confirmSheetsRestore": {
+    "message": "Dodać wszystko, co jest w arkuszu? Spotkania, które już tu są, zostaną bez zmian."
+  },
+  "autoSync": {
+    "message": "Auto-synchronizacja po zakończeniu"
+  },
+  "dataTitle": {
+    "message": "Dane"
+  },
+  "exportAllTitle": {
+    "message": "Eksportuj wszystko"
+  },
+  "exportAllHint": {
+    "message": "Kopia JSON lub zbiorczy CSV."
+  },
+  "importTitle": {
+    "message": "Importuj kopię"
+  },
+  "importHint": {
+    "message": "Dołącz kopię JSON albo CSV wyeksportowany stąd (istniejące spotkania zostają)."
+  },
+  "importBtn": {
+    "message": "Importuj JSON / CSV"
+  },
+  "importAppsTitle": {
+    "message": "Import z innej aplikacji"
+  },
+  "importAppsHint": {
+    "message": "Przekonwertuj kopię z innego rozszerzenia do obecności i dołącz ją."
+  },
+  "importAppsBtn": {
+    "message": "Konwertuj i importuj"
+  },
+  "maxMeetings": {
+    "message": "Przechowywane spotkania"
+  },
+  "maxMeetingsHint": {
+    "message": "Starsze spotkania ponad limit są usuwane. „Bez limitu” zachowuje wszystkie."
+  },
+  "maxUnlimited": {
+    "message": "Bez limitu"
+  },
+  "clearAll": {
+    "message": "Usuń wszystkie dane"
+  },
+  "clearAllHint": {
+    "message": "Usuń każde zapisane spotkanie. Bez cofnięcia."
+  },
+  "confirmClearAll": {
+    "message": "Usunąć WSZYSTKIE zapisane spotkania? Nie da się tego cofnąć."
+  },
+  "confirmSheetsDisconnect": {
+    "message": "Rozłączyć konto Google i zapomnieć arkusz?"
+  },
+  "csvMeetingCode": {
+    "message": "Kod Meet"
+  },
+  "csvMeetingStart": {
+    "message": "Początek spotkania"
+  },
+  "csvMeetingEnd": {
+    "message": "Koniec spotkania"
+  },
+  "csvMeetingLength": {
+    "message": "Długość spotkania"
+  },
+  "csvEmail": {
+    "message": "E-mail"
+  },
+  "csvPresentMinutes": {
+    "message": "Obecność (min)"
+  },
+  "csvTotalMinutes": {
+    "message": "Łącznie (min)"
+  },
+  "csvSessionCount": {
+    "message": "Bloki obecności"
+  },
+  "csvSessionList": {
+    "message": "Wejścia i wyjścia"
+  },
+  "csvMergedFrom": {
+    "message": "Scalono z"
+  },
+  "csvId": {
+    "message": "ID"
+  },
+  "savedToast": {
+    "message": "Zapisano"
+  },
+  "copiedToast": {
+    "message": "Skopiowano do schowka"
+  },
+  "importedToast": {
+    "message": "Zaimportowano $COUNT$ spotkań",
+    "description": "Confirmation after importing meetings from a file.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "importInvalid": {
+    "message": "To nie jest poprawna kopia"
+  },
+  "importedConvertedToast": {
+    "message": "Przekonwertowano $COUNT$ spotkań z $SOURCE$",
+    "description": "Confirmation after importing meetings converted from another tool's export.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      },
+      "source": {
+        "content": "$2",
+        "example": "RollCall"
+      }
+    }
+  },
+  "importSourceInvalid": {
+    "message": "Ten plik nie wygląda na kopię z $SOURCE$",
+    "description": "Error when the file does not match the selected import source.",
+    "placeholders": {
+      "source": {
+        "content": "$1",
+        "example": "RollCall"
+      }
+    }
+  },
+  "importNothingNew": {
+    "message": "Nic nowego — te spotkania już tu są"
+  },
+  "rosterClearedToast": {
+    "message": "Wyczyszczono listę"
+  },
+  "addedNamesOne": {
+    "message": "Dodano 1 nazwisko"
+  },
+  "addedNamesMany": {
+    "message": "Dodano $COUNT$ nazwisk",
+    "description": "Confirmation after pasting several names into the roster.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "sheetsConnectedToast": {
+    "message": "Połączono konto Google"
+  },
+  "sheetsConnectFailed": {
+    "message": "Nie udało się połączyć"
+  },
+  "sheetsDisconnectedToast": {
+    "message": "Rozłączono"
+  },
+  "sheetsCreatedToast": {
+    "message": "Utworzono arkusz"
+  },
+  "sheetsCreateFailed": {
+    "message": "Nie udało się utworzyć arkusza"
+  },
+  "sheetsSavedToast": {
+    "message": "Podłączono arkusz"
+  },
+  "sheetsSaveFailed": {
+    "message": "Nie udało się otworzyć arkusza"
+  },
+  "sheetsIdRequired": {
+    "message": "Podaj ID arkusza"
+  },
+  "syncedToast": {
+    "message": "Zsynchronizowano"
+  },
+  "syncFailed": {
+    "message": "Synchronizacja nieudana"
+  },
+  "reportSubtitle": {
+    "message": "Raport obecności"
+  },
+  "groupReportSubtitle": {
+    "message": "Raport obecności cyklu"
+  },
+  "reportSummary": {
+    "message": "Podsumowanie"
+  },
+  "reportPeople": {
+    "message": "Osoby"
+  },
+  "reportPresent": {
+    "message": "Obecni"
+  },
+  "reportAvg": {
+    "message": "Śr. obecność"
+  },
+  "reportAbsentees": {
+    "message": "Nieobecni"
+  },
+  "eventLogTitle": {
+    "message": "Dziennik zdarzeń"
+  },
+  "evJoined": {
+    "message": "Wejście"
+  },
+  "evLeft": {
+    "message": "Wyjście"
+  },
+  "evSession": {
+    "message": "sesja"
+  },
+  "rosterReconTitle": {
+    "message": "Kontrola listy"
+  },
+  "rosterExpected": {
+    "message": "Oczekiwani"
+  },
+  "rosterAbsent": {
+    "message": "Nieobecni"
+  },
+  "sessionsBreakdown": {
+    "message": "Sesje"
+  },
+  "reportGenerated": {
+    "message": "Wygenerowano $DATE$",
+    "description": "Timestamp printed in the footer of a PDF report.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "4 March 2026"
+      }
+    }
+  },
+  "reportBy": {
+    "message": "Google Meet Attendance Tracker"
+  },
+  "printReport": {
+    "message": "Zapisz jako PDF"
+  },
+  "backToApp": {
+    "message": "Wróć"
+  },
+  "reportNotFound": {
+    "message": "Nie znaleziono raportu"
+  },
+  "reportNotFoundBody": {
+    "message": "Tego spotkania nie ma już w pamięci."
+  },
+  "stillInCall": {
+    "message": "wciąż w rozmowie"
+  },
+  "popupTracking": {
+    "message": "Śledzę to spotkanie"
+  },
+  "popupIdle": {
+    "message": "Nie śledzę"
+  },
+  "popupNoMeeting": {
+    "message": "Otwórz Google Meet, aby zacząć"
+  },
+  "popupInThisCall": {
+    "message": "W tej rozmowie"
+  },
+  "popupStatusTracking": {
+    "message": "Aktywne"
+  },
+  "popupStatusIdle": {
+    "message": "Nieaktywne"
+  },
+  "popupStatusNoMeeting": {
+    "message": "Brak spotkania"
+  },
+  "popupOpenDashboard": {
+    "message": "Otwórz panel"
+  },
+  "popupRecent": {
+    "message": "Ostatnie spotkania"
+  },
+  "popupNoRecent": {
+    "message": "Brak spotkań"
+  },
+  "popupExport": {
+    "message": "Eksport CSV"
+  },
+  "popupViewAll": {
+    "message": "Zobacz wszystkie"
+  }
+}

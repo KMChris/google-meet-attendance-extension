@@ -1,15 +1,23 @@
 /**
- * Runtime i18n (EN/PL) as an ES module. Pages import { t, initI18n, ... }.
+ * Runtime i18n as an ES module. Pages import { t, initI18n, ... }.
  *
  *   <span data-i18n="navMeetings"></span>        → textContent
  *   <input data-i18n-placeholder="searchMeetings">
  *   <button data-i18n-title="save" data-i18n-aria="save">
  *
+ * Strings live in Chrome's own message catalogues, _locales/<code>/messages.json,
+ * which is what the manifest's __MSG_*__ references resolve against. Pages read
+ * those files over fetch rather than through chrome.i18n.getMessage, because
+ * getMessage is pinned to the browser UI language and this extension lets the
+ * user pick a language in Settings.
+ *
  * Language preference is stored in chrome.storage.sync ('rollcallLanguage') as 'en' | 'pl';
- * when the key is absent the language is Automatic — it follows the browser language.
- * Interpolation uses {n} tokens: t('importedToast', { n: 3 }).
+ * when the key is absent the language is Automatic and follows the browser language.
+ * Substitution follows the messages.json placeholder contract: t('importedToast', { count: 3 })
+ * fills the $COUNT$ placeholder declared for that message.
+ *
+ * initI18n() must resolve before the first t() call; every page awaits it on startup.
  */
-import { TRANSLATIONS } from './translations.js';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'English', native: 'English', flag: '🇬🇧' },
@@ -20,7 +28,11 @@ const STORAGE_KEY = 'rollcallLanguage';
 const DEFAULT = 'en';
 const AUTO = 'auto';
 const listeners = new Set();
-let preference = AUTO; // 'auto' | 'en' | 'pl' — user's choice ('auto' follows the browser)
+
+/** locale code -> parsed messages.json ({ key: { message, placeholders? } }). */
+const catalogues = new Map();
+
+let preference = AUTO; // 'auto' | 'en' | 'pl' — the user's choice ('auto' follows the browser)
 let locale = DEFAULT;  // resolved 'en' | 'pl' currently in use
 
 function normalize(code) {
@@ -37,14 +49,43 @@ export function getLocale() { return locale; }
 export function getLanguagePreference() { return preference; }
 export function localeTag() { return locale === 'pl' ? 'pl-PL' : 'en-GB'; }
 
-/** Translate a key with optional {n}-style interpolation. Falls back to EN, then the key. */
+/** Read one locale's messages.json out of the extension package. Cached per locale. */
+async function loadCatalogue(code) {
+  const cached = catalogues.get(code);
+  if (cached) return cached;
+  try {
+    const res = await fetch(chrome.runtime.getURL(`_locales/${code}/messages.json`));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const messages = await res.json();
+    catalogues.set(code, messages);
+    return messages;
+  } catch (err) {
+    console.warn(`[GM Attendance] could not load _locales/${code}/messages.json:`, err);
+    catalogues.set(code, {});
+    return {};
+  }
+}
+
+/**
+ * Fill the message's placeholders, following the messages.json rules: '$$' is a
+ * literal '$' and '$name$' is matched case-insensitively. A placeholder with no
+ * value is left in place so the gap is visible rather than silently blank.
+ */
+function substitute(message, params) {
+  return message.replace(/\$(\$|[A-Za-z0-9_]+\$)/g, (token, body) => {
+    if (body === '$') return '$';
+    if (!params) return token;
+    const name = body.slice(0, -1).toLowerCase();
+    const value = params[name];
+    return value == null ? token : String(value);
+  });
+}
+
+/** Translate a key with optional placeholder values. Falls back to EN, then the key. */
 export function t(key, params) {
-  const table = TRANSLATIONS[locale] || TRANSLATIONS[DEFAULT];
-  let str = table[key];
-  if (str == null) str = TRANSLATIONS[DEFAULT][key];
-  if (str == null) return key;
-  if (params) for (const p in params) str = str.replace(new RegExp(`\\{${p}\\}`, 'g'), params[p]);
-  return str;
+  const entry = (catalogues.get(locale) || {})[key] ?? (catalogues.get(DEFAULT) || {})[key];
+  if (!entry || typeof entry.message !== 'string') return key;
+  return substitute(entry.message, params);
 }
 
 /** Apply translations to every [data-i18n*] node under root. */
@@ -58,6 +99,22 @@ export function applyI18n(root = document) {
 
 export function onLocaleChange(cb) { listeners.add(cb); return () => listeners.delete(cb); }
 
+/**
+ * Every locale's plain key -> string table, e.g. { en: { save: 'Save' }, pl: { save: 'Zapisz' } }.
+ * Used where all languages matter at once, such as recognising a CSV header that was
+ * exported in the other language.
+ */
+export async function getAllMessages() {
+  const tables = {};
+  await Promise.all(SUPPORTED_LANGUAGES.map(async ({ code }) => {
+    const messages = await loadCatalogue(code);
+    const table = {};
+    for (const key in messages) table[key] = messages[key].message;
+    tables[code] = table;
+  }));
+  return tables;
+}
+
 function readStored() {
   return new Promise((resolve) => {
     try {
@@ -69,11 +126,12 @@ function readStored() {
   });
 }
 
-/** Load the stored (or browser) locale and apply it. Call once per page. */
+/** Load the stored (or browser) locale and apply it. Call once per page, before t(). */
 export async function initI18n() {
   const stored = await readStored();
   preference = (stored === 'en' || stored === 'pl') ? stored : AUTO;
   locale = resolveLocale(preference);
+  await Promise.all([loadCatalogue(locale), loadCatalogue(DEFAULT)]);
   applyI18n(document);
   return locale;
 }
@@ -87,6 +145,7 @@ export async function setLocale(code) {
   } catch { /* sync unavailable */ }
   const next = resolveLocale(preference);
   if (next === locale) return;
+  await loadCatalogue(next);
   locale = next;
   applyI18n(document);
   listeners.forEach(cb => { try { cb(next); } catch (e) { console.warn(e); } });

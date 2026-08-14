@@ -14,7 +14,6 @@
  */
 
 import { deriveAttendee, isMeetCode, makeSessionId } from './attendance.js';
-import { TRANSLATIONS } from './translations.js';
 
 /** Thrown when a file doesn't look like the chosen source's export at all. */
 export class ImportFormatError extends Error {}
@@ -166,12 +165,22 @@ const CSV_COLUMNS = {
 };
 const HEADER_ALIASES = new Map();
 const ABSENT_LABELS = new Set();
-for (const table of Object.values(TRANSLATIONS)) {
-  for (const key in CSV_COLUMNS) {
-    const label = table[key];
-    if (label) HEADER_ALIASES.set(String(label).trim().toLowerCase(), CSV_COLUMNS[key]);
+
+/**
+ * Hand over every locale's strings, as { en: { colDate: 'Date', … }, pl: { … } }.
+ * The caller owns the message catalogues (they are loaded from _locales at runtime),
+ * which keeps this module free of chrome.* and of any single language.
+ */
+export function configureLocaleLabels(tables) {
+  HEADER_ALIASES.clear();
+  ABSENT_LABELS.clear();
+  for (const table of Object.values(tables || {})) {
+    for (const key in CSV_COLUMNS) {
+      const label = table[key];
+      if (label) HEADER_ALIASES.set(String(label).trim().toLowerCase(), CSV_COLUMNS[key]);
+    }
+    if (table.absent) ABSENT_LABELS.add(String(table.absent).trim().toLowerCase());
   }
-  if (table.absent) ABSENT_LABELS.add(String(table.absent).trim().toLowerCase());
 }
 
 const DAY_RE = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
@@ -232,6 +241,7 @@ function eventsFromRow(get, day) {
  * lossless path.
  */
 export function fromOwnCSV(text) {
+  if (!HEADER_ALIASES.size) throw new Error('configureLocaleLabels() must run before a CSV is read');
   const rows = parseCSV(text);
   if (!rows.length) throw new ImportFormatError('empty file');
 
