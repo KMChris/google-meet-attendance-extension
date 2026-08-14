@@ -451,12 +451,6 @@
   "colTotalShare": {
     "message": "% of series"
   },
-  "groupSavePdf": {
-    "message": "Series PDF report"
-  },
-  "groupExportCsv": {
-    "message": "Export CSV"
-  },
   "createGroupTitle": {
     "message": "New series"
   },

@@ -451,12 +451,6 @@
   "colTotalShare": {
     "message": "% cyklu"
   },
-  "groupSavePdf": {
-    "message": "Raport PDF cyklu"
-  },
-  "groupExportCsv": {
-    "message": "Eksport CSV"
-  },
   "createGroupTitle": {
     "message": "Nowy cykl"
   },
