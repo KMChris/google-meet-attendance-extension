@@ -115,16 +115,17 @@ function renderGroup(group, meetings) {
   const sessionBlocks = ms.map(m => {
     const people = Object.keys(m.attendance).length;
     const absent = A.absenteesFor(m, group.roster).length;
+    const startIso = A.meetingStartIso(m);   // the meeting's own hours, pinned ones included
     return `<div class="sess-block">
       <div class="sb-head"><div class="sb-title">${esc(m.meetingTitle)}</div>
-        <div class="sb-meta">${esc(i18n.formatDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${time(m.date)} · ${people} ${t('reportPeople').toLowerCase()} · ${absent} ${t('absent').toLowerCase()}</div></div>
+        <div class="sb-meta">${esc(i18n.formatDate(startIso, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${time(startIso)} · ${people} ${t('reportPeople').toLowerCase()} · ${absent} ${t('absent').toLowerCase()}</div></div>
       ${attendanceTable(m, group.roster)}
       <div class="rep-sect"><h2>${t('eventLogTitle')}</h2>${eventLog(m)}</div>
     </div>`;
   }).join('');
 
   const range = first && last
-    ? esc(i18n.formatDate(first.date, { day: 'numeric', month: 'short' })) + ' – ' + esc(i18n.formatDate(last.date, { day: 'numeric', month: 'short', year: 'numeric' }))
+    ? esc(i18n.formatDate(A.meetingStartIso(first), { day: 'numeric', month: 'short' })) + ' – ' + esc(i18n.formatDate(A.meetingStartIso(last), { day: 'numeric', month: 'short', year: 'numeric' }))
     : '';
 
   document.getElementById('report').innerHTML = `<div class="doc">
