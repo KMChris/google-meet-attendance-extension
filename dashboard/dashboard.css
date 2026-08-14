@@ -26,7 +26,9 @@
 
 .view-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin:26px 0 18px;flex-wrap:wrap}
 .lede{margin:7px 0 0;color:var(--ink-2);font-size:14px}
-.head-actions{display:flex;align-items:center;gap:9px;position:relative}
+/* the buttons here carry icons now, so the row is wider than it was; it wraps rather than
+   pushing the search field off the edge on a narrow window */
+.head-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;position:relative;flex-wrap:wrap}
 .search{position:relative;min-width:220px}
 .search.inline{min-width:180px}
 .search .field{padding-left:34px;height:38px}
@@ -130,9 +132,12 @@
 /* menus (dropdowns) */
 .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:var(--panel);border:1.5px solid var(--line-2);
   border-radius:var(--radius-sm);box-shadow:var(--shadow);padding:5px;min-width:170px}
-.menu-item{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;color:var(--ink);
-  font-size:13px;padding:9px 11px;border-radius:6px}
+.menu-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+  color:var(--ink);font-size:13px;padding:9px 11px;border-radius:6px}
 .menu-item:hover{background:var(--panel-2)}
+/* the leading glyph, not the tick a group menu puts on the current row */
+.menu-item>svg:not(.mi-check){flex:none;color:var(--ink-3)}
+.menu-item:hover>svg:not(.mi-check){color:var(--ink-2)}
 
 /* detail */
 .back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:var(--ink-2);
@@ -190,7 +195,6 @@
 .badge-menu .group-caret{border-top-left-radius:0;border-bottom-left-radius:0;padding:5px 9px 5px 6px;color:var(--ink-3)}
 .badge-menu .group-caret:hover{color:var(--ink)}
 .badge-menu .menu{left:0;right:auto;min-width:200px;max-width:300px;max-height:320px;overflow-y:auto}
-.group-menu .menu-item{display:flex;align-items:center;gap:9px}
 .group-menu .gdot{width:9px;height:9px;border-radius:50%;flex:none}
 .group-menu .mi-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .group-menu .mi-check{margin-left:auto;color:var(--present);flex:none}

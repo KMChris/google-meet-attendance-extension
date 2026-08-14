@@ -372,7 +372,7 @@ function renderMeetings(filter = '') {
   const list = q ? scope.filter(m => meetingMatches(m, q)) : scope;
 
   const tab = (btn, key, count, on) => {
-    btn.textContent = `${t(key)} (${count})`;
+    $('.lbl', btn).textContent = `${t(key)} (${count})`;
     btn.hidden = !count && !on;
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
@@ -791,7 +791,9 @@ function refreshParticipantModal() {
   $('#merge-note').hidden = !target;
   if (target) $('#merge-note-text').textContent = t('mergeWarning', { name: target });
   const save = $('#participant-save');
-  save.textContent = target ? t('merge') : t('save');
+  $('.lbl', save).textContent = target ? t('merge') : t('save');
+  $('.ic-save', save).hidden = !!target;
+  $('.ic-merge', save).hidden = !target;
   save.disabled = !v || v === editingName;
 }
 
@@ -940,7 +942,7 @@ function renderGroups() {
   const shown = groups.filter(g => !!g.archived === archive);
   const archivedCount = groups.filter(g => g.archived).length;
 
-  $('#btn-groups-archive').textContent = archive ? t('groupsActive') : `${t('groupsArchive')} (${archivedCount})`;
+  $('#btn-groups-archive .lbl').textContent = archive ? t('groupsActive') : `${t('groupsArchive')} (${archivedCount})`;
   $('#btn-groups-archive').hidden = !archive && !archivedCount;
   $('#btn-new-group').hidden = archive;
   setI18nText($('#groups-lede'), archive ? 'archiveSubtitle' : 'groupsSubtitle');
@@ -1293,7 +1295,7 @@ function renderPickMeetings() {
 }
 function syncPickCount() {
   const n = pickedMeetings.size;
-  $('#pick-meetings-save').textContent = n ? `${t('add')} (${n})` : t('add');
+  $('#pick-meetings-save .lbl').textContent = n ? `${t('add')} (${n})` : t('add');
   $('#pick-meetings-save').disabled = !n;
 }
 $('#btn-add-meetings').addEventListener('click', openPickMeetings);

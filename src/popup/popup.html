@@ -25,16 +25,27 @@
       <div class="live-count" id="live-count">—</div>
       <div class="live-label eyebrow" id="live-label" data-i18n="popupInThisCall"></div>
     </div>
-    <button class="btn ghost" id="btn-export-live" hidden data-i18n="popupExport"></button>
+    <button class="btn ghost" id="btn-export-live" hidden>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+      <span data-i18n="popupExport"></span>
+    </button>
   </div>
 
   <div class="recent">
-    <div class="recent-head"><span class="eyebrow" data-i18n="popupRecent"></span><button class="link-btn" id="view-all" data-i18n="popupViewAll"></button></div>
+    <div class="recent-head"><span class="eyebrow" data-i18n="popupRecent"></span>
+      <button class="link-btn" id="view-all">
+        <span data-i18n="popupViewAll"></span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </div>
     <div id="recent-list"></div>
     <div class="recent-empty eyebrow" id="recent-empty" data-i18n="popupNoRecent" hidden></div>
   </div>
 
-  <button class="btn block" id="open-dash" data-i18n="popupOpenDashboard"></button>
+  <button class="btn block" id="open-dash">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 14.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5"/></svg>
+    <span data-i18n="popupOpenDashboard"></span>
+  </button>
 
   <script type="module" src="popup.js"></script>
 </body>

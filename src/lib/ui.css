@@ -142,6 +142,15 @@ a{color:var(--accent);text-decoration:none}
 .btn.subtle:hover{background:var(--panel-2);filter:none;color:var(--ink)}
 .btn.danger{background:var(--red);color:#fff}
 .btn:disabled{opacity:.5;cursor:default;filter:none}
+/* A button's icon leads its label, and the label sits in a span of its own: applyI18n writes
+   textContent, and on the button itself that would carry the icon off with the old string. */
+.btn>svg{flex:none}
+/* uppercase mono next to a drawn glyph reads heavier than the glyph does, so the icon is let
+   back up to the label's weight only on the accented buttons, where the contrast carries it */
+.btn.ghost>svg,.btn.subtle>svg{color:var(--ink-3)}
+.btn.ghost:hover>svg,.btn.subtle:hover>svg,.btn.ghost.on>svg{color:inherit}
+/* where the glyph *is* the button there is no label to carry it, so it keeps the full weight */
+.btn.icon>svg{color:inherit}
 
 /* ------------------------- status chips ----------------------------- */
 .status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:500;

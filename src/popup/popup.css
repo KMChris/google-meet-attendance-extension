@@ -15,7 +15,9 @@
 
 .recent{display:flex;flex-direction:column;gap:8px}
 .recent-head{display:flex;align-items:center;justify-content:space-between}
-.link-btn{background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.link-btn{display:inline-flex;align-items:center;gap:3px;padding:0;background:none;border:none;cursor:pointer;
+  font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.link-btn svg{flex:none;opacity:.8}
 .recent-empty{padding:10px 2px;color:var(--ink-3)}
 
 .rec-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;

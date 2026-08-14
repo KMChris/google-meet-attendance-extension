@@ -46,13 +46,31 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings" data-i18n-aria="searchMeetings">
           </div>
-          <button class="btn ghost" id="btn-meetings-archive" aria-pressed="false"></button>
-          <button class="btn ghost" id="btn-meetings-trash" aria-pressed="false"></button>
-          <button class="btn subtle" id="btn-trash-empty" data-i18n="trashEmpty" hidden></button>
-          <button class="btn ghost" id="btn-export-all" data-i18n="export">Export</button>
+          <button class="btn ghost" id="btn-meetings-archive" aria-pressed="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.2"/><path d="M5 9v10.5h14V9M10 13h4"/></svg>
+            <span class="lbl"></span>
+          </button>
+          <button class="btn ghost" id="btn-meetings-trash" aria-pressed="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+            <span class="lbl"></span>
+          </button>
+          <button class="btn subtle" id="btn-trash-empty" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="m10 10.5 4 5m0-5-4 5"/></svg>
+            <span data-i18n="trashEmpty"></span>
+          </button>
+          <button class="btn ghost" id="btn-export-all">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+            <span data-i18n="export">Export</span>
+          </button>
           <div class="menu" id="export-all-menu" hidden>
-            <button class="menu-item" data-format="json">JSON</button>
-            <button class="menu-item" data-format="csv">CSV</button>
+            <button class="menu-item" data-format="json">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3.5H7a2 2 0 0 0-2 2v3.5a2.5 2.5 0 0 1-2.5 2.5a2.5 2.5 0 0 1 2.5 2.5V18a2 2 0 0 0 2 2h1"/><path d="M16 3.5h1a2 2 0 0 1 2 2V9a2.5 2.5 0 0 0 2.5 2.5a2.5 2.5 0 0 0-2.5 2.5V18a2 2 0 0 1-2 2h-1"/></svg>
+              <span>JSON</span>
+            </button>
+            <button class="menu-item" data-format="csv">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M9 9.5V20"/></svg>
+              <span>CSV</span>
+            </button>
           </div>
         </div>
       </div>
@@ -118,8 +136,14 @@
             </div>
           </div>
           <div class="detail-actions">
-            <button class="btn ghost" id="btn-export" data-i18n="exportCsv">Export CSV</button>
-            <button class="btn" id="btn-pdf" data-i18n="savePdf">PDF report</button>
+            <button class="btn ghost" id="btn-export">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+              <span data-i18n="exportCsv">Export CSV</span>
+            </button>
+            <button class="btn" id="btn-pdf">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13.5h6M9 17h4"/></svg>
+              <span data-i18n="savePdf">PDF report</span>
+            </button>
             <button class="btn subtle icon" id="btn-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>
@@ -153,8 +177,14 @@
           <p class="lede" data-i18n="groupsSubtitle" id="groups-lede"></p>
         </div>
         <div class="head-actions">
-          <button class="btn ghost" id="btn-groups-archive"></button>
-          <button class="btn" id="btn-new-group" data-i18n="newGroup">New series</button>
+          <button class="btn ghost" id="btn-groups-archive">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.2"/><path d="M5 9v10.5h14V9M10 13h4"/></svg>
+            <span class="lbl"></span>
+          </button>
+          <button class="btn" id="btn-new-group">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span data-i18n="newGroup">New series</span>
+          </button>
         </div>
       </div>
       <div id="series-suggestions"></div>
@@ -184,8 +214,14 @@
             <div class="detail-badges"><div class="detail-meta mono" id="group-meta"></div></div>
           </div>
           <div class="detail-actions">
-            <button class="btn ghost" id="btn-group-export" data-i18n="exportCsv">Export CSV</button>
-            <button class="btn" id="btn-group-pdf" data-i18n="savePdf">PDF report</button>
+            <button class="btn ghost" id="btn-group-export">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+              <span data-i18n="exportCsv">Export CSV</span>
+            </button>
+            <button class="btn" id="btn-group-pdf">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13.5h6M9 17h4"/></svg>
+              <span data-i18n="savePdf">PDF report</span>
+            </button>
             <button class="btn subtle icon" id="btn-group-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>
@@ -205,7 +241,10 @@
         <div class="sect">
           <div class="sect-head">
             <div class="sect-head-text"><div class="eyebrow" data-i18n="groupSessionsTitle"></div><div class="eyebrow soft" data-i18n="groupSessionsHint"></div></div>
-            <button class="btn ghost" id="btn-add-meetings" data-i18n="addMeetings">Add meetings</button>
+            <button class="btn ghost" id="btn-add-meetings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18"/><path d="M12 13v5M9.5 15.5h5"/></svg>
+              <span data-i18n="addMeetings">Add meetings</span>
+            </button>
           </div>
           <table class="rc-table sessions-table" id="group-sessions"></table>
         </div>
@@ -215,7 +254,10 @@
           <p class="hint" data-i18n="groupRosterHint"></p>
           <div class="roster-editor">
             <input class="field" id="group-roster-input" data-i18n-placeholder="rosterPlaceholder" data-i18n-aria="groupRosterTitle">
-            <button class="btn ghost" id="group-roster-add" data-i18n="add"></button>
+            <button class="btn ghost" id="group-roster-add">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span data-i18n="add"></span>
+            </button>
           </div>
           <div class="chips" id="group-roster-chips"></div>
         </div>
@@ -256,7 +298,10 @@
           <p class="lede" data-i18n="analyticsSubtitle"></p>
         </div>
         <div class="head-actions">
-          <button class="btn ghost" id="btn-analytics-csv" data-i18n="exportCsv">Export CSV</button>
+          <button class="btn ghost" id="btn-analytics-csv">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+            <span data-i18n="exportCsv">Export CSV</span>
+          </button>
         </div>
       </div>
 
@@ -283,7 +328,10 @@
             <div class="picker" id="pick-series"></div>
             <span class="fb-key eyebrow" data-i18n="filterMeetings"></span>
             <div class="picker" id="pick-titles"></div>
-            <button class="btn subtle" id="filters-reset" data-i18n="filterReset" hidden></button>
+            <button class="btn subtle" id="filters-reset" hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3 8.5"/><path d="M3 3.5v5h5"/></svg>
+              <span data-i18n="filterReset"></span>
+            </button>
           </div>
           <div class="fb-summary mono" id="filter-summary"></div>
         </div>
@@ -402,9 +450,18 @@
           <div class="setting-text"><label class="setting-title" for="roster-input" data-i18n="settingRoster"></label><div class="setting-hint" data-i18n="settingRosterHint"></div></div>
           <div class="roster-editor">
             <input class="field" id="roster-input" data-i18n-placeholder="rosterPlaceholder">
-            <button class="btn ghost" id="roster-add" data-i18n="add"></button>
-            <button class="btn ghost" id="roster-paste" data-i18n="rosterPaste"></button>
-            <button class="btn subtle" id="roster-clear" data-i18n="rosterClear"></button>
+            <button class="btn ghost" id="roster-add">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span data-i18n="add"></span>
+            </button>
+            <button class="btn ghost" id="roster-paste">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="2.5" width="8" height="4" rx="1.3"/><path d="M16 4.5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h2"/></svg>
+              <span data-i18n="rosterPaste"></span>
+            </button>
+            <button class="btn subtle" id="roster-clear">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9.5 9.5 5 5m0-5-5 5"/></svg>
+              <span data-i18n="rosterClear"></span>
+            </button>
           </div>
           <div class="chips" id="roster-chips"></div>
         </div>
@@ -421,8 +478,14 @@
                 <div class="step-state mono" id="sheets-account-state"></div>
               </div>
               <div class="step-act">
-                <button class="btn ghost" id="sheets-connect" data-i18n="sheetsConnect"></button>
-                <button class="btn subtle" id="sheets-disconnect" data-i18n="sheetsDisconnect" hidden></button>
+                <button class="btn ghost" id="sheets-connect">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10.5 13.5a4.5 4.5 0 0 0 6.8.5l2.5-2.5a4.5 4.5 0 0 0-6.4-6.4L12 6.5"/><path d="M13.5 10.5a4.5 4.5 0 0 0-6.8-.5l-2.5 2.5a4.5 4.5 0 0 0 6.4 6.4L12 17.5"/></svg>
+                  <span data-i18n="sheetsConnect"></span>
+                </button>
+                <button class="btn subtle" id="sheets-disconnect" hidden>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 16 4-4-4-4"/><path d="M14 12H3"/></svg>
+                  <span data-i18n="sheetsDisconnect"></span>
+                </button>
               </div>
             </li>
             <li class="sheets-step" id="sheets-step-sheet">
@@ -432,12 +495,21 @@
                 <div class="step-state mono" id="sheets-sheet-state"></div>
                 <div class="inline-field">
                   <input class="field mono" id="spreadsheet-ref" data-i18n-placeholder="spreadsheetRefPlaceholder" data-i18n-aria="sheetsStepSheet">
-                  <button class="btn ghost" id="sheets-save" data-i18n="sheetsSave"></button>
-                  <a class="btn ghost" id="sheets-open" target="_blank" rel="noopener" data-i18n="sheetsOpen" hidden></a>
+                  <button class="btn ghost" id="sheets-save">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4.5 12.5 5 5 10-11"/></svg>
+                    <span data-i18n="sheetsSave"></span>
+                  </button>
+                  <a class="btn ghost" id="sheets-open" target="_blank" rel="noopener" hidden>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 14.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5"/></svg>
+                    <span data-i18n="sheetsOpen"></span>
+                  </a>
                 </div>
               </div>
               <div class="step-act">
-                <button class="btn ghost" id="sheets-create" data-i18n="sheetsCreate"></button>
+                <button class="btn ghost" id="sheets-create">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  <span data-i18n="sheetsCreate"></span>
+                </button>
               </div>
             </li>
             <li class="sheets-step" id="sheets-step-data">
@@ -449,8 +521,14 @@
                 <label class="switch-row"><input type="checkbox" id="set-autosync"><span class="track"></span><span data-i18n="autoSync"></span></label>
               </div>
               <div class="step-act">
-                <button class="btn ghost" id="sheets-push" data-i18n="sheetsPush"></button>
-                <button class="btn ghost" id="sheets-restore" data-i18n="sheetsRestore"></button>
+                <button class="btn ghost" id="sheets-push">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 14.9A5 5 0 0 1 6.6 5.6a6.5 6.5 0 0 1 12 1.4 4.5 4.5 0 0 1 1.4 8.6"/><path d="M12 12v9"/><path d="m8.5 15.5 3.5-3.5 3.5 3.5"/></svg>
+                  <span data-i18n="sheetsPush"></span>
+                </button>
+                <button class="btn ghost" id="sheets-restore">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 14.9A5 5 0 0 1 6.6 5.6a6.5 6.5 0 0 1 12 1.4 4.5 4.5 0 0 1 1.4 8.6"/><path d="M12 12v9"/><path d="m8.5 17.5 3.5 3.5 3.5-3.5"/></svg>
+                  <span data-i18n="sheetsRestore"></span>
+                </button>
               </div>
             </li>
           </ol>
@@ -460,14 +538,20 @@
       <div class="card setting-card">
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="importTitle"></div><div class="setting-hint" data-i18n="importHint"></div></div>
-          <button class="btn ghost" id="btn-import" data-i18n="importBtn"></button>
+          <button class="btn ghost" id="btn-import">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+            <span data-i18n="importBtn"></span>
+          </button>
           <input type="file" id="import-file" accept="application/json,.json,text/csv,.csv" data-i18n-aria="importBtn" hidden>
         </div>
         <div class="setting-row">
           <div class="setting-text"><label class="setting-title" for="import-source" data-i18n="importAppsTitle"></label><div class="setting-hint" data-i18n="importAppsHint"></div></div>
           <div class="inline-field">
             <select class="field" id="import-source" style="width:230px"></select>
-            <button class="btn ghost" id="btn-import-app" data-i18n="importAppsBtn"></button>
+            <button class="btn ghost" id="btn-import-app">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m17 3 3.5 3.5L17 10"/><path d="M3.5 11V9.5a3 3 0 0 1 3-3h14"/><path d="M7 21l-3.5-3.5L7 14"/><path d="M20.5 13v1.5a3 3 0 0 1-3 3h-14"/></svg>
+              <span data-i18n="importAppsBtn"></span>
+            </button>
             <input type="file" id="import-app-file" accept="application/json,.json" data-i18n-aria="importAppsBtn" hidden>
           </div>
         </div>
@@ -484,7 +568,10 @@
         </div>
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="clearAll"></div><div class="setting-hint" data-i18n="clearAllHint"></div></div>
-          <button class="btn danger" id="btn-clear-all" data-i18n="delete"></button>
+          <button class="btn danger" id="btn-clear-all">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+            <span data-i18n="delete"></span>
+          </button>
         </div>
       </div>
     </section>
@@ -500,7 +587,10 @@
       <textarea class="field" id="paste-textarea" rows="7" data-i18n-placeholder="rosterPastePlaceholder" data-i18n-aria="rosterPasteTitle"></textarea>
       <div class="modal-actions">
         <button class="btn subtle" id="paste-cancel" data-i18n="cancel"></button>
-        <button class="btn" id="paste-add" data-i18n="rosterAddNames"></button>
+        <button class="btn" id="paste-add">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.4 2.9-6 6.5-6 1.1 0 2.2.25 3.1.7"/><path d="M18 13.5v6M15 16.5h6"/></svg>
+          <span data-i18n="rosterAddNames"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -514,7 +604,10 @@
       <div class="color-picker" id="group-modal-colors"></div>
       <div class="modal-actions">
         <button class="btn subtle" id="group-modal-cancel" data-i18n="cancel"></button>
-        <button class="btn" id="group-modal-save" data-i18n="create"></button>
+        <button class="btn" id="group-modal-save">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="create"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -536,8 +629,14 @@
       <div class="sched-observed mono" id="schedule-observed"></div>
       <div class="modal-actions">
         <button class="btn subtle" id="schedule-cancel" data-i18n="cancel"></button>
-        <button class="btn ghost" id="schedule-auto" data-i18n="scheduleAuto"></button>
-        <button class="btn" id="schedule-save" data-i18n="save"></button>
+        <button class="btn ghost" id="schedule-auto">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
+          <span data-i18n="scheduleAuto"></span>
+        </button>
+        <button class="btn" id="schedule-save">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4.5 12.5 5 5 10-11"/></svg>
+          <span data-i18n="save"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -560,12 +659,21 @@
         <div class="modal-label" data-i18n="unmergeLabel"></div>
         <div class="unmerge-row">
           <div class="unmerge-names" id="unmerge-names"></div>
-          <button class="btn ghost" id="btn-unmerge" data-i18n="unmerge"></button>
+          <button class="btn ghost" id="btn-unmerge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6.5" cy="12" r="4.5"/><circle cx="17.5" cy="12" r="4.5"/></svg>
+            <span data-i18n="unmerge"></span>
+          </button>
         </div>
       </div>
       <div class="modal-actions">
         <button class="btn subtle" id="participant-cancel" data-i18n="cancel"></button>
-        <button class="btn" id="participant-save" data-i18n="save"></button>
+        <!-- the same button saves a rename or folds two rows into one, so it carries both marks
+             and shows whichever the typed name currently means -->
+        <button class="btn" id="participant-save">
+          <svg class="ic-save" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4.5 12.5 5 5 10-11"/></svg>
+          <svg class="ic-merge" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" hidden><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>
+          <span class="lbl"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -576,7 +684,10 @@
       <div class="assign-list" id="assign-list"></div>
       <div class="modal-actions">
         <button class="btn subtle" id="assign-cancel" data-i18n="cancel"></button>
-        <button class="btn ghost" id="assign-new" data-i18n="assignNew"></button>
+        <button class="btn ghost" id="assign-new">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="assignNew"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -590,7 +701,10 @@
       <div class="pick-list" id="pick-meetings-list"></div>
       <div class="modal-actions">
         <button class="btn subtle" id="pick-meetings-cancel" data-i18n="cancel"></button>
-        <button class="btn" id="pick-meetings-save"></button>
+        <button class="btn" id="pick-meetings-save">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="lbl"></span>
+        </button>
       </div>
     </div>
   </div>
