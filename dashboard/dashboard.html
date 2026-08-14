@@ -441,7 +441,12 @@
         </div>
         <div class="setting-row">
           <div class="setting-text"><label class="setting-title" for="set-language" data-i18n="settingLanguage"></label><div class="setting-hint" data-i18n="settingLanguageHint"></div></div>
-          <select class="field" id="set-language" style="width:180px"></select>
+          <!-- a native <select> can only hold text, and a flag emoji is only text on the OSes that
+               draw one; the languages carry SVG flags, so this is the menu primitive instead -->
+          <div class="lang-picker">
+            <button class="field lang-btn" id="set-language" aria-haspopup="listbox" aria-expanded="false"></button>
+            <div class="menu lang-menu" id="lang-menu" role="listbox" data-i18n-aria="settingLanguage" hidden></div>
+          </div>
         </div>
       </div>
 

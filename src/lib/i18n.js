@@ -19,9 +19,27 @@
  * initI18n() must resolve before the first t() call; every page awaits it on startup.
  */
 
+/**
+ * `flag` is drawn, not written. A flag emoji is a pair of regional indicators (Poland is U+1F1F5
+ * U+1F1F1) and Windows ships no country glyphs in Segoe UI Emoji, so it renders the bare letters
+ * "PL" instead, which is why these are SVG. Each sits in a shared 3:2 box; strokes that run past
+ * the edge (the Union Jack's diagonals) are cut by the SVG viewport, which clips by default.
+ *
+ * These hex values are deliberate, against the rule that colour comes from the tokens in ui.css:
+ * they belong to the flags rather than to the interface, so they hold in light and dark alike.
+ */
+const FLAG_GB = '<svg viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+  + '<rect width="60" height="40" fill="#012169"/>'
+  + '<path d="M0 0 60 40M60 0 0 40" stroke="#fff" stroke-width="9"/>'
+  + '<path d="M0 0 60 40M60 0 0 40" stroke="#c8102e" stroke-width="5"/>'
+  + '<path d="M30 0v40M0 20h60" stroke="#fff" stroke-width="15"/>'
+  + '<path d="M30 0v40M0 20h60" stroke="#c8102e" stroke-width="9"/></svg>';
+const FLAG_PL = '<svg viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+  + '<rect width="60" height="20" fill="#fff"/><rect y="20" width="60" height="20" fill="#dc143c"/></svg>';
+
 export const SUPPORTED_LANGUAGES = [
-  { code: 'en', label: 'English', native: 'English', flag: '🇬🇧' },
-  { code: 'pl', label: 'Polish', native: 'Polski', flag: '🇵🇱' }
+  { code: 'en', label: 'English', native: 'English', flag: FLAG_GB },
+  { code: 'pl', label: 'Polish', native: 'Polski', flag: FLAG_PL }
 ];
 
 const STORAGE_KEY = 'rollcallLanguage';

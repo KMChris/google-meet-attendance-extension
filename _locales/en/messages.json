@@ -1027,7 +1027,7 @@
     "message": "Interface language. Automatic follows your browser."
   },
   "languageAuto": {
-    "message": "🌐 Automatic"
+    "message": "Automatic"
   },
   "settingRoster": {
     "message": "Default roster"

@@ -73,7 +73,10 @@ Chrome truncates past those limits.
 
 1. Add `_locales/<code>/messages.json` (copy `en`, translate the `message` values, leave the keys,
    `description` and `placeholders` alone).
-2. Add the language to `SUPPORTED_LANGUAGES` in `src/lib/i18n.js`.
+2. Add the language to `SUPPORTED_LANGUAGES` in `src/lib/i18n.js`, `flag` included. The flag is an
+   SVG on a `0 0 60 40` viewBox, not a flag emoji: emoji flags are regional-indicator pairs, and
+   Windows has no glyphs for them, so it would render the bare country letters. Settings picks the
+   language up from that list on its own.
 
 Pages read these files over `fetch` rather than through `chrome.i18n.getMessage`, because
 `getMessage` is pinned to the browser UI language and Settings lets the user pick a language.

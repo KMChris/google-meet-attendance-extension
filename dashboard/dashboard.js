@@ -1545,7 +1545,10 @@ function toggleMenu(btnSel, menuSel) {
   const btn = $(btnSel), menu = $(menuSel);
   btn.addEventListener('click', e => { e.stopPropagation(); const wasHidden = menu.hidden; $$('.menu').forEach(m => m.hidden = true); menu.hidden = !wasHidden; });
 }
-document.addEventListener('click', () => { $$('.menu').forEach(m => m.hidden = true); $('#btn-group').setAttribute('aria-expanded', 'false'); });
+document.addEventListener('click', () => {
+  $$('.menu').forEach(m => m.hidden = true);
+  $$('[aria-haspopup]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+});
 
 let groupModalColor = 'teal';
 function openGroupModal(assignIds) {
@@ -1605,7 +1608,7 @@ function syncSettingsUI() {
   $('#set-auto-track').checked = autoTrack;
   $('#set-max').value = String(settings.maxStoredMeetings ?? 200);
   $('#set-trash-days').value = String(settings.trashRetentionDays ?? 30);
-  $('#set-language').value = i18n.getLanguagePreference();
+  renderLanguage();
   applyTheme(settings.theme || 'system');
   renderRosterChips();
 }
@@ -1630,16 +1633,63 @@ $('#set-trash-days').addEventListener('change', async () => {
   toast(t('savedToast'));
 });
 
-// language
-(function initLang() {
-  const sel = $('#set-language');
-  const auto = document.createElement('option');
-  auto.value = 'auto'; auto.dataset.i18n = 'languageAuto'; auto.textContent = t('languageAuto');
-  sel.appendChild(auto);
-  i18n.SUPPORTED_LANGUAGES.forEach(l => { const o = document.createElement('option'); o.value = l.code; o.textContent = `${l.flag} ${l.native}`; sel.appendChild(o); });
-  sel.value = i18n.getLanguagePreference();
-  sel.addEventListener('change', () => i18n.setLocale(sel.value));
-})();
+/* ---- language ----
+ * The flags come drawn from i18n.js, which is why this is a menu and not a <select>: an <option>
+ * holds text only, and the flag emoji it would hold reads as "GB" / "PL" on Windows.
+ */
+const GLOBE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.4 9h17.2M3.4 15h17.2"/><ellipse cx="12" cy="12" rx="4.2" ry="9"/></svg>';
+
+const langByCode = code => i18n.SUPPORTED_LANGUAGES.find(l => l.code === code) || null;
+/** Automatic follows the browser, so it gets a globe where a language gets its flag. */
+function langMark(code) {
+  const l = langByCode(code);
+  return l ? `<span class="lang-mark flag">${l.flag}</span>` : `<span class="lang-mark auto">${GLOBE_ICON}</span>`;
+}
+function langName(code) {
+  const l = langByCode(code);
+  return l ? l.native : t('languageAuto');
+}
+function renderLanguage() {
+  const cur = i18n.getLanguagePreference();
+  $('#set-language').innerHTML = `${langMark(cur)}<span class="lang-name">${esc(langName(cur))}</span>`;
+  $('#lang-menu').innerHTML = ['auto', ...i18n.SUPPORTED_LANGUAGES.map(l => l.code)].map(code =>
+    `<button class="menu-item" role="option" aria-selected="${code === cur}" data-code="${esc(code)}">
+       ${langMark(code)}<span class="mi-name">${esc(langName(code))}</span>${code === cur ? MI_CHECK : ''}</button>`).join('');
+}
+function setLangMenu(open) {
+  $('#lang-menu').hidden = !open;
+  $('#set-language').setAttribute('aria-expanded', String(open));
+}
+$('#set-language').addEventListener('click', e => {
+  e.stopPropagation();
+  const opening = $('#lang-menu').hidden;
+  $$('.menu').forEach(mn => mn.hidden = true);
+  setLangMenu(opening);
+  if (opening) ($('#lang-menu .menu-item[aria-selected="true"]') || $('#lang-menu .menu-item')).focus();
+});
+$('#lang-menu').addEventListener('click', async e => {
+  const item = e.target.closest('.menu-item'); if (!item) return;
+  e.stopPropagation();
+  setLangMenu(false);
+  $('#set-language').focus();
+  // setLocale is quiet when the resolved locale is unchanged (auto -> en on an English browser),
+  // and the preference still moved, so the picker is repainted here rather than left to the listener
+  await i18n.setLocale(item.dataset.code);
+  renderLanguage();
+});
+// the menu replaces a control that was keyboard-operable, so it answers the same keys
+$('#lang-menu').addEventListener('keydown', e => {
+  const items = $$('.menu-item', $('#lang-menu'));
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+  } else if (e.key === 'Escape') {
+    e.stopPropagation();
+    setLangMenu(false);
+    $('#set-language').focus();
+  }
+});
 
 // roster (global)
 function renderRosterChips() {
@@ -1882,6 +1932,7 @@ $('#set-autosync').addEventListener('change', async () => {
 /* ============================ locale ============================ */
 i18n.onLocaleChange(() => {
   i18n.applyI18n(document);
+  renderLanguage();   // "Automatic" is a translated label, so the picker reads differently now
   renderReadout();
   route(true);
 });

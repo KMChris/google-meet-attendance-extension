@@ -472,7 +472,9 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 }
 
 /* settings */
-.setting-card{padding:6px 24px;margin-bottom:16px}
+/* overflow:visible so the language menu can leave the card, the way .detail-card opens up for
+   the series menu; nothing in a settings row reaches the rounded corners */
+.setting-card{padding:6px 24px;margin-bottom:16px;overflow:visible}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 0;border-bottom:1px solid var(--line)}
 .setting-card .setting-row:last-child{border-bottom:none}
 .setting-row.block{display:block}
@@ -484,6 +486,25 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 .inline-field{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .unit{color:var(--ink-3);font-size:12px}
 .hint{color:var(--ink-2);font-size:12.5px;margin:2px 0 12px}
+
+/* language picker: a .field that opens a .menu, so the rows can carry a drawn flag */
+.lang-picker{position:relative;width:190px;flex:none}
+.lang-btn{display:flex;align-items:center;gap:10px;width:100%;cursor:pointer;text-align:left}
+/* the same caret select.field draws, in a control that is not a select */
+.lang-btn::after{content:"";margin-left:auto;flex:none;width:0;height:0;
+  border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--ink-3)}
+.lang-btn[aria-expanded="true"]{border-color:var(--accent)}
+.lang-menu{left:0;right:0;top:calc(100% + 5px);min-width:0}
+.lang-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* One slot of the same size whatever it holds: the names line up, and a row with the globe stands
+   exactly as tall as a row with a flag. The globe is drawn rather than filled, so it runs to the
+   full slot to carry the weight a flag has from its fill alone. */
+.lang-mark{flex:none;width:21px;height:18px;display:flex;align-items:center;justify-content:center}
+.lang-mark>svg{display:block}
+/* white sits on white in the Polish flag, so every flag keeps a hairline of its own */
+.lang-mark.flag>svg{width:21px;height:14px;border-radius:3px;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 22%,transparent)}
+.lang-mark.auto{color:var(--ink-3)}
 
 /* switch */
 .switch{position:relative;display:inline-block;width:44px;height:26px;flex:none}
