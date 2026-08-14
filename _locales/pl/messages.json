@@ -163,6 +163,30 @@
   "colGroup": {
     "message": "Cykl"
   },
+  "pagerRange": {
+    "message": "$FROM$–$TO$ z $TOTAL$",
+    "description": "Which slice of a paged list is on screen.",
+    "placeholders": {
+      "from": {
+        "content": "$1",
+        "example": "1"
+      },
+      "to": {
+        "content": "$2",
+        "example": "25"
+      },
+      "total": {
+        "content": "$3",
+        "example": "120"
+      }
+    }
+  },
+  "pagerPrev": {
+    "message": "Poprzednia strona"
+  },
+  "pagerNext": {
+    "message": "Następna strona"
+  },
   "statMeetings": {
     "message": "Spotkania"
   },

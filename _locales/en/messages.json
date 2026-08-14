@@ -163,6 +163,30 @@
   "colGroup": {
     "message": "Series"
   },
+  "pagerRange": {
+    "message": "$FROM$–$TO$ of $TOTAL$",
+    "description": "Which slice of a paged list is on screen.",
+    "placeholders": {
+      "from": {
+        "content": "$1",
+        "example": "1"
+      },
+      "to": {
+        "content": "$2",
+        "example": "25"
+      },
+      "total": {
+        "content": "$3",
+        "example": "120"
+      }
+    }
+  },
+  "pagerPrev": {
+    "message": "Previous page"
+  },
+  "pagerNext": {
+    "message": "Next page"
+  },
   "statMeetings": {
     "message": "Meetings"
   },

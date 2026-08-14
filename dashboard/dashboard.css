@@ -90,6 +90,19 @@
   background:none;border:none;cursor:pointer;color:var(--ink-3);padding:5px;border-radius:7px}
 .sel-close:hover{background:var(--panel-2);color:var(--ink)}
 
+/* pages under a long list: where you are on the left, the jumps on the right */
+.pager{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:11px 20px;border-top:1.5px solid var(--line-2)}
+.pg-range{font-size:11.5px;letter-spacing:.04em;color:var(--ink-3)}
+.pg-nav{display:flex;align-items:center;gap:4px;margin-left:auto}
+.pg-num,.pg-step{min-width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;
+  padding:0 7px;background:none;border:1.5px solid transparent;border-radius:8px;cursor:pointer;
+  color:var(--ink-2);font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.pg-num:hover,.pg-step:hover:not(:disabled){background:var(--panel-2);color:var(--ink)}
+.pg-num.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.pg-step:disabled{opacity:.35;cursor:default}
+.pg-gap{color:var(--ink-3);padding:0 2px}
+
 /* date badge */
 .date-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:46px;
   border-radius:10px;background:var(--panel-2);border:1px solid var(--line);line-height:1}

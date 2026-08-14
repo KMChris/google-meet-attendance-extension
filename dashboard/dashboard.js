@@ -312,6 +312,36 @@ function meetingMatches(m, q) {
   if (String(m.meetingTitle || '').toLowerCase().includes(q)) return true;
   return Object.keys(m.attendance).some(n => n.toLowerCase().includes(q));
 }
+/**
+ * Pages under a list: where you are in it, and the jumps out of it. The run of numbers
+ * collapses around the current page, so a hundred pages take no more room than five.
+ */
+function renderPager(box, { page, pages, from, count, total, go }) {
+  box.hidden = pages < 2;
+  if (box.hidden) { box.innerHTML = ''; return; }
+  const step = (p, disabled, key, path) =>
+    `<button class="pg-step" data-p="${p}"${disabled ? ' disabled' : ''} title="${esc(t(key))}" aria-label="${esc(t(key))}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="${path}"/></svg></button>`;
+  box.innerHTML = `<span class="pg-range mono">${esc(t('pagerRange', { from: from + 1, to: from + count, total }))}</span>
+    <div class="pg-nav">
+      ${step(page - 1, page === 1, 'pagerPrev', 'm15 18-6-6 6-6')}
+      ${pageNumbers(page, pages).map(n => n === null
+        ? '<span class="pg-gap">…</span>'
+        : `<button class="pg-num${n === page ? ' on' : ''}" data-p="${n}"${n === page ? ' aria-current="page"' : ''}>${n}</button>`).join('')}
+      ${step(page + 1, page === pages, 'pagerNext', 'm9 6 6 6-6 6')}
+    </div>`;
+  $$('button[data-p]', box).forEach(b => b.addEventListener('click', () => { if (!b.disabled) go(Number(b.dataset.p)); }));
+}
+/** The first page, the last one, and the current one with a neighbour either side; null is a gap. */
+function pageNumbers(page, pages) {
+  const keep = new Set([1, 2, pages - 1, pages, page - 1, page, page + 1]);
+  const shown = Array.from(keep).filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+  return shown.flatMap((n, i) => (i && n - shown[i - 1] > 1 ? [null, n] : [n]));
+}
+
+const MEETINGS_PER_PAGE = 25;
+let meetingsPage = 1;
+
 function renderMeetings(filter = '') {
   const q = filter.toLowerCase();
   const list = q ? history.filter(m => meetingMatches(m, q)) : history;
@@ -332,7 +362,13 @@ function renderMeetings(filter = '') {
   if (!list.length) { table.style.display = 'none'; empty.classList.add('visible'); return; }
   table.style.display = ''; empty.classList.remove('visible');
 
-  $('#meetings-body').innerHTML = list.map(m => {
+  // clamped rather than reset: deleting the last record of page 4 lands on page 3, not page 1
+  const pages = Math.max(1, Math.ceil(list.length / MEETINGS_PER_PAGE));
+  meetingsPage = Math.min(Math.max(1, meetingsPage), pages);
+  const from = (meetingsPage - 1) * MEETINGS_PER_PAGE;
+  const page = list.slice(from, from + MEETINGS_PER_PAGE);
+
+  $('#meetings-body').innerHTML = page.map(m => {
     const startIso = A.meetingStartIso(m);
     const d = new Date(startIso);
     const people = Object.keys(m.attendance).length;
@@ -359,6 +395,11 @@ function renderMeetings(filter = '') {
   }));
   $$('#meetings-body [data-act="export"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); downloadMeetingCSV(b.dataset.id); }));
 
+  renderPager($('#meetings-pager'), {
+    page: meetingsPage, pages, from, count: page.length, total: list.length,
+    go: p => { meetingsPage = p; renderMeetings(filter); table.scrollIntoView({ block: 'start' }); }
+  });
+
   mountSelection({
     scope: 'meetings', head: $('#meetings-table .list-head'), root: $('#meetings-body'),
     actions: [
@@ -376,7 +417,8 @@ function renderMeetings(filter = '') {
     ]
   });
 }
-$('#meeting-search').addEventListener('input', e => renderMeetings(e.target.value.trim()));
+// a new filter is a new list, so it starts at its first page
+$('#meeting-search').addEventListener('input', e => { meetingsPage = 1; renderMeetings(e.target.value.trim()); });
 
 /* ============================ MEETING DETAIL ============================ */
 function currentMeeting() { return history.find(m => m.id === curMeetingId) || null; }
