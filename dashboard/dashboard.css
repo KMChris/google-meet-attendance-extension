@@ -77,6 +77,11 @@
 .list-head .sel-bar{padding:0 20px}
 .sel-count{font-size:11.5px;letter-spacing:.04em;color:var(--ink);text-transform:none;white-space:nowrap}
 .sel-acts{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+/* taking the whole list is about the picking, not about the picks, so it sits with the count
+   and wears no border: it is not one of the actions on the right */
+.sel-all{flex:none;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--accent);background:none;border:none;padding:4px 2px;cursor:pointer;white-space:nowrap}
+.sel-all:hover{text-decoration:underline}
 .sel-act{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);
   background:var(--panel);border:1.5px solid var(--line-2);border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
 .sel-act:hover{border-color:var(--ink-3);color:var(--ink)}

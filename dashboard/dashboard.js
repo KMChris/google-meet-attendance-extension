@@ -243,7 +243,7 @@ function mountSelection({ scope, head, root, actions }) {
       p.setAttribute('aria-checked', String(picked));
     });
     bar.hidden = !on;
-    if (on) drawSelectionBar(bar, actions, paint);
+    if (on) drawSelectionBar(bar, actions, paint, handles.map(p => p.dataset.key));
   };
   selection.repaint = paint;
 
@@ -260,14 +260,23 @@ function mountSelection({ scope, head, root, actions }) {
   paint();
 }
 
-function drawSelectionBar(bar, actions, paint) {
+/**
+ * The bar over the list head while something is picked: the count, the way to take the whole
+ * list in one go, and what can be done with the picks. `allKeys` is what is on screen right
+ * now, so "select all" follows the filter rather than reaching behind it.
+ */
+function drawSelectionBar(bar, actions, paint, allKeys) {
   const n = selection.keys.size;
   const shown = actions.filter(a => n >= (a.min || 1));
+  const rest = allKeys.filter(k => !selection.keys.has(k));
   bar.innerHTML = `<span class="sel-count mono">${esc(t('selCount', { count: n }))}</span>
+    ${rest.length ? `<button class="sel-all">${esc(t('selAll'))} (${allKeys.length})</button>` : ''}
     <div class="sel-acts">${shown.map((a, i) =>
       `<button class="sel-act${a.danger ? ' danger' : ''}" data-i="${i}">${esc(a.label())}</button>`).join('')}</div>
     <button class="sel-close" title="${esc(t('selClear'))}" aria-label="${esc(t('selClear'))}">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>`;
+  const all = $('.sel-all', bar);
+  if (all) all.addEventListener('click', e => { e.stopPropagation(); rest.forEach(k => selection.keys.add(k)); paint(); });
   $$('.sel-act', bar).forEach(b => b.addEventListener('click', async e => {
     e.stopPropagation();
     await shown[Number(b.dataset.i)].run(Array.from(selection.keys));

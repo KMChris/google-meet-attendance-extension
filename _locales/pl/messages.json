@@ -81,6 +81,9 @@
       }
     }
   },
+  "selAll": {
+    "message": "Zaznacz wszystkie"
+  },
   "selClear": {
     "message": "Wyczyść zaznaczenie"
   },
