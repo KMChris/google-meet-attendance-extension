@@ -203,8 +203,9 @@ select.field{cursor:pointer;appearance:none;
 .tl-name{width:var(--tl-names);padding-right:16px;flex:none;display:flex;align-items:center;gap:9px;min-width:0}
 .tl-name .who{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl-name .dot{width:7px;height:7px;border-radius:50%;flex:none}
-.tl-track{position:relative;flex:1;height:22px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);
-  background-image:linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:33.333% 100%}
+/* An empty track is left plain: the axis over the lanes carries the hours, and the same track is
+   reused under a session block where there is no axis for a grid line to belong to. */
+.tl-track{position:relative;flex:1;height:22px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line)}
 .seg{position:absolute;top:2px;bottom:2px;background:var(--present);border-radius:4px;
   box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent);transition:box-shadow .12s}
 /* a block answers the pointer: its hours are one hover away, in the readout */
