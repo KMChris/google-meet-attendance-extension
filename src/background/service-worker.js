@@ -7,8 +7,9 @@
  * in the pages themselves (they import storage.js directly).
  *
  * Session identity fix: a recurring Meet link reuses the same code, so we resolve a
- * per-session record id — resuming an open session on refresh/rejoin, but starting a
+ * per-session record id — resuming a recent session on refresh/rejoin, but starting a
  * fresh record for a later day — instead of letting the code overwrite prior sessions.
+ * A resumed session keeps what it already recorded: see attendance.mergeRawParticipants.
  */
 
 import * as storage from '../lib/storage.js';
@@ -104,7 +105,9 @@ async function handleMeetingSchedule(message, tabId) {
 
 async function handleAttendanceUpdate(message, tabId) {
   const raw = await resolveRawMeeting(message, tabId);
-  raw.participants = message.participants || {};
+  // The page reports what *this* load of the content script has seen, which starts over on
+  // every reload — fold it into what the tab reported before rather than replacing it.
+  raw.participants = attendance.mergeRawParticipants(raw.participants, message.participants);
   if (tabId != null) activeMeetings.set(tabId, raw);
 
   // upsertMeeting re-applies any user renames/merges (nameMap) — count the mapped result.
@@ -116,7 +119,7 @@ async function handleAttendanceUpdate(message, tabId) {
 
 async function handleMeetingEnded(message, tabId) {
   const raw = await resolveRawMeeting(message, tabId);
-  if (message.participants) raw.participants = message.participants;
+  if (message.participants) raw.participants = attendance.mergeRawParticipants(raw.participants, message.participants);
 
   const record = attendance.buildMeetingRecord(raw);
   record.endedAt = message.endTime || new Date().toISOString();

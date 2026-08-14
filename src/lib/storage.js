@@ -14,7 +14,7 @@
 
 import {
   buildMeetingRecord, normalizeMeeting, resolveMappedName, splitConcatenatedEvents,
-  annotateMerges, lastActivityMs, RESUME_WINDOW_MS
+  annotateMerges, lastActivityMs, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -118,9 +118,14 @@ export async function clearHistory() {
 }
 
 /**
- * A recurring link reuses the same Meet code. To avoid overwriting a prior session we
- * only resume an existing record when it is still open (no endedAt) and was active
- * recently (refresh / rejoin); otherwise the caller starts a fresh session record.
+ * A recurring link reuses the same Meet code. To avoid overwriting a prior session we only
+ * resume an existing record when it was active recently (refresh / rejoin); otherwise the
+ * caller starts a fresh session record.
+ *
+ * A record that already ended resumes only within the much shorter REJOIN_WINDOW_MS, because
+ * reloading a Meet tab ends the meeting on the way out: the page reports everyone as gone
+ * before it goes away. Rejoining the same link a minute later is that same call coming back,
+ * while the same link tomorrow is a new session and must stay one.
  */
 export async function findResumableSession(code) {
   if (!code) return null;
@@ -128,9 +133,10 @@ export async function findResumableSession(code) {
   let best = null, bestT = 0;
   for (const raw of await getHistory()) {
     const m = normalizeMeeting(raw);
-    if (m.meetingCode !== code || m.endedAt) continue;
+    if (m.meetingCode !== code) continue;
+    const window = m.endedAt ? REJOIN_WINDOW_MS : RESUME_WINDOW_MS;
     const t = lastActivityMs(m) || Date.parse(m.date) || 0;
-    if (now - t < RESUME_WINDOW_MS && t > bestT) { best = m; bestT = t; }
+    if (now - t < window && t > bestT) { best = m; bestT = t; }
   }
   return best;
 }

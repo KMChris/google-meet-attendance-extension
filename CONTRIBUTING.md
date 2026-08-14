@@ -10,6 +10,17 @@ There is **no build step**. Load the folder directly:
 2. **Load unpacked** → select the project root
 3. After editing, hit **Reload** on the extension card (and reopen the dashboard/popup)
 
+## Tests
+
+`tests/` covers the pure modules with `node:test` — no dependencies, no config:
+
+```
+node --test "tests/**/*.test.mjs"
+```
+
+Anything that can be exercised without `chrome.*` belongs there: `attendance.js` and
+`importers.js` are pure by design, which is what makes the derivation testable at all.
+
 ## Project layout
 
 See [README → Project Structure](README.md#project-structure). In short:

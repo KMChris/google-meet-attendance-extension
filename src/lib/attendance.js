@@ -21,6 +21,12 @@ function ms(iso) {
 export const STALE_MS = 4 * 60 * 60 * 1000;
 /** A meeting re-opened within this window (refresh / rejoin) resumes the same record. */
 export const RESUME_WINDOW_MS = 3 * 60 * 60 * 1000;
+/**
+ * A record that already ended still resumes for this long. Reloading the tab ends the meeting
+ * on the way out (the page reports every remaining participant as gone), so without a short
+ * grace period the same call would come back as a second, separate record.
+ */
+export const REJOIN_WINDOW_MS = 2 * 60 * 1000;
 
 /** Is a string a bare Google Meet code (abc-defg-hij)? */
 export function isMeetCode(s) {
@@ -579,6 +585,99 @@ export function rawParticipantsFromMeeting(meeting) {
     parts[name] = { name, email: a.email || null, events: (a.events || []).slice(), isPresent: !!a.present };
   });
   return parts;
+}
+
+/* ============================ live tracking ============================ */
+
+const eventKey = (e) => `${e.time}|${e.type}`;
+
+function usableEvents(events) {
+  return (Array.isArray(events) ? events : [])
+    .filter(e => e && e.time && e.type && !Number.isNaN(ms(e.time)))
+    .slice()
+    .sort((a, b) => ms(a.time) - ms(b.time) || eventRank(a.type) - eventRank(b.type));
+}
+
+/** Does this stream leave the person inside the call? */
+function endsOpen(events) {
+  const sessions = sessionsFromEvents(events);
+  return sessions.length > 0 && sessions[sessions.length - 1].leftAt === null;
+}
+
+function lastEventMs(events) {
+  return events.length ? ms(events[events.length - 1].time) : -Infinity;
+}
+
+/** Earliest event across a whole participants map (Infinity when there are none). */
+function earliestEventMs(participants) {
+  let earliest = Infinity;
+  Object.values(participants || {}).forEach(p => {
+    usableEvents(p && p.events).forEach(e => { const t = ms(e.time); if (t < earliest) earliest = t; });
+  });
+  return earliest;
+}
+
+/**
+ * Fold a fresh event stream into one already held for the same person, keeping both.
+ *
+ * A stream still held open is closed where the fresh one picks the person up again: the earlier
+ * stream was abandoned (the page went away), not left running, so the Leave that would have
+ * balanced it never arrives. Without that close the two Joins outnumber the Leaves and the
+ * person reads as never having left.
+ */
+function mergeEventStreams(held, fresh) {
+  const prior = usableEvents(held);
+  const next = usableEvents(fresh);
+  if (!prior.length) return next;
+  if (!next.length) return prior;
+
+  const seen = new Set(prior.map(eventKey));
+  const added = next.filter(e => !seen.has(eventKey(e)));
+  if (!added.length) return prior;
+
+  const resumesAt = ms(added[0].time);
+  const out = prior.concat(added);
+  if (added[0].type === 'Join' && resumesAt >= lastEventMs(prior) && endsOpen(prior)) {
+    out.push({ time: added[0].time, type: 'Leave' });
+  }
+  return usableEvents(out);   // one canonical order, so merging the same scan again is a no-op
+}
+
+/**
+ * Fold a tab's fresh scan into what it reported before, matched by name.
+ *
+ * A page reload restarts the content script's own record of the call: it reports a stream that
+ * begins again from the moment it rescanned, and the people it has not found again yet are
+ * simply missing from it. Taking that scan as the whole truth would drop everything observed
+ * before the reload, so the two are merged instead — events deduplicated by (time, type), and
+ * anyone the fresh scan no longer knows about closed out where it picked the call back up
+ * rather than left standing as present for the rest of the day.
+ */
+export function mergeRawParticipants(held, fresh) {
+  const prior = (held && typeof held === 'object') ? held : {};
+  const next = (fresh && typeof fresh === 'object') ? fresh : {};
+
+  const out = {};
+  const restart = Object.keys(prior).some(name => !(name in next));
+  const resumesAt = restart ? earliestEventMs(next) : Infinity;
+
+  for (const name in prior) {
+    const a = prior[name];
+    if (name in next) continue;                       // merged below, with the fresh entry
+    const events = usableEvents(a && a.events);
+    if (Number.isFinite(resumesAt) && resumesAt >= lastEventMs(events) && endsOpen(events)) {
+      out[name] = { ...a, events: events.concat({ time: new Date(resumesAt).toISOString(), type: 'Leave' }), isPresent: false };
+    } else {
+      out[name] = a;
+    }
+  }
+  for (const name in next) {
+    const a = prior[name], b = next[name] || {};
+    out[name] = a
+      ? { ...a, ...b, email: b.email || a.email || null, events: mergeEventStreams(a.events, b.events) }
+      : b;
+  }
+  return out;
 }
 
 /* ============================ csv ============================ */
