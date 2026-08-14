@@ -2,6 +2,90 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.2] 2026-08-14
+
+### Added
+- **A series can be archived.** It keeps its meetings and its numbers, but stays out of the way:
+  archived series are not offered when a meeting is put into one, they carry an archive icon by
+  the name, and they live behind an *Archive* entry beside *New series*.
+- **A meeting can be archived too.** The archive icon in its header sets it aside, the list has an
+  *Archive* tab of its own, and a batch can be archived or brought back in one go. An archived
+  meeting still counts in its series, in analytics and in reports; it is only out of the list and
+  out of the popup's recent meetings.
+- **Deleting a meeting now sends it to a trash.** Each row there says how long it has left, a row
+  restores on its own and a batch restores or goes for good together. The trash empties itself
+  after 30 days (7 / 14 / 30 / 60 / 90 in Settings), swept whenever the dashboard opens or the
+  extension wakes. A meeting waiting there is out of every count, chart, export and sync until it
+  is restored, and a call thrown away and then rejoined in Meet comes back on its own.
+- **Google Sheets sync works in both directions.** A finished meeting still goes up, and meetings
+  the sheet holds that this machine is missing now come back down: right after a meeting ends,
+  when the dashboard is opened (at most every 5 minutes) and when the extension wakes (at most
+  every 6 hours). Neither side is overwritten or cleared, a meeting in the trash is not brought
+  back by the copy the sheet still carries, and step 3 shows when the last pass ran.
+- **A spreadsheet is pointed at with a link or an ID.** The link from the address bar is enough,
+  including the `/u/1/` form, an older `?key=` link and a Drive link; the id is read out of it.
+  What cannot be opened, a published copy among others, is refused on the spot.
+- **A spreadsheet picked by hand is given the structure it needs.** The *Meetings*, *Participants*
+  and *Backup* tabs are created when the sheet is linked rather than at the first sync, and a
+  sheet already in use keeps its rows: an existing tab gets its header row inserted above them.
+- **Meetings can be added to a series from the series itself**, chosen from a searchable list of
+  everything that is not in it yet.
+- **The meetings list is paged**, 25 to a page, with the range on the left and page numbers on the
+  right; deleting the last record of a page lands on the one before it, not back at the start.
+- **Select all** appears in the batch toolbar as soon as one meeting or one person is picked.
+- **A block on the presence timeline says which hours it covers**, in the same hover read-out the
+  charts use.
+- **The series badge leads to the series**, both from the meetings list and from under a meeting's
+  title.
+
+### Changed
+- **The series a meeting belongs to reads as a badge under its title** and changes right there,
+  from the caret beside the name, instead of in a modal over the page.
+- **The hours badge is as wide as the hours it shows**, and only widens on hover to make room for
+  the pencil.
+- **Renaming a title happens in place.** The line keeps its layout while the field is open and the
+  pencil stays on the right, instead of the header shifting as you type.
+- **A person unfolded in a series stays inside the table's width** rather than stretching the
+  matrix under them.
+- The weekly rhythm chart is a normal card again, beside its neighbour rather than across the page.
+- *Series PDF report* is now simply *PDF report*, as it is on a meeting.
+- The three readings in an unfolded person's panel are told apart by dots.
+- Auto-sync says what it now does: it keeps the sheet and the register in step, both ways.
+
+### Fixed
+- **Reloading a Meet tab mid-meeting no longer loses what was recorded before it.** The page
+  starts its own count of the call over on every load, and that was taken as the whole truth:
+  everything observed up to the reload was dropped, or the call came back as a second, separate
+  meeting. The two are folded together now, someone the reloaded page cannot find again is
+  closed out at the moment it picked the call back up rather than left standing as present, and
+  a record that ended seconds ago is recognised as the same call resuming.
+- **A second meeting joined in the same tab is tracked.** Meet enters one without a page load,
+  and tracking stopped for good after the first call ended. Leaving a meeting keeps its code in
+  the address bar, so the call just finished is not started again.
+- **Auto-tracking shows its real state.** Settings read the switch from the wrong place and drew
+  it as on every time the page opened, whatever it was set to.
+- **A Google Sheets sync that failed can no longer report success.** A request retried after an
+  expired token was returned unchecked, so an error from the second attempt was read as data.
+- The participant panel is no longer hunted for indefinitely: after ~30 seconds without it, the
+  page is one we cannot read and the search stops.
+- Meet's own markup is kept out of the register — the check that separates a name from an
+  internal id or a container's text now covers the current user too.
+- The series report reads a meeting's hours the way every other view does, so hours set by hand
+  or detected from the calendar event show there as well.
+- Searching the meetings list no longer breaks on an imported record with no title.
+- **Escape while renaming a meeting or a series cancels the edit.** Closing the field counted as
+  leaving it, so the name was saved instead.
+- Every form field on the dashboard carries a name and a label, so the browser stops reporting
+  unnamed and unlabelled fields.
+
+### Removed
+- The copy button in a meeting's header; the place it took under the title is the series badge.
+- The presence timeline's grid lines. They lined up with the axis over the lanes, but the same
+  track is reused under a session block where there is no axis for them to belong to, and there
+  they read as a stray mark across the bar.
+- Unused code: an English-only CSV helper, an unreferenced Sheets write and import lookup, a
+  canvas clear that nothing called, and 22 message-catalogue entries no longer shown anywhere.
+
 ## [1.3.1] 2026-08-14
 
 ### Added
