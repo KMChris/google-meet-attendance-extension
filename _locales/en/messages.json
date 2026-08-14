@@ -1083,8 +1083,8 @@
   "sheetsNotConnected": {
     "message": "Not connected"
   },
-  "spreadsheetIdPlaceholder": {
-    "message": "Paste the ID of an existing sheet"
+  "spreadsheetRefPlaceholder": {
+    "message": "Paste a link to the sheet, or its ID"
   },
   "sheetsSave": {
     "message": "Use this one"
@@ -1291,8 +1291,8 @@
   "sheetsSaveFailed": {
     "message": "Could not reach that sheet"
   },
-  "sheetsIdRequired": {
-    "message": "Enter a spreadsheet ID"
+  "sheetsRefRequired": {
+    "message": "Paste a link to the spreadsheet, or its ID"
   },
   "reportSubtitle": {
     "message": "Attendance report"

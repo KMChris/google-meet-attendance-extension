@@ -1083,8 +1083,8 @@
   "sheetsNotConnected": {
     "message": "Nie połączono"
   },
-  "spreadsheetIdPlaceholder": {
-    "message": "Wklej ID istniejącego arkusza"
+  "spreadsheetRefPlaceholder": {
+    "message": "Wklej link do arkusza albo jego ID"
   },
   "sheetsSave": {
     "message": "Użyj tego"
@@ -1291,8 +1291,8 @@
   "sheetsSaveFailed": {
     "message": "Nie udało się otworzyć arkusza"
   },
-  "sheetsIdRequired": {
-    "message": "Podaj ID arkusza"
+  "sheetsRefRequired": {
+    "message": "Wklej link do arkusza albo jego ID"
   },
   "reportSubtitle": {
     "message": "Raport obecności"

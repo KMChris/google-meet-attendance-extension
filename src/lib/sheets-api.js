@@ -23,6 +23,33 @@ const HEADERS = {
 };
 
 /**
+ * Read a spreadsheet id out of whatever the user has at hand: the link from the address bar,
+ * a Drive link, or the id on its own. Anything else reads as "not a spreadsheet" so the field
+ * can say so, instead of the API being asked about a meaningless id.
+ *
+ * A published link (/spreadsheets/d/e/2PACX-…) is refused on purpose: that id addresses the
+ * published copy, not the spreadsheet, and no API call can open it.
+ */
+export function parseSpreadsheetRef(input) {
+  const text = String(input == null ? '' : input).trim();
+  if (!text) return null;
+  if (/\/spreadsheets\/d\/e\//.test(text)) return null;
+
+  const inPath = text.match(/\/spreadsheets\/(?:[^/]+\/)*d\/([\w-]{20,})/);
+  if (inPath) return inPath[1];
+
+  const inQuery = text.match(/[?&](?:key|id)=([\w-]{20,})/);   // older links, and Drive's ?id=
+  if (inQuery) return inQuery[1];
+
+  return /^[\w-]{20,}$/.test(text) ? text : null;
+}
+
+/** The link that opens a spreadsheet in the browser. */
+export function spreadsheetUrl(spreadsheetId) {
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+}
+
+/**
  * Get OAuth2 token using Chrome Identity API
  */
 export async function getAuthToken(interactive = true) {

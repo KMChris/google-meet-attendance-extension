@@ -1750,9 +1750,9 @@ async function refreshSheets() {
   $('#sheets-step-sheet').classList.toggle('off', !connected);
   $('#sheets-step-sheet').classList.toggle('done', linked);
   $('#sheets-sheet-state').textContent = linked ? (settings.spreadsheetName || settings.spreadsheetId) : t('sheetsNoSheet');
-  $('#spreadsheet-id').value = settings.spreadsheetId || '';
+  $('#spreadsheet-ref').value = settings.spreadsheetId || '';
   $('#sheets-open').hidden = !linked;
-  if (linked) $('#sheets-open').href = 'https://docs.google.com/spreadsheets/d/' + settings.spreadsheetId + '/edit';
+  if (linked) $('#sheets-open').href = sheets.spreadsheetUrl(settings.spreadsheetId);
 
   $('#sheets-step-data').classList.toggle('off', !linked);
   $('#set-autosync').checked = !!settings.autoSync;
@@ -1784,17 +1784,21 @@ $('#sheets-create').addEventListener('click', async () => {
     const ss = await sheets.createSpreadsheet();
     settings = await store.updateSettings({ spreadsheetId: ss.spreadsheetId, spreadsheetName: (ss.properties && ss.properties.title) || null });
     toast(t('sheetsCreatedToast'));
-    window.open('https://docs.google.com/spreadsheets/d/' + ss.spreadsheetId + '/edit', '_blank');
+    window.open(sheets.spreadsheetUrl(ss.spreadsheetId), '_blank');
   } catch (e) { console.error('[GM Attendance] create spreadsheet failed:', (e && e.message) || e); toast(t('sheetsCreateFailed')); }
   $('#sheets-create').disabled = false; refreshSheets();
 });
-$('#sheets-save').addEventListener('click', async () => {
-  const id = $('#spreadsheet-id').value.trim(); if (!id) { toast(t('sheetsIdRequired')); return; }
+// a link or a bare id, whichever the user has at hand: the id is read out of it here
+async function useSpreadsheet() {
+  const id = sheets.parseSpreadsheetRef($('#spreadsheet-ref').value);
+  if (!id) { toast(t('sheetsRefRequired')); return; }
   $('#sheets-save').disabled = true;
   try { await linkSpreadsheet(id); toast(t('sheetsSavedToast')); }
   catch (e) { console.error('[GM Attendance] open spreadsheet failed:', (e && e.message) || e); toast(t('sheetsSaveFailed')); }
   $('#sheets-save').disabled = false; refreshSheets();
-});
+}
+$('#sheets-save').addEventListener('click', useSpreadsheet);
+$('#spreadsheet-ref').addEventListener('keydown', ev => { if (ev.key === 'Enter') useSpreadsheet(); });
 
 // the sheet becomes a full backup: every stored record goes in, replacing what was there
 $('#sheets-push').addEventListener('click', async () => {
