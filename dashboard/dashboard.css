@@ -126,15 +126,21 @@
 .detail-headings{min-width:0;flex:1 1 340px;max-width:min(640px,100%)}
 .detail-headings h1{font-size:26px;overflow-wrap:anywhere;min-width:0;
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
-/* renaming is a pencil beside the name, not a button in the action row — same gesture as the
-   participant rows, and it leaves the action row for what you do *with* the meeting */
-.title-line{display:flex;align-items:flex-start;gap:6px;margin-top:8px}
+/* renaming is a pencil at the end of the title line, not a button in the action row: the same
+   gesture as the participant rows, and it leaves the action row for what you do *with* the
+   meeting. The pencil holds the right edge of the line whatever the title's length, and the
+   input is laid over the title's own box (out of flow, the heading keeping its space), so
+   going into a rename and back out of it cannot move a thing. */
+.title-line{display:flex;align-items:flex-start;gap:8px;margin-top:8px}
+.title-slot{position:relative;flex:1;min-width:0}
 .title-edit{display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;
   color:var(--ink-3);padding:5px;margin-top:2px;border-radius:7px;flex:none;opacity:.45;
   transition:opacity .12s,background .12s,color .12s}
 .detail-headings:hover .title-edit,.title-edit:focus-visible{opacity:1}
 .title-edit:hover{background:var(--panel-2);color:var(--ink)}
-.rename-input{font-family:var(--disp);font-weight:700;font-size:24px;margin-top:6px;max-width:100%}
+.title-line.editing h1{visibility:hidden}
+.rename-input{position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:calc(100% + 12px);
+  font-family:var(--disp);font-weight:700;font-size:24px;line-height:1.15;padding:3px 8px}
 .detail-badges{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:11px}
 .detail-meta{color:var(--ink-2);font-size:12.5px}
 .detail-meta b{color:var(--ink);font-weight:500}

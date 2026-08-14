@@ -539,14 +539,25 @@ function renderAttendance(m, filter) {
 $('#participant-search').addEventListener('input', e => { const m = currentMeeting(); if (m) renderAttendance(m, e.target.value.trim()); });
 
 /* ---- detail actions ---- */
+/**
+ * Open or close a title line for editing. The input sits over the heading rather than in its
+ * place, so all this does is decide which of the two is the one you see.
+ */
+function setTitleEditing(input, on) {
+  input.closest('.title-line').classList.toggle('editing', on);
+  input.hidden = !on;
+}
+
 $('#btn-rename').addEventListener('click', () => startRename());
 function startRename() {
   const m = currentMeeting(); if (!m) return;
   const input = $('#rename-input');
-  $('#detail-title').hidden = true; input.hidden = false; input.value = m.meetingTitle; input.focus(); input.select();
+  input.value = m.meetingTitle;
+  setTitleEditing(input, true); input.focus(); input.select();
 }
 async function commitRename() {
   const m = currentMeeting(); const input = $('#rename-input');
+  if (input.hidden) return;         // Escape closed the line already: nothing left to keep
   const v = input.value.trim();
   if (m && v) {
     m.meetingTitle = v;
@@ -554,12 +565,12 @@ async function commitRename() {
     if (stored) { stored.meetingTitle = v; await store.upsertMeeting(stored); }
     $('#detail-title').textContent = v;
   }
-  input.hidden = true; $('#detail-title').hidden = false;
+  setTitleEditing(input, false);
   renderMeetings($('#meeting-search').value.trim());
 }
 $('#rename-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
-  else if (e.key === 'Escape') { $('#rename-input').hidden = true; $('#detail-title').hidden = false; }
+  else if (e.key === 'Escape') { setTitleEditing($('#rename-input'), false); }
 });
 $('#rename-input').addEventListener('blur', commitRename);
 
@@ -961,16 +972,19 @@ $('#btn-group-rename').addEventListener('click', () => startGroupRename());
 function startGroupRename() {
   const g = groupById(curGroupId); if (!g) return;
   const input = $('#group-rename-input');
-  $('#group-title').hidden = true; input.hidden = false; input.value = g.name; input.focus(); input.select();
+  input.value = g.name;
+  setTitleEditing(input, true); input.focus(); input.select();
 }
 async function commitGroupRename() {
-  const g = groupById(curGroupId); const input = $('#group-rename-input'); const v = input.value.trim();
+  const g = groupById(curGroupId); const input = $('#group-rename-input');
+  if (input.hidden) return;         // Escape closed the line already: nothing left to keep
+  const v = input.value.trim();
   if (g && v) { g.name = v; await store.updateGroup(g.id, { name: v }); $('#group-title').textContent = v; }
-  input.hidden = true; $('#group-title').hidden = false;
+  setTitleEditing(input, false);
 }
 $('#group-rename-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); commitGroupRename(); }
-  else if (e.key === 'Escape') { $('#group-rename-input').hidden = true; $('#group-title').hidden = false; }
+  else if (e.key === 'Escape') { setTitleEditing($('#group-rename-input'), false); }
 });
 $('#group-rename-input').addEventListener('blur', commitGroupRename);
 
