@@ -679,24 +679,3 @@ export function mergeRawParticipants(held, fresh) {
   }
   return out;
 }
-
-/* ============================ csv ============================ */
-
-function csvRow(cells) {
-  return cells.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',');
-}
-
-/** Plain (English) per-participant CSV — used by the popup's quick export. */
-export function meetingToCSV(meeting) {
-  const rows = [['Name', 'Email', 'First seen', 'Last left', 'Time (s)', 'Share %', 'Status']];
-  Object.entries((meeting && meeting.attendance) || {})
-    .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([name, a]) => {
-      const st = statusFor(a, meeting);
-      rows.push([
-        name, a.email || '', a.firstSeen || '', a.present ? '' : (a.lastLeft || ''),
-        st.seconds, st.sharePct, 'Present'
-      ]);
-    });
-  return rows.map(csvRow).join('\n');
-}

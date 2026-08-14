@@ -497,11 +497,3 @@ export function heat(canvas, o) {
   ctx.textAlign = 'left';
   ctx.fillText(fmt(max), lx + lw + 6, ly);
 }
-
-/** Wipe a canvas (used when a chart has nothing to draw). */
-export function clear(canvas) {
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  HOT.set(canvas, []);
-}

@@ -14,9 +14,6 @@
   "extActionTitle": {
     "message": "Attendance Tracker"
   },
-  "appName": {
-    "message": "Attendance Tracker"
-  },
   "save": {
     "message": "Zapisz"
   },
@@ -25,9 +22,6 @@
   },
   "delete": {
     "message": "Usuń"
-  },
-  "close": {
-    "message": "Zamknij"
   },
   "add": {
     "message": "Dodaj"
@@ -38,23 +32,8 @@
   "rename": {
     "message": "Zmień nazwę"
   },
-  "remove": {
-    "message": "Usuń"
-  },
-  "back": {
-    "message": "Wróć"
-  },
   "export": {
     "message": "Eksportuj"
-  },
-  "open": {
-    "message": "Otwórz"
-  },
-  "dismiss": {
-    "message": "Odrzuć"
-  },
-  "at": {
-    "message": "o"
   },
   "present": {
     "message": "Obecny"
@@ -199,15 +178,6 @@
   "emptyMeetingsBody": {
     "message": "Dołącz do Google Meet — Attendance Tracker sam rozpocznie rejestr obecności."
   },
-  "tagAuto": {
-    "message": "Auto"
-  },
-  "ungrouped": {
-    "message": "Bez cyklu"
-  },
-  "metaRoster": {
-    "message": "na liście"
-  },
   "metaAttended": {
     "message": "obecnych"
   },
@@ -268,14 +238,8 @@
   "copyText": {
     "message": "Kopiuj"
   },
-  "exportJson": {
-    "message": "JSON"
-  },
   "addToGroup": {
     "message": "Dodaj do cyklu"
-  },
-  "inGroup": {
-    "message": "Cykl"
   },
   "removeFromGroup": {
     "message": "Usuń z cyklu"
@@ -507,9 +471,6 @@
   },
   "assignTitle": {
     "message": "Dodaj do cyklu"
-  },
-  "assignPick": {
-    "message": "Wybierz cykl"
   },
   "assignNew": {
     "message": "Nowy cykl…"
@@ -876,9 +837,6 @@
   "rosterPlaceholder": {
     "message": "Wpisz nazwę i naciśnij Enter"
   },
-  "rosterAdd": {
-    "message": "Dodaj"
-  },
   "rosterPaste": {
     "message": "Wklej listę"
   },
@@ -982,15 +940,6 @@
   },
   "autoSync": {
     "message": "Auto-synchronizacja po zakończeniu"
-  },
-  "dataTitle": {
-    "message": "Dane"
-  },
-  "exportAllTitle": {
-    "message": "Eksportuj wszystko"
-  },
-  "exportAllHint": {
-    "message": "Kopia JSON lub zbiorczy CSV."
   },
   "importTitle": {
     "message": "Importuj kopię"
@@ -1150,26 +1099,14 @@
   "sheetsIdRequired": {
     "message": "Podaj ID arkusza"
   },
-  "syncedToast": {
-    "message": "Zsynchronizowano"
-  },
-  "syncFailed": {
-    "message": "Synchronizacja nieudana"
-  },
   "reportSubtitle": {
     "message": "Raport obecności"
   },
   "groupReportSubtitle": {
     "message": "Raport obecności cyklu"
   },
-  "reportSummary": {
-    "message": "Podsumowanie"
-  },
   "reportPeople": {
     "message": "Osoby"
-  },
-  "reportPresent": {
-    "message": "Obecni"
   },
   "reportAvg": {
     "message": "Śr. obecność"
@@ -1228,9 +1165,6 @@
   },
   "stillInCall": {
     "message": "wciąż w rozmowie"
-  },
-  "popupTracking": {
-    "message": "Śledzę to spotkanie"
   },
   "popupIdle": {
     "message": "Nie śledzę"

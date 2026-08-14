@@ -165,18 +165,6 @@ export async function appendData(spreadsheetId, range, values) {
 }
 
 /**
- * Update data in a sheet
- */
-export async function updateData(spreadsheetId, range, values) {
-  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-
-  return apiRequest(url, {
-    method: 'PUT',
-    body: JSON.stringify({ values })
-  });
-}
-
-/**
  * Batch update multiple ranges
  */
 export async function batchUpdate(spreadsheetId, data) {

@@ -14,9 +14,6 @@
   "extActionTitle": {
     "message": "Attendance Tracker"
   },
-  "appName": {
-    "message": "Attendance Tracker"
-  },
   "save": {
     "message": "Save"
   },
@@ -25,9 +22,6 @@
   },
   "delete": {
     "message": "Delete"
-  },
-  "close": {
-    "message": "Close"
   },
   "add": {
     "message": "Add"
@@ -38,23 +32,8 @@
   "rename": {
     "message": "Rename"
   },
-  "remove": {
-    "message": "Remove"
-  },
-  "back": {
-    "message": "Back"
-  },
   "export": {
     "message": "Export"
-  },
-  "open": {
-    "message": "Open"
-  },
-  "dismiss": {
-    "message": "Dismiss"
-  },
-  "at": {
-    "message": "at"
   },
   "present": {
     "message": "Present"
@@ -199,15 +178,6 @@
   "emptyMeetingsBody": {
     "message": "Join a Google Meet and Attendance Tracker starts the register automatically."
   },
-  "tagAuto": {
-    "message": "Auto"
-  },
-  "ungrouped": {
-    "message": "No series"
-  },
-  "metaRoster": {
-    "message": "on the roster"
-  },
   "metaAttended": {
     "message": "attended"
   },
@@ -268,14 +238,8 @@
   "copyText": {
     "message": "Copy"
   },
-  "exportJson": {
-    "message": "JSON"
-  },
   "addToGroup": {
     "message": "Add to series"
-  },
-  "inGroup": {
-    "message": "Series"
   },
   "removeFromGroup": {
     "message": "Remove from series"
@@ -507,9 +471,6 @@
   },
   "assignTitle": {
     "message": "Add to series"
-  },
-  "assignPick": {
-    "message": "Pick a series"
   },
   "assignNew": {
     "message": "New series…"
@@ -876,9 +837,6 @@
   "rosterPlaceholder": {
     "message": "Type a name and press Enter"
   },
-  "rosterAdd": {
-    "message": "Add"
-  },
   "rosterPaste": {
     "message": "Paste list"
   },
@@ -982,15 +940,6 @@
   },
   "autoSync": {
     "message": "Auto-sync on meeting end"
-  },
-  "dataTitle": {
-    "message": "Data"
-  },
-  "exportAllTitle": {
-    "message": "Export everything"
-  },
-  "exportAllHint": {
-    "message": "JSON backup or a combined CSV."
   },
   "importTitle": {
     "message": "Import backup"
@@ -1150,26 +1099,14 @@
   "sheetsIdRequired": {
     "message": "Enter a spreadsheet ID"
   },
-  "syncedToast": {
-    "message": "Synced to Sheets"
-  },
-  "syncFailed": {
-    "message": "Sync failed"
-  },
   "reportSubtitle": {
     "message": "Attendance report"
   },
   "groupReportSubtitle": {
     "message": "Series attendance report"
   },
-  "reportSummary": {
-    "message": "Summary"
-  },
   "reportPeople": {
     "message": "People"
-  },
-  "reportPresent": {
-    "message": "Attended"
   },
   "reportAvg": {
     "message": "Avg presence"
@@ -1228,9 +1165,6 @@
   },
   "stillInCall": {
     "message": "still in call"
-  },
-  "popupTracking": {
-    "message": "Tracking this meeting"
   },
   "popupIdle": {
     "message": "Not tracking"

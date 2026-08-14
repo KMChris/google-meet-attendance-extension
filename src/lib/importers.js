@@ -326,10 +326,3 @@ export const IMPORT_SOURCES = [
 export function getImportSource(id) {
   return IMPORT_SOURCES.find(s => s.id === id) || null;
 }
-
-/** Convert a parsed foreign backup with the named source. Throws ImportFormatError. */
-export function convertWith(sourceId, raw) {
-  const source = getImportSource(sourceId);
-  if (!source) throw new ImportFormatError(`unknown source: ${sourceId}`);
-  return source.convert(raw);
-}
