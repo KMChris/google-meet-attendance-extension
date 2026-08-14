@@ -1754,7 +1754,9 @@ async function refreshSheets() {
   $('#sheets-open').hidden = !linked;
   if (linked) $('#sheets-open').href = sheets.spreadsheetUrl(settings.spreadsheetId);
 
+  // step 3 counts as done once the sheet keeps itself up to date without being told to
   $('#sheets-step-data').classList.toggle('off', !linked);
+  $('#sheets-step-data').classList.toggle('done', linked && !!settings.autoSync);
   $('#set-autosync').checked = !!settings.autoSync;
 }
 
@@ -1835,7 +1837,11 @@ $('#sheets-restore').addEventListener('click', async () => {
   } catch (e) { console.error('[GM Attendance] restore from Sheets failed:', (e && e.message) || e); toast(t('sheetsRestoreFailed')); }
   $('#sheets-restore').disabled = false;
 });
-$('#set-autosync').addEventListener('change', async () => { settings = await store.updateSettings({ autoSync: $('#set-autosync').checked }); toast(t('savedToast')); });
+$('#set-autosync').addEventListener('change', async () => {
+  settings = await store.updateSettings({ autoSync: $('#set-autosync').checked });
+  toast(t('savedToast'));
+  refreshSheets();
+});
 
 /* ============================ locale ============================ */
 i18n.onLocaleChange(() => {

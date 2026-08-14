@@ -123,6 +123,7 @@ a{color:var(--accent);text-decoration:none}
 /* ------------------------------ buttons ----------------------------- */
 .btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;
   font-family:var(--mono);font-weight:500;font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+  line-height:normal; /* a link styled as a button would otherwise inherit the page's and stand taller */
   background:var(--accent);color:var(--on-accent);border:1.5px solid transparent;
   border-radius:9px;padding:10px 15px;transition:filter .15s,background .15s,border-color .15s}
 .btn:hover{filter:brightness(1.06)}
