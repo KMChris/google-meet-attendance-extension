@@ -234,6 +234,19 @@ function selectionClick(key) {
   return true;
 }
 
+/**
+ * The label of a list switch (the archive, the trash): the word, and how much is in there.
+ * The count is a span of its own because a narrow screen keeps only it beside the glyph, so
+ * the whole text goes on the button as its name for a pointer and for a screen reader.
+ */
+function setSwitchLabel(btn, word, count) {
+  const full = count == null ? word : `${word} (${count})`;
+  $('.lbl', btn).innerHTML = `<span class="w">${esc(word)}</span>` +
+    (count == null ? '' : `<span class="n">${count}</span>`);
+  btn.title = full;
+  btn.setAttribute('aria-label', full);
+}
+
 /** The handle that stands in for a badge or avatar while selecting. */
 function pickHandle(key, inner) {
   return `<span class="pick" data-key="${esc(key)}" role="checkbox" aria-checked="false" tabindex="0"
@@ -375,7 +388,7 @@ function renderMeetings(filter = '') {
   const list = q ? scope.filter(m => meetingMatches(m, q)) : scope;
 
   const tab = (btn, key, count, on) => {
-    $('.lbl', btn).textContent = `${t(key)} (${count})`;
+    setSwitchLabel(btn, t(key), count);
     btn.hidden = !count && !on;
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
@@ -952,7 +965,8 @@ function renderGroups() {
   const shown = groups.filter(g => !!g.archived === archive);
   const archivedCount = groups.filter(g => g.archived).length;
 
-  $('#btn-groups-archive .lbl').textContent = archive ? t('groupsActive') : `${t('groupsArchive')} (${archivedCount})`;
+  if (archive) setSwitchLabel($('#btn-groups-archive'), t('groupsActive'), null);
+  else setSwitchLabel($('#btn-groups-archive'), t('groupsArchive'), archivedCount);
   $('#btn-groups-archive').hidden = !archive && !archivedCount;
   $('#btn-new-group').hidden = archive;
   setI18nText($('#groups-lede'), archive ? 'archiveSubtitle' : 'groupsSubtitle');

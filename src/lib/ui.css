@@ -151,6 +151,11 @@ a{color:var(--accent);text-decoration:none}
 .btn.ghost:hover>svg,.btn.subtle:hover>svg,.btn.ghost.on>svg{color:inherit}
 /* where the glyph *is* the button there is no label to carry it, so it keeps the full weight */
 .btn.icon>svg{color:inherit}
+/* a list switch reads "Archive (3)": the count is its own span, so a narrow screen can keep
+   the number and let the glyph say the rest */
+.btn .lbl .n{margin-left:.45em}
+.btn .lbl .n::before{content:"("}
+.btn .lbl .n::after{content:")"}
 
 /* ------------------------- status chips ----------------------------- */
 .status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:500;

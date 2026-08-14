@@ -33,8 +33,30 @@
 .view-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin:26px 0 18px;flex-wrap:wrap}
 .lede{margin:7px 0 0;color:var(--ink-2);font-size:14px}
 /* the buttons here carry icons now, so the row is wider than it was; it wraps rather than
-   pushing the search field off the edge on a narrow window */
-.head-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;position:relative;flex-wrap:wrap}
+   pushing the search field off the edge on a narrow window. It grows into whatever the
+   title leaves, so once the row does wrap it holds the full width instead of standing as a
+   ragged content-width box with dead space beside it (the contents stay pinned right). */
+.head-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;position:relative;
+  flex-wrap:wrap;flex:1 1 320px;container-type:inline-size}
+
+/* How the row gives way is a question about the row's own width, not the window's: the same
+   bar sits beside a short title on a wide page and alone under a long one. */
+@container (max-width:640px){
+  /* the field spreads across what is left and keeps the export beside it */
+  .head-actions .search{flex:1 1 180px;min-width:0}
+  /* unless a list switch is out too: then the field takes the line and the buttons the next */
+  .head-actions:has(> .btn:not([hidden]) ~ .btn:not([hidden])) .search{flex-basis:100%}
+}
+/* below this the labels cost more than the field can spare: the glyphs speak instead, and the
+   switches keep their count (setSwitchLabel leaves the whole label as title and aria-label) */
+@container (max-width:420px){
+  #btn-export-all > span{display:none}
+  .btn .lbl:has(.n) .w{display:none}
+  .btn .lbl .n{margin-left:0}
+  .btn .lbl .n::before,.btn .lbl .n::after{content:none}
+  /* with no label there is no line box to stand a button up: the field sets the row's height */
+  .head-actions .btn{min-height:38px}
+}
 .search{position:relative;min-width:220px}
 .search.inline{min-width:180px}
 .search .field{padding-left:34px;height:38px}
@@ -634,8 +656,9 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
   .view-head{margin:20px 0 14px}
   .back{margin:18px 0 12px}
 
-  /* the search takes a full line of its own; the buttons wrap after it */
-  .head-actions .search{flex:1 1 100%;min-width:0}
+  /* the actions take their own line under the title rather than a ragged content-width box
+     beside it; what happens inside that line is the container's business, above */
+  .head-actions{flex-basis:100%}
   .sect-head .search.inline{width:100%;min-width:0}
 
   /* the selection toolbar cannot grow as an absolute overlay, and its wrapped buttons
