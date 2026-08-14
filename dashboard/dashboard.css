@@ -138,16 +138,18 @@
 .detail-badges{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:11px}
 .detail-meta{color:var(--ink-2);font-size:12.5px}
 .detail-meta b{color:var(--ink);font-weight:500}
-/* the meeting hours read as a badge under the title; the pencil sits in the layout at rest and
-   only fades in on hover, so pointing at it never shifts the line */
+/* the meeting hours read as a badge under the title: it is cut to the hours themselves and
+   opens up for the pencil only while pointed at, quickly enough to feel like one gesture
+   (the negative margin swallows the flex gap the pencil would otherwise keep at rest) */
 .hours-badge{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--mono);
   font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-2);background:var(--panel-2);
   border:1px solid var(--line);border-radius:999px;padding:5px 11px;
   transition:border-color .12s,color .12s,background .12s}
 .hours-badge:hover{border-color:var(--ink-3);color:var(--ink)}
 .hours-badge .hb-ic{color:var(--ink-3);flex:none}
-.hours-badge .hb-edit{flex:none;opacity:0;transition:opacity .12s}
-.hours-badge:hover .hb-edit,.hours-badge:focus-visible .hb-edit{opacity:1}
+.hours-badge .hb-edit{flex:none;width:0;margin-left:-7px;opacity:0;
+  transition:width .12s,margin-left .12s,opacity .12s}
+.hours-badge:hover .hb-edit,.hours-badge:focus-visible .hb-edit{width:11px;margin-left:0;opacity:1}
 .hours-badge.pinned{background:var(--present-2);border-color:color-mix(in srgb,var(--present) 35%,transparent);color:var(--present)}
 .hours-badge.pinned .hb-ic{color:var(--present)}
 .detail-actions{display:flex;align-items:center;gap:8px;position:relative;flex-wrap:wrap;
