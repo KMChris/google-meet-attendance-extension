@@ -169,6 +169,9 @@ window.addEventListener('hashchange', () => route());
 
 function switchView(name) {
   $$('.tab').forEach(tb => tb.classList.toggle('on', tb.dataset.view === (PARENT_TAB[name] || name)));
+  // the rail scrolls on a phone, so the tab just lit may be out of frame
+  const lit = $('.tab.on');
+  if (lit) lit.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   const view = $('#view-' + name);
   if (view && !view.classList.contains('on')) {
     $$('.view').forEach(v => v.classList.remove('on'));
