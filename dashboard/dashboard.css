@@ -254,7 +254,9 @@
 .suggest .s-sub{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:1px}
 
 /* matrix */
-.matrix-wrap{overflow-x:auto}
+/* the scroller is the yardstick for the unfolded person below: a container query gives that
+   width to a panel living inside a table that may be far wider */
+.matrix-wrap{overflow-x:auto;container-type:inline-size}
 .matrix{min-width:520px}
 .matrix th,.matrix td{text-align:center}
 .matrix th:first-child,.matrix td:first-child{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1}
@@ -292,7 +294,9 @@ tr:hover .cell-go .go,tr:focus-visible .cell-go .go{opacity:1}
 /* one person unfolded under their matrix row — every session of the series is a lane */
 /* the panel spans every column, so it must opt out of the sticky first-column rule */
 .matrix tr.person-expand td{padding:0;background:var(--panel-2);position:static}
-.matrix tr.person-expand .pm{padding:4px 14px 18px}
+/* it is measured against the scroller, not the matrix: a long meeting title can no longer push
+   the table wider, and the panel stays in view when the matrix is scrolled sideways */
+.matrix tr.person-expand .pm{position:sticky;left:0;width:100cqw;padding:4px 14px 18px}
 .matrix tbody tr.expanded td{background:var(--panel-2)}
 .matrix tbody tr.expanded .go{opacity:1;transform:rotate(90deg)}
 .matrix .m-name .go{transition:opacity .12s,transform .12s}
