@@ -12,6 +12,7 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 /* ------------------------------ state ------------------------------ */
 let history = [];         // normalized meetings, newest-first
+let trash = [];           // deleted meetings waiting out the retention window
 let groups = [];
 let settings = {};
 let roster = [];          // global default roster
@@ -20,7 +21,7 @@ let curMeetingId = null;
 let curGroupId = null;
 let assignContextIds = []; // meeting ids awaiting a series assignment
 let groupsArchive = false; // the series view is showing the archive rather than the active list
-let meetingsArchive = false; // same for the meetings list
+let meetingsList = 'active'; // which meetings list is on screen: 'active' | 'archive' | 'trash'
 
 const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-violet', rose: '--grp-rose', sky: '--grp-sky', lime: '--grp-lime' };
 const GRP_KEYS = Object.keys(GRP_COLORS);
@@ -98,7 +99,8 @@ function parseRoute(hash) {
   return {
     view,
     person: view === 'people' ? (p.get('person') || null) : null,
-    archive: (view === 'groups' || view === 'meetings') && p.has('archive')
+    archive: view === 'groups' && p.has('archive'),
+    list: p.has('trash') ? 'trash' : p.has('archive') ? 'archive' : 'active'
   };
 }
 
@@ -148,8 +150,9 @@ function route(force) {
   curMeetingId = null; curGroupId = null;
   // read before the view draws itself
   groupsArchive = r.view === 'groups' && !!r.archive;
-  if (r.view === 'meetings' && meetingsArchive !== !!r.archive) meetingsPage = 1;
-  meetingsArchive = r.view === 'meetings' && !!r.archive;
+  const list = r.view === 'meetings' ? r.list : 'active';
+  if (list !== meetingsList) meetingsPage = 1;   // another list starts at its own first page
+  meetingsList = list;
   switchView(r.view);
   if (r.view === 'people' && r.person) expandPerson(r.person);
 }
@@ -177,10 +180,12 @@ $('#btn-back-group').addEventListener('click', () => goBack(groupsArchive ? 'gro
 
 /* ------------------------------ load ------------------------------ */
 async function load() {
-  const [h, g, s, r, at] = await Promise.all([
-    store.getHistory(), store.getGroups(), store.getSettings(), store.getRoster(), store.getAutoTrack()
+  await store.purgeExpiredTrash();   // whatever has waited out its window goes before anything is read
+  const [h, tr, g, s, r, at] = await Promise.all([
+    store.getHistory(), store.getTrash(), store.getGroups(), store.getSettings(), store.getRoster(), store.getAutoTrack()
   ]);
   history = h.map(A.normalizeMeeting).sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+  trash = tr.map(A.normalizeMeeting).sort((a, b) => (Date.parse(b.deletedAt) || 0) - (Date.parse(a.deletedAt) || 0));
   groups = g; settings = s; roster = r; autoTrack = at;
   applyTheme(settings.theme || 'system');
   renderReadout();
@@ -355,16 +360,20 @@ let meetingsPage = 1;
 
 function renderMeetings(filter = '') {
   const q = filter.toLowerCase();
-  // the archive is a list of its own: set aside, still counted everywhere else
-  const scope = history.filter(m => !!m.archived === meetingsArchive);
+  const inTrash = meetingsList === 'trash';
+  // the archive and the trash are lists of their own: set aside, and on their way out
+  const scope = inTrash ? trash : history.filter(m => !!m.archived === (meetingsList === 'archive'));
   const list = q ? scope.filter(m => meetingMatches(m, q)) : scope;
 
-  const archivedCount = history.filter(m => m.archived).length;
-  const archBtn = $('#btn-meetings-archive');
-  archBtn.textContent = `${t('meetingsArchive')} (${archivedCount})`;
-  archBtn.hidden = !archivedCount && !meetingsArchive;
-  archBtn.classList.toggle('on', meetingsArchive);
-  archBtn.setAttribute('aria-pressed', String(meetingsArchive));
+  const tab = (btn, key, count, on) => {
+    btn.textContent = `${t(key)} (${count})`;
+    btn.hidden = !count && !on;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+  };
+  tab($('#btn-meetings-archive'), 'meetingsArchive', history.filter(m => m.archived).length, meetingsList === 'archive');
+  tab($('#btn-meetings-trash'), 'meetingsTrash', trash.length, inTrash);
+  $('#btn-trash-empty').hidden = !(inTrash && trash.length);
 
   // stats
   const people = new Set(); let durSum = 0, shareSum = 0, shareN = 0;
@@ -379,8 +388,13 @@ function renderMeetings(filter = '') {
   setStat($('#stat-attendance'), shareN ? Math.round(shareSum / shareN) : 0, '%');
 
   const table = $('#meetings-table'), empty = $('#meetings-empty');
-  setI18nText($('#meetings-empty-title'), meetingsArchive ? 'emptyArchiveTitle' : 'emptyMeetingsTitle');
-  setI18nText($('#meetings-empty-body'), meetingsArchive ? 'emptyMeetingsArchiveBody' : 'emptyMeetingsBody');
+  const emptyKeys = {
+    active: ['emptyMeetingsTitle', 'emptyMeetingsBody'],
+    archive: ['emptyArchiveTitle', 'emptyMeetingsArchiveBody'],
+    trash: ['emptyTrashTitle', 'emptyTrashBody']
+  }[meetingsList];
+  setI18nText($('#meetings-empty-title'), emptyKeys[0]);
+  setI18nText($('#meetings-empty-body'), emptyKeys[1]);
   // the rows go too, or a later selection would still find the ones that are no longer listed
   if (!list.length) { $('#meetings-body').innerHTML = ''; table.style.display = 'none'; empty.classList.add('visible'); return; }
   table.style.display = ''; empty.classList.remove('visible');
@@ -402,21 +416,30 @@ function renderMeetings(filter = '') {
       : '';
     const live = A.isInProgress(m) ? `<span class="status status--present" style="margin-left:6px">${t('inCall')}</span>` : '';
     const badge = `<div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div>`;
+    // in the trash the series it was in is beside the point; what is left of its stay is not
+    const middle = inTrash
+      ? `<span class="group-pill"><span class="gname">${esc(trashLeft(m))}</span></span>`
+      : groupCell;
+    const action = inTrash
+      ? `<button class="row-action" data-act="restore" data-id="${esc(m.id)}">${esc(t('trashRestore'))}</button>`
+      : `<button class="row-action" data-act="export" data-id="${esc(m.id)}">${t('export')}</button>`;
     return `<div class="row meetings-grid" data-id="${esc(m.id)}">
       <div class="col-date">${pickHandle(m.id, badge)}</div>
       <div class="col-title"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(startIso)}</div></div>
-      <div class="col-group">${groupCell}</div>
+      <div class="col-group">${middle}</div>
       <div class="col-people num">${people}</div>
       <div class="col-avg num">${fmtDur(avg)}</div>
-      <div class="col-actions" style="text-align:right"><button class="row-action" data-act="export" data-id="${esc(m.id)}">${t('export')}</button></div>
+      <div class="col-actions" style="text-align:right">${action}</div>
     </div>`;
   }).join('');
 
   $$('#meetings-body .row').forEach(row => row.addEventListener('click', () => {
     if (selectionClick(row.dataset.id)) return;
-    go('meeting=' + encodeURIComponent(row.dataset.id));
+    // a meeting in the trash has no detail page to open — it is not in the history any more
+    if (!inTrash) go('meeting=' + encodeURIComponent(row.dataset.id));
   }));
   $$('#meetings-body [data-act="export"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); downloadMeetingCSV(b.dataset.id); }));
+  $$('#meetings-body [data-act="restore"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); restoreMeetings([b.dataset.id]); }));
 
   renderPager($('#meetings-pager'), {
     page: meetingsPage, pages, from, count: page.length, total: list.length,
@@ -425,25 +448,21 @@ function renderMeetings(filter = '') {
 
   mountSelection({
     scope: 'meetings', head: $('#meetings-table .list-head'), root: $('#meetings-body'),
-    actions: [
+    actions: inTrash ? [
+      { label: () => t('trashRestore'), run: ids => restoreMeetings(ids) },
+      { label: () => t('trashDeleteNow'), danger: true, run: ids => purgeMeetings(ids) }
+    ] : [
       { label: () => t('addToGroup'), run: ids => openAssignModal(ids.map(id => history.find(m => m.id === id)).filter(Boolean)) },
       { label: () => t('exportCsv'), run: ids => downloadSelectionCSV(ids) },
-      { label: () => t(meetingsArchive ? 'unarchive' : 'archive'), run: ids => archiveMeetings(ids, !meetingsArchive) },
-      {
-        label: () => t('delete'), danger: true,
-        run: async ids => {
-          if (!confirm(t('confirmDeleteMeetings', { count: ids.length }))) return;
-          for (const id of ids) await store.deleteMeetingById(id);
-          selectionReset(); await load();
-          toast(t('deletedMeetingsToast', { count: ids.length }));
-        }
-      }
+      { label: () => t(meetingsList === 'archive' ? 'unarchive' : 'archive'), run: ids => archiveMeetings(ids, meetingsList !== 'archive') },
+      { label: () => t('delete'), danger: true, run: ids => trashMeetings(ids) }
     ]
   });
 }
 // a new filter is a new list, so it starts at its first page
 $('#meeting-search').addEventListener('input', e => { meetingsPage = 1; renderMeetings(e.target.value.trim()); });
-$('#btn-meetings-archive').addEventListener('click', () => go(meetingsArchive ? 'meetings' : 'meetings&archive'));
+$('#btn-meetings-archive').addEventListener('click', () => go(meetingsList === 'archive' ? 'meetings' : 'meetings&archive'));
+$('#btn-meetings-trash').addEventListener('click', () => go(meetingsList === 'trash' ? 'meetings' : 'meetings&trash'));
 
 /** Put meetings aside, or bring them back. Used by the toolbar and by the detail header. */
 async function archiveMeetings(ids, archived) {
@@ -451,6 +470,38 @@ async function archiveMeetings(ids, archived) {
   selectionReset(); await load();
   toast(t(archived ? 'archivedMeetingsToast' : 'unarchivedMeetingsToast', { count: n }));
 }
+
+/* ---- the trash ---- */
+/** How much of its stay a deleted meeting has left, in the words the row has room for. */
+function trashLeft(m) {
+  const days = Number(settings.trashRetentionDays ?? 30);
+  if (!(days > 0)) return t('trashLeftKept');
+  const goneAt = (Date.parse(m.deletedAt) || Date.now()) + days * 86400000;
+  const left = Math.ceil((goneAt - Date.now()) / 86400000);
+  return left <= 1 ? t('trashLeftToday') : t('trashLeftDays', { days: left });
+}
+async function trashMeetings(ids) {
+  for (const id of ids) await store.deleteMeetingById(id);
+  selectionReset(); await load();
+  toast(t('trashedToast', { count: ids.length }));
+}
+async function restoreMeetings(ids) {
+  const n = await store.restoreMeetings(ids);
+  selectionReset(); await load();
+  toast(t('restoredToast', { count: n }));
+}
+async function purgeMeetings(ids) {
+  if (!confirm(t('confirmPurge', { count: ids.length }))) return;
+  const n = await store.purgeMeetings(ids);
+  selectionReset(); await load();
+  toast(t('purgedToast', { count: n }));
+}
+$('#btn-trash-empty').addEventListener('click', async () => {
+  if (!confirm(t('confirmEmptyTrash', { count: trash.length }))) return;
+  const n = await store.emptyTrash();
+  selectionReset(); await load();
+  toast(t('purgedToast', { count: n }));
+});
 
 /* ============================ MEETING DETAIL ============================ */
 function currentMeeting() { return history.find(m => m.id === curMeetingId) || null; }
@@ -786,11 +837,12 @@ $('#participant-name').addEventListener('keydown', e => {
 $('#participant-save').addEventListener('click', commitParticipantEdit);
 $('#participant-cancel').addEventListener('click', () => { $('#participant-modal').hidden = true; editingName = null; });
 
+// deleting is undoable now: it goes to the trash, and the list is where you land
 $('#btn-delete').addEventListener('click', async () => {
   const m = currentMeeting(); if (!m) return;
-  if (!confirm(t('confirmDeleteMeeting'))) return;
   await store.deleteMeetingById(m.id);
   await load(); go('meetings', { replace: true });
+  toast(t('trashedToast', { count: 1 }));
 });
 
 // export — the same three controls the series head offers, in the same order
@@ -1527,6 +1579,7 @@ $$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target ==
 function syncSettingsUI() {
   $('#set-auto-track').checked = autoTrack;
   $('#set-max').value = String(settings.maxStoredMeetings ?? 200);
+  $('#set-trash-days').value = String(settings.trashRetentionDays ?? 30);
   $('#set-language').value = i18n.getLanguagePreference();
   applyTheme(settings.theme || 'system');
   renderRosterChips();
@@ -1541,6 +1594,14 @@ $('#set-max').addEventListener('change', async () => {
   const cap = parseInt($('#set-max').value, 10) || 0; // 0 = unlimited
   settings = await store.updateSettings({ maxStoredMeetings: cap });
   if (cap > 0 && history.length > cap) { const trimmed = history.slice(0, cap); await store.saveHistory(trimmed); await load(); }
+  toast(t('savedToast'));
+});
+
+// a shorter window can put records past their date straight away, so the trash is swept here
+$('#set-trash-days').addEventListener('change', async () => {
+  settings = await store.updateSettings({ trashRetentionDays: parseInt($('#set-trash-days').value, 10) || 30 });
+  await store.purgeExpiredTrash();
+  await load();
   toast(t('savedToast'));
 });
 

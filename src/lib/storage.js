@@ -3,8 +3,10 @@
  *
  * Stores:
  *   attendanceHistory : Meeting[]  (newest-first)
+ *   trashedMeetings   : Meeting[]  (deleted, each with deletedAt; purged after the retention window)
  *   meetingGroups     : Group[]    ({ id, name, color, roster[], createdAt })
- *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings, theme }
+ *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings,
+ *                         trashRetentionDays, theme }
  *   savedRoster       : string[]   (global default roster)
  *   autoTrack         : boolean    (own key — the content script reads it directly)
  *   schemaVersion     : number
@@ -19,6 +21,7 @@ import {
 
 export const STORAGE_KEYS = {
   HISTORY: 'attendanceHistory',
+  TRASH: 'trashedMeetings',
   GROUPS: 'meetingGroups',
   LEGACY_MEETINGS: 'meetings',
   SETTINGS: 'settings',
@@ -34,6 +37,7 @@ export const DEFAULT_SETTINGS = {
   syncInterval: 5,
   spreadsheetId: null,
   maxStoredMeetings: 200, // 0 = unlimited (keep every meeting)
+  trashRetentionDays: 30, // how long a deleted meeting waits before it goes for good
   theme: 'system' // 'system' | 'light' | 'dark'
 };
 
@@ -103,6 +107,9 @@ export async function upsertMeeting(record) {
   if (cap > 0 && history.length > cap) history = history.slice(0, cap);
 
   await saveHistory(history);
+  // a call thrown away and then rejoined is alive again, so it leaves the trash behind. Only
+  // worth a look when the record is new here — during a call this runs every few seconds.
+  if (idx < 0) await purgeMeetings([record.id]);
   return normalizeMeeting(merged);
 }
 
@@ -120,11 +127,79 @@ export async function setMeetingsArchived(ids, archived) {
   return changed;
 }
 
+/* ============================ trash ============================ */
+/**
+ * Deleting is a move, not an erasure: the record waits in `trashedMeetings` with the moment it
+ * was thrown away, and goes for good once it has waited out `trashRetentionDays`. Nothing else
+ * reads this key, so a meeting in the trash is out of every count, chart and sync until it is
+ * either restored or expires.
+ */
+export async function getTrash() {
+  const t = await get(STORAGE_KEYS.TRASH);
+  return Array.isArray(t) ? t : [];
+}
+export async function saveTrash(list) {
+  await set(STORAGE_KEYS.TRASH, list);
+  return list;
+}
+
 export async function deleteMeetingById(id) {
   const history = await getHistory();
-  const next = history.filter(m => m.id !== id);
+  const record = history.find(m => m.id === id);
+  if (!record) return false;
+  await saveHistory(history.filter(m => m.id !== id));
+  const trash = await getTrash();
+  await saveTrash([{ ...record, deletedAt: new Date().toISOString() }, ...trash.filter(m => m.id !== id)]);
+  return true;
+}
+
+/** Back into the history, newest-first as the list expects it. */
+export async function restoreMeetings(ids) {
+  const wanted = new Set(ids);
+  const trash = await getTrash();
+  const coming = trash.filter(m => wanted.has(m.id));
+  if (!coming.length) return 0;
+  await saveTrash(trash.filter(m => !wanted.has(m.id)));
+  const history = await getHistory();
+  const restored = coming.map(({ deletedAt, ...rec }) => rec);
+  const next = restored.concat(history.filter(m => !wanted.has(m.id)))
+    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
   await saveHistory(next);
-  return next.length !== history.length;
+  return restored.length;
+}
+
+/** Out of the trash for good. */
+export async function purgeMeetings(ids) {
+  const wanted = new Set(ids);
+  const trash = await getTrash();
+  const kept = trash.filter(m => !wanted.has(m.id));
+  if (kept.length === trash.length) return 0;
+  await saveTrash(kept);
+  return trash.length - kept.length;
+}
+
+export async function emptyTrash() {
+  const n = (await getTrash()).length;
+  if (n) await saveTrash([]);
+  return n;
+}
+
+/**
+ * Drop whatever has waited out the retention window. Called on every dashboard load and when
+ * the worker wakes, which is often enough for a window measured in days.
+ */
+export async function purgeExpiredTrash(now = Date.now()) {
+  const trash = await getTrash();
+  if (!trash.length) return 0;
+  const { trashRetentionDays } = await getSettings();
+  const days = Number(trashRetentionDays);
+  if (!(days > 0)) return 0;
+  const cutoff = now - days * 86400000;
+  // an unreadable timestamp is treated as "just deleted" rather than silently dropped
+  const kept = trash.filter(m => (Date.parse(m.deletedAt) || now) > cutoff);
+  if (kept.length === trash.length) return 0;
+  await saveTrash(kept);
+  return trash.length - kept.length;
 }
 
 export async function clearHistory() {

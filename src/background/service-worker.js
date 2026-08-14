@@ -184,4 +184,19 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
 });
 
+/**
+ * Sweep the trash whenever the worker wakes. The dashboard does the same on load; between the
+ * two, a retention window measured in days is kept without an alarm of its own.
+ */
+async function sweepTrash() {
+  try {
+    const gone = await storage.purgeExpiredTrash();
+    if (gone) console.log('[GM Attendance] trash purged:', gone);
+  } catch (err) {
+    console.warn('[GM Attendance] trash purge failed:', err);
+  }
+}
+chrome.runtime.onStartup.addListener(sweepTrash);
+sweepTrash();
+
 console.log('[GM Attendance] service worker started');

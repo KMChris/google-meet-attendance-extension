@@ -47,6 +47,8 @@
             <input class="field" id="meeting-search" data-i18n-placeholder="searchMeetings" data-i18n-aria="searchMeetings">
           </div>
           <button class="btn ghost" id="btn-meetings-archive" aria-pressed="false"></button>
+          <button class="btn ghost" id="btn-meetings-trash" aria-pressed="false"></button>
+          <button class="btn subtle" id="btn-trash-empty" data-i18n="trashEmpty" hidden></button>
           <button class="btn ghost" id="btn-export-all" data-i18n="export">Export</button>
           <div class="menu" id="export-all-menu" hidden>
             <button class="menu-item" data-format="json">JSON</button>
@@ -469,6 +471,13 @@
         <div class="setting-row">
           <div class="setting-text"><label class="setting-title" for="set-max" data-i18n="maxMeetings"></label><div class="setting-hint" data-i18n="maxMeetingsHint"></div></div>
           <select class="field" id="set-max" style="width:140px"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="500">500</option><option value="1000">1000</option><option value="0" data-i18n="maxUnlimited"></option></select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-text"><label class="setting-title" for="set-trash-days" data-i18n="settingTrash"></label><div class="setting-hint" data-i18n="settingTrashHint"></div></div>
+          <div class="inline-field">
+            <select class="field" id="set-trash-days" style="width:100px"><option value="7">7</option><option value="14">14</option><option value="30">30</option><option value="60">60</option><option value="90">90</option></select>
+            <span class="unit" data-i18n="unitDays"></span>
+          </div>
         </div>
         <div class="setting-row">
           <div class="setting-text"><div class="setting-title" data-i18n="clearAll"></div><div class="setting-hint" data-i18n="clearAllHint"></div></div>

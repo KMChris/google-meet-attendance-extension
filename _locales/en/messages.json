@@ -174,6 +174,99 @@
       }
     }
   },
+  "meetingsTrash": {
+    "message": "Trash"
+  },
+  "trashRestore": {
+    "message": "Restore"
+  },
+  "trashDeleteNow": {
+    "message": "Delete for good"
+  },
+  "trashEmpty": {
+    "message": "Empty the trash"
+  },
+  "trashLeftDays": {
+    "message": "goes in $DAYS$ days",
+    "description": "How long a meeting in the trash has left.",
+    "placeholders": {
+      "days": {
+        "content": "$1",
+        "example": "27"
+      }
+    }
+  },
+  "trashLeftToday": {
+    "message": "goes today"
+  },
+  "trashLeftKept": {
+    "message": "kept until you say so"
+  },
+  "emptyTrashTitle": {
+    "message": "The trash is empty"
+  },
+  "emptyTrashBody": {
+    "message": "A deleted meeting waits here until its retention window runs out. Until then you can put it back."
+  },
+  "trashedToast": {
+    "message": "Moved to the trash: $COUNT$",
+    "description": "Confirmation after moving meetings to the trash.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "restoredToast": {
+    "message": "Restored from the trash: $COUNT$",
+    "description": "Confirmation after restoring meetings from the trash.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "purgedToast": {
+    "message": "Deleted for good: $COUNT$",
+    "description": "Confirmation after deleting meetings for good.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "confirmPurge": {
+    "message": "Delete $COUNT$ meetings for good? This cannot be undone.",
+    "description": "Prompt before deleting meetings for good.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "confirmEmptyTrash": {
+    "message": "Empty the trash ($COUNT$)? This cannot be undone.",
+    "description": "Prompt before emptying the trash.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "settingTrash": {
+    "message": "Trash"
+  },
+  "settingTrashHint": {
+    "message": "How many days a deleted meeting waits in the trash before it goes for good."
+  },
+  "unitDays": {
+    "message": "days"
+  },
   "searchMeetings": {
     "message": "Search meetings or people…"
   },
@@ -299,9 +392,6 @@
   },
   "removeFromGroup": {
     "message": "Remove from series"
-  },
-  "confirmDeleteMeeting": {
-    "message": "Delete this meeting permanently?"
   },
   "hoursPinnedTitle": {
     "message": "Meeting hours set by hand — click to edit"
