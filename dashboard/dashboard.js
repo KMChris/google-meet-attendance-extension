@@ -1035,6 +1035,70 @@ $('#btn-group-pdf').addEventListener('click', () => { if (curGroupId) openReport
 $('#btn-group-export').addEventListener('click', () => downloadGroupCSV(curGroupId));
 $('#btn-new-group').addEventListener('click', () => openGroupModal([]));
 
+/* ---- filling a series from its own page ---- */
+/**
+ * The meeting's badge answers "which series is this in?"; this answers the other one, "what
+ * else belongs here?". Anything not already in this series is offered, one in another series
+ * included: picking it moves it, and the badge it carries says where it is coming from.
+ * The picks live in a Set rather than in the DOM, so filtering the list keeps them.
+ */
+const pickedMeetings = new Set();
+function openPickMeetings() {
+  if (!groupById(curGroupId)) return;
+  pickedMeetings.clear();
+  $('#pick-meetings-search').value = '';
+  renderPickMeetings();
+  $('#pick-meetings-modal').hidden = false;
+  $('#pick-meetings-search').focus();
+}
+function renderPickMeetings() {
+  const g = groupById(curGroupId); if (!g) return;
+  const q = $('#pick-meetings-search').value.trim().toLowerCase();
+  const box = $('#pick-meetings-list');
+  let list = history.filter(m => m.groupId !== g.id);
+  const offered = list.length;
+  if (q) list = list.filter(m => `${m.meetingTitle} ${m.meetingCode || ''}`.toLowerCase().includes(q));
+
+  if (!list.length) {
+    box.innerHTML = `<p class="pick-empty">${esc(t(offered ? 'pickEmpty' : 'pickMeetingsEmpty'))}</p>`;
+  } else {
+    box.innerHTML = list.map(m => {
+      const og = m.groupId ? groupById(m.groupId) : null;
+      const on = pickedMeetings.has(m.id);
+      return `<label class="pick-item${on ? ' on' : ''}">
+        <input type="checkbox" name="pickMeeting" id="pick-m-${esc(m.id)}" value="${esc(m.id)}"${on ? ' checked' : ''}>
+        <span class="pi-date">${esc(i18n.formatDate(A.meetingStartIso(m), { day: 'numeric', month: 'short', year: 'numeric' }))}</span>
+        <span class="pi-title">${esc(m.meetingTitle)}</span>
+        ${og ? `<span class="pi-tag"><span class="gdot" style="background:var(${groupColorVar(og)})"></span>${esc(og.name)}</span>` : ''}
+      </label>`;
+    }).join('');
+  }
+  syncPickCount();
+}
+function syncPickCount() {
+  const n = pickedMeetings.size;
+  $('#pick-meetings-save').textContent = n ? `${t('add')} (${n})` : t('add');
+  $('#pick-meetings-save').disabled = !n;
+}
+$('#btn-add-meetings').addEventListener('click', openPickMeetings);
+$('#pick-meetings-search').addEventListener('input', renderPickMeetings);
+$('#pick-meetings-list').addEventListener('change', e => {
+  const cb = e.target.closest('input[type="checkbox"]'); if (!cb) return;
+  if (cb.checked) pickedMeetings.add(cb.value); else pickedMeetings.delete(cb.value);
+  cb.closest('.pick-item').classList.toggle('on', cb.checked);
+  syncPickCount();
+});
+$('#pick-meetings-cancel').addEventListener('click', () => $('#pick-meetings-modal').hidden = true);
+$('#pick-meetings-save').addEventListener('click', async () => {
+  const g = groupById(curGroupId), ids = Array.from(pickedMeetings);
+  if (!g || !ids.length) return;
+  await store.assignMeetingsToGroup(ids, g.id);
+  $('#pick-meetings-modal').hidden = true;
+  pickedMeetings.clear();
+  await load();
+  toast(t('meetingsAddedToast', { count: ids.length }));
+});
+
 /* ============================ PEOPLE ============================ */
 function aggregatePeople() {
   const map = new Map();

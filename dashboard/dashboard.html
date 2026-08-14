@@ -194,7 +194,10 @@
         </div>
 
         <div class="sect">
-          <div class="sect-head"><div class="eyebrow" data-i18n="groupSessionsTitle"></div><div class="eyebrow soft" data-i18n="groupSessionsHint"></div></div>
+          <div class="sect-head">
+            <div class="sect-head-text"><div class="eyebrow" data-i18n="groupSessionsTitle"></div><div class="eyebrow soft" data-i18n="groupSessionsHint"></div></div>
+            <button class="btn ghost" id="btn-add-meetings" data-i18n="addMeetings">Add meetings</button>
+          </div>
           <table class="rc-table sessions-table" id="group-sessions"></table>
         </div>
 
@@ -557,6 +560,20 @@
       <div class="modal-actions">
         <button class="btn subtle" id="assign-cancel" data-i18n="cancel"></button>
         <button class="btn ghost" id="assign-new" data-i18n="assignNew"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- the other way round from the meeting's own badge: pick what belongs to this series -->
+  <div class="modal" id="pick-meetings-modal" hidden>
+    <div class="modal-card card">
+      <h2 data-i18n="pickMeetingsTitle"></h2>
+      <p class="hint" data-i18n="pickMeetingsHint"></p>
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="pick-meetings-search" data-i18n-placeholder="searchMeetings" data-i18n-aria="searchMeetings"></div>
+      <div class="pick-list" id="pick-meetings-list"></div>
+      <div class="modal-actions">
+        <button class="btn subtle" id="pick-meetings-cancel" data-i18n="cancel"></button>
+        <button class="btn" id="pick-meetings-save"></button>
       </div>
     </div>
   </div>

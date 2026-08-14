@@ -426,6 +426,28 @@
   "groupSessionsHint": {
     "message": "open one for its own timeline"
   },
+  "addMeetings": {
+    "message": "Add meetings"
+  },
+  "pickMeetingsTitle": {
+    "message": "Add meetings to this series"
+  },
+  "pickMeetingsHint": {
+    "message": "Tick the meetings that belong here. One already in another series moves over."
+  },
+  "pickMeetingsEmpty": {
+    "message": "Every meeting is already in this series"
+  },
+  "meetingsAddedToast": {
+    "message": "Added to series: $COUNT$",
+    "description": "Confirmation after adding meetings to a series from the series page.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
   "personSessionsTitle": {
     "message": "Presence of $NAME$ in every session",
     "description": "Heading above one person's presence across every session.",

@@ -426,6 +426,28 @@
   "groupSessionsHint": {
     "message": "otwórz, aby zobaczyć oś obecności"
   },
+  "addMeetings": {
+    "message": "Dodaj spotkania"
+  },
+  "pickMeetingsTitle": {
+    "message": "Dodaj spotkania do cyklu"
+  },
+  "pickMeetingsHint": {
+    "message": "Zaznacz spotkania, które należą do tego cyklu. Spotkanie z innego cyklu zostanie przeniesione."
+  },
+  "pickMeetingsEmpty": {
+    "message": "Wszystkie spotkania są już w tym cyklu"
+  },
+  "meetingsAddedToast": {
+    "message": "Dodano do cyklu: $COUNT$",
+    "description": "Confirmation after adding meetings to a series from the series page.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
   "personSessionsTitle": {
     "message": "Obecność — $NAME$ — w każdej sesji",
     "description": "Heading above one person's presence across every session.",
