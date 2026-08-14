@@ -1288,6 +1288,9 @@
   "sheetsSavedToast": {
     "message": "Podłączono arkusz"
   },
+  "sheetsPreparedToast": {
+    "message": "Podłączono arkusz i utworzono w nim strukturę"
+  },
   "sheetsSaveFailed": {
     "message": "Nie udało się otworzyć arkusza"
   },

@@ -155,21 +155,73 @@ async function writeHeaders(spreadsheetId, titles) {
   await batchUpdate(spreadsheetId, titles.map(t => ({ range: `${t}!A1`, values: [HEADERS[t]] })));
 }
 
+/** A..G is the whole width we ever address. */
+const colLetter = (n) => String.fromCharCode(64 + n);
+
 /**
- * Make sure the tabs we write to exist. A sheet the user picked by hand, or one an older
- * version created, will be missing some — add them rather than failing the whole sync.
+ * What a tab that already exists needs before it can hold our rows: nothing, a header row
+ * written into an empty first row, or a row inserted to make room for one. Rows someone else
+ * put there are never overwritten: a spreadsheet picked by hand may already be in use.
+ */
+export function headerRepair(firstRow, expected) {
+  const cell = (v) => String(v == null ? '' : v).trim();
+  const row = Array.isArray(firstRow) ? firstRow : [];
+  if (expected.every((h, i) => cell(row[i]) === h)) return 'ok';
+  return row.some(cell) ? 'insert' : 'write';
+}
+
+/**
+ * Give the spreadsheet the structure we write into: the three tabs, each with its header row.
+ * A sheet the user picked by hand has none of it and one an older version created may be
+ * missing a tab, so it is built here rather than failing the sync. Returns what it had to do.
  */
 export async function ensureSheets(spreadsheetId) {
   const ss = await getSpreadsheet(spreadsheetId);
-  const have = new Set((ss.sheets || []).map(s => s.properties && s.properties.title));
-  const missing = Object.keys(HEADERS).filter(t => !have.has(t));
+  const props = new Map((ss.sheets || []).map(s => [s.properties && s.properties.title, s.properties]));
+
+  const missing = Object.keys(HEADERS).filter(t => !props.has(t));
   if (missing.length) {
     await structureUpdate(spreadsheetId, missing.map(title => ({
       addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } }
     })));
     await writeHeaders(spreadsheetId, missing);
   }
-  return ss;
+
+  const repaired = await repairHeaders(spreadsheetId, Object.keys(HEADERS)
+    .filter(t => props.has(t)).map(t => props.get(t)));
+
+  return { spreadsheet: ss, added: missing, repaired, prepared: !!(missing.length + repaired.length) };
+}
+
+/** Header rows of the tabs that were already there. Returns the ones it had to write. */
+async function repairHeaders(spreadsheetId, sheetProps) {
+  if (!sheetProps.length) return [];
+  const titles = sheetProps.map(p => p.title);
+  const read = await getRanges(spreadsheetId, titles.map(t => `${t}!A1:${colLetter(HEADERS[t].length)}1`));
+  const rows = (read.valueRanges || []).map(v => (v.values && v.values[0]) || []);
+
+  const requests = [], repaired = [];
+  titles.forEach((title, i) => {
+    const fix = headerRepair(rows[i], HEADERS[title]);
+    if (fix === 'ok') return;
+    repaired.push(title);
+    if (fix === 'insert') requests.push({
+      insertDimension: {
+        range: { sheetId: sheetProps[i].sheetId, dimension: 'ROWS', startIndex: 0, endIndex: 1 }
+      }
+    });
+  });
+  // a header only helps while it stays in view over the rows that pile up under it
+  sheetProps.filter(p => (p.gridProperties || {}).frozenRowCount !== 1).forEach(p => requests.push({
+    updateSheetProperties: {
+      properties: { sheetId: p.sheetId, gridProperties: { frozenRowCount: 1 } },
+      fields: 'gridProperties.frozenRowCount'
+    }
+  }));
+
+  if (requests.length) await structureUpdate(spreadsheetId, requests);
+  if (repaired.length) await writeHeaders(spreadsheetId, repaired);
+  return repaired;
 }
 
 /**
@@ -215,6 +267,12 @@ export async function batchUpdate(spreadsheetId, data) {
 export async function getData(spreadsheetId, range) {
   const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
   return apiRequest(url);
+}
+
+/** Several ranges in one read. They come back in the order they were asked for. */
+async function getRanges(spreadsheetId, ranges) {
+  const query = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+  return apiRequest(`${SHEETS_API_BASE}/${spreadsheetId}/values:batchGet?${query}`);
 }
 
 /* ------------------------- what a meeting looks like in the sheet ------------------------- */

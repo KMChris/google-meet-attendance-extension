@@ -1758,13 +1758,18 @@ async function refreshSheets() {
   $('#set-autosync').checked = !!settings.autoSync;
 }
 
-/** Remember the sheet's own title, so step 2 can name it instead of showing a raw id. */
+/**
+ * Link a sheet and leave it ready to be written to: a spreadsheet picked by hand rarely has the
+ * tabs, so they are created here. Its own title is remembered, so step 2 can name the sheet
+ * instead of showing a raw id.
+ */
 async function linkSpreadsheet(id) {
-  const ss = await sheets.getSpreadsheet(id);
+  const { spreadsheet, prepared } = await sheets.ensureSheets(id);
   settings = await store.updateSettings({
     spreadsheetId: id,
-    spreadsheetName: (ss.properties && ss.properties.title) || null
+    spreadsheetName: (spreadsheet.properties && spreadsheet.properties.title) || null
   });
+  return prepared;
 }
 $('#sheets-connect').addEventListener('click', async () => {
   $('#sheets-connect').disabled = true;
@@ -1793,7 +1798,7 @@ async function useSpreadsheet() {
   const id = sheets.parseSpreadsheetRef($('#spreadsheet-ref').value);
   if (!id) { toast(t('sheetsRefRequired')); return; }
   $('#sheets-save').disabled = true;
-  try { await linkSpreadsheet(id); toast(t('sheetsSavedToast')); }
+  try { toast(await linkSpreadsheet(id) ? t('sheetsPreparedToast') : t('sheetsSavedToast')); }
   catch (e) { console.error('[GM Attendance] open spreadsheet failed:', (e && e.message) || e); toast(t('sheetsSaveFailed')); }
   $('#sheets-save').disabled = false; refreshSheets();
 }

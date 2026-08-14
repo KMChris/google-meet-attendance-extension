@@ -1288,6 +1288,9 @@
   "sheetsSavedToast": {
     "message": "Sheet linked"
   },
+  "sheetsPreparedToast": {
+    "message": "Sheet linked and set up"
+  },
   "sheetsSaveFailed": {
     "message": "Could not reach that sheet"
   },

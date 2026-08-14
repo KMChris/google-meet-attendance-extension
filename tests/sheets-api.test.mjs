@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSpreadsheetRef, spreadsheetUrl } from '../src/lib/sheets-api.js';
+import { parseSpreadsheetRef, spreadsheetUrl, headerRepair } from '../src/lib/sheets-api.js';
 
 const ID = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
 
@@ -46,4 +46,26 @@ test('what cannot be opened is refused rather than guessed at', () => {
 test('the id read out of a link leads back to the same link', () => {
   const url = spreadsheetUrl(parseSpreadsheetRef(`https://docs.google.com/spreadsheets/d/${ID}/edit#gid=7`));
   assert.equal(url, `https://docs.google.com/spreadsheets/d/${ID}/edit`);
+});
+
+/* ---- the structure a picked spreadsheet has to be given ---- */
+
+const HEAD = ['Meeting ID', 'Name', 'Email', 'Time', 'Type'];
+
+test('a tab that already carries the header row is left alone', () => {
+  assert.equal(headerRepair(HEAD, HEAD), 'ok');
+  assert.equal(headerRepair([...HEAD, 'Notes of my own'], HEAD), 'ok', 'extra columns are the user\'s business');
+  assert.equal(headerRepair(['  Meeting ID ', 'Name', 'Email', 'Time', 'Type'], HEAD), 'ok');
+});
+
+test('an empty first row is where the header goes', () => {
+  assert.equal(headerRepair([], HEAD), 'write');
+  assert.equal(headerRepair(undefined, HEAD), 'write', 'the API omits a row that has nothing in it');
+  assert.equal(headerRepair(['', '  ', null], HEAD), 'write');
+});
+
+test('rows somebody else put there get a row above them, not overwritten', () => {
+  assert.equal(headerRepair(['Spotkanie', 'Osoba'], HEAD), 'insert');
+  assert.equal(headerRepair(['mtg-1', 'Anna Kowalska'], HEAD), 'insert');
+  assert.equal(headerRepair(['Meeting ID', 'Name', 'Email'], HEAD), 'insert', 'half a header is not the header');
 });
