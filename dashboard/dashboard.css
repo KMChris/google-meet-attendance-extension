@@ -346,7 +346,9 @@ tr:hover .cell-go .go,tr:focus-visible .cell-go .go{opacity:1}
 /* a person unfolded under their row in the people list */
 .row.expanded{background:var(--panel-2);border-bottom-color:transparent}
 .row-panel{padding:2px 20px 18px;background:var(--panel-2);border-bottom:1px solid var(--line)}
-.row-panel .p-stats{display:flex;gap:16px;font-family:var(--mono);font-size:12px;color:var(--ink-2);flex-wrap:wrap}
+.row-panel .p-stats{display:flex;gap:10px;font-family:var(--mono);font-size:12px;color:var(--ink-2);flex-wrap:wrap}
+/* the three readings are one line: told apart by the same dot the session lines use */
+.row-panel .p-stats span + span::before{content:'·';margin-right:10px;color:var(--ink-3)}
 .person-meetings{margin-top:14px;table-layout:fixed}
 /* fixed widths so a long meeting title can never squeeze the date out of its column */
 .person-meetings th:nth-child(2),.person-meetings td:nth-child(2){width:124px}
