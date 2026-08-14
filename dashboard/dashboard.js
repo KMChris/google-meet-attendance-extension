@@ -19,6 +19,7 @@ let autoTrack = true;     // own storage key, not part of settings
 let curMeetingId = null;
 let curGroupId = null;
 let assignContextIds = []; // meeting ids awaiting a series assignment
+let groupsArchive = false; // the series view is showing the archive rather than the active list
 
 const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-violet', rose: '--grp-rose', sky: '--grp-sky', lime: '--grp-lime' };
 const GRP_KEYS = Object.keys(GRP_COLORS);
@@ -93,7 +94,11 @@ function parseRoute(hash) {
   if (p.get('meeting')) return { view: 'detail', id: p.get('meeting') };
   if (p.get('group')) return { view: 'group', id: p.get('group'), person: p.get('person') || null };
   const view = VIEWS.find(v => p.has(v)) || 'meetings';
-  return { view, person: view === 'people' ? (p.get('person') || null) : null };
+  return {
+    view,
+    person: view === 'people' ? (p.get('person') || null) : null,
+    archive: view === 'groups' && p.has('archive')
+  };
 }
 
 /** Navigate. `replace` for corrections (a dead id, a view you should not be able to go back to). */
@@ -140,6 +145,7 @@ function route(force) {
     return;
   }
   curMeetingId = null; curGroupId = null;
+  groupsArchive = !!r.archive;   // read before the view draws itself
   switchView(r.view);
   if (r.view === 'people' && r.person) expandPerson(r.person);
 }
@@ -162,7 +168,8 @@ function switchView(name) {
 }
 $$('.tab').forEach(tb => tb.addEventListener('click', () => go(tb.dataset.view)));
 $('#btn-back-detail').addEventListener('click', () => goBack('meetings'));
-$('#btn-back-group').addEventListener('click', () => goBack('groups'));
+// back to the list this came from: the archive is a list of its own
+$('#btn-back-group').addEventListener('click', () => goBack(groupsArchive ? 'groups&archive' : 'groups'));
 
 /* ------------------------------ load ------------------------------ */
 async function load() {
@@ -767,9 +774,19 @@ function renderGroupBadge(m) {
   $('#btn-group').title = g ? g.name : t('assignTitle');
 }
 
+/**
+ * The series a meeting can be put into: the archive is out of the way here, which is the whole
+ * point of it. The one a meeting is already in stays on the list even when archived, or the
+ * badge would name a series the menu denies.
+ */
+function assignableGroups(inGroupIds) {
+  const keep = new Set(inGroupIds.filter(Boolean));
+  return groups.filter(g => !g.archived || keep.has(g.id));
+}
+
 const MI_CHECK = '<svg class="mi-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>';
 function groupMenuItems(m) {
-  let html = groups.map(g => `<button class="menu-item" role="menuitem" data-id="${esc(g.id)}">
+  let html = assignableGroups([m.groupId]).map(g => `<button class="menu-item" role="menuitem" data-id="${esc(g.id)}">
       <span class="gdot" style="background:var(${groupColorVar(g)})"></span><span class="mi-name">${esc(g.name)}</span>${g.id === m.groupId ? MI_CHECK : ''}</button>`).join('');
   if (m.groupId) html += `<button class="menu-item" role="menuitem" data-id="__none">
       <span class="gdot" style="background:var(--absent)"></span><span class="mi-name">${esc(t('removeFromGroup'))}</span></button>`;
@@ -801,19 +818,46 @@ $('#group-menu').addEventListener('click', async e => {
 });
 
 /* ============================ GROUPS ============================ */
+const ARCHIVE_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.2"/><path d="M5 9v10.5h14V9M10 13h4"/></svg>';
+
+/** Swap a node's translated text for another key, so a later locale change still finds it. */
+function setI18nText(el, key) { el.dataset.i18n = key; el.textContent = t(key); }
+
+/**
+ * The series view has two lists: the ones in play, and the archive. The archive is a route of
+ * its own (#groups&archive), so the back button and a reload land where you were.
+ */
 function renderGroups() {
-  renderSeriesSuggestions();
+  const archive = groupsArchive;
+  const shown = groups.filter(g => !!g.archived === archive);
+  const archivedCount = groups.filter(g => g.archived).length;
+
+  $('#btn-groups-archive').textContent = archive ? t('groupsActive') : `${t('groupsArchive')} (${archivedCount})`;
+  $('#btn-groups-archive').hidden = !archive && !archivedCount;
+  $('#btn-new-group').hidden = archive;
+  setI18nText($('#groups-lede'), archive ? 'archiveSubtitle' : 'groupsSubtitle');
+
   const list = $('#groups-list'), empty = $('#groups-empty');
-  if (!groups.length) { list.innerHTML = ''; empty.classList.add('visible'); return; }
+  $('#series-suggestions').hidden = archive;
+  if (!archive) renderSeriesSuggestions();
+
+  if (!shown.length) {
+    list.innerHTML = '';
+    setI18nText($('#groups-empty-title'), archive ? 'emptyArchiveTitle' : 'emptyGroupsTitle');
+    setI18nText($('#groups-empty-body'), archive ? 'emptyArchiveBody' : 'emptyGroupsBody');
+    empty.classList.add('visible');
+    return;
+  }
   empty.classList.remove('visible');
 
-  list.innerHTML = groups.map(g => {
+  list.innerHTML = shown.map(g => {
     const ms = history.filter(m => m.groupId === g.id);
     const agg = A.aggregateGroup(ms, g.roster);
     const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
+    const mark = g.archived ? `<span class="gc-archived" title="${esc(t('groupsArchive'))}">${ARCHIVE_ICON}</span>` : '';
     return `<div class="card group-card" data-id="${esc(g.id)}">
       <div class="gc-top"><span class="gc-swatch" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>
-        <div style="min-width:0"><h3>${esc(g.name)}</h3><div class="gc-meta">${ms.length === 1 ? t('sessionOne') : t('sessionsN', { count: ms.length })}</div></div></div>
+        <div style="min-width:0"><h3>${esc(g.name)}${mark}</h3><div class="gc-meta">${ms.length === 1 ? t('sessionOne') : t('sessionsN', { count: ms.length })}</div></div></div>
       <div class="gc-stats">
         <div class="gc-stat"><div class="n">${agg.peopleCount}</div><div class="l">${t('colGroupPeople')}</div></div>
         <div class="gc-stat"><div class="n">${avgAtt}%</div><div class="l">${t('colGroupAttendance')}</div></div>
@@ -855,9 +899,14 @@ function renderGroup(g) {
   const agg = A.aggregateGroup(ms, g.roster);
   const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
 
-  $('#group-eyebrow').innerHTML = `<span style="color:var(${GRP_COLORS[g.color] || '--grp-teal'})">●</span> ${t('navGroups').toUpperCase()}`;
+  $('#group-eyebrow').innerHTML = `<span style="color:var(${GRP_COLORS[g.color] || '--grp-teal'})">●</span> ${t('navGroups').toUpperCase()}`
+    + (g.archived ? ` · ${esc(t('groupsArchive')).toUpperCase()}` : '');
   $('#group-title').textContent = g.name;
   $('#group-title').title = g.name;
+  // the archive box beside the name is both the state and the switch for it
+  const arch = $('#btn-group-archive'), label = t(g.archived ? 'unarchiveGroup' : 'archiveGroup');
+  arch.classList.toggle('on', !!g.archived);
+  arch.title = label; arch.setAttribute('aria-label', label);
   $('#group-meta').innerHTML = `${ms.length === 1 ? t('sessionOne') : t('sessionsN', { count: ms.length })} · ${agg.peopleCount === 1 ? t('peopleOne') : t('peopleN', { count: agg.peopleCount })}`;
 
   setStat($('#g-sessions'), agg.sessionCount, '');
@@ -1085,6 +1134,14 @@ $('#btn-group-delete').addEventListener('click', async () => {
 $('#btn-group-pdf').addEventListener('click', () => { if (curGroupId) openReport('group', curGroupId); });
 $('#btn-group-export').addEventListener('click', () => downloadGroupCSV(curGroupId));
 $('#btn-new-group').addEventListener('click', () => openGroupModal([]));
+$('#btn-groups-archive').addEventListener('click', () => go(groupsArchive ? 'groups' : 'groups&archive'));
+$('#btn-group-archive').addEventListener('click', async () => {
+  const g = groupById(curGroupId); if (!g) return;
+  const archived = !g.archived;
+  await store.updateGroup(g.id, { archived });
+  await load();
+  toast(t(archived ? 'archivedToast' : 'unarchivedToast'));
+});
 
 /* ---- filling a series from its own page ---- */
 /**
@@ -1413,9 +1470,10 @@ function openAssignModal(meetings) {
   const shared = ms.every(m => m.groupId === ms[0].groupId) ? ms[0].groupId : null;
 
   const list = $('#assign-list');
-  list.innerHTML = groups.map(g => `<div class="assign-item ${shared === g.id ? 'current' : ''}" data-id="${esc(g.id)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>${esc(g.name)}</div>`).join('')
+  const offered = assignableGroups(ms.map(m => m.groupId));
+  list.innerHTML = offered.map(g => `<div class="assign-item ${shared === g.id ? 'current' : ''}" data-id="${esc(g.id)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>${esc(g.name)}</div>`).join('')
     + (ms.some(m => m.groupId) ? `<div class="assign-item" data-id="__none"><span class="gdot" style="background:var(--absent)"></span>${t('removeFromGroup')}</div>` : '');
-  if (!groups.length) list.innerHTML = `<p class="hint">${t('emptyGroupsBody')}</p>`;
+  if (!offered.length) list.innerHTML = `<p class="hint">${t('emptyGroupsBody')}</p>`;
   $$('#assign-list .assign-item').forEach(it => it.addEventListener('click', async () => {
     const gid = it.dataset.id === '__none' ? null : it.dataset.id;
     await store.assignMeetingsToGroup(assignContextIds, gid);

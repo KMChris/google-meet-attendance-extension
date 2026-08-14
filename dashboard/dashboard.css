@@ -252,6 +252,10 @@
 .group-card .gc-top{display:flex;align-items:center;gap:10px}
 .group-card .gc-swatch{width:12px;height:12px;border-radius:4px;flex:none}
 .group-card h3{font-family:var(--disp);font-size:18px}
+.gc-archived{display:inline-flex;vertical-align:middle;margin-left:7px;color:var(--ink-3)}
+/* the archive box beside the name lights up when the series is in it */
+.title-edit.on{opacity:1;color:var(--late)}
+.title-edit.on:hover{background:var(--late-2);color:var(--late)}
 .group-card .gc-meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .group-card .gc-stats{display:flex;gap:18px;margin-top:16px}
 .gc-stat .n{font-family:var(--disp);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}

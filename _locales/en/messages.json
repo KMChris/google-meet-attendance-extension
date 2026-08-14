@@ -371,6 +371,33 @@
   "newGroup": {
     "message": "New series"
   },
+  "groupsArchive": {
+    "message": "Archive"
+  },
+  "groupsActive": {
+    "message": "Active series"
+  },
+  "archiveSubtitle": {
+    "message": "Series set aside. They keep all of their data, but stay out of the way when a meeting is added to a series."
+  },
+  "archiveGroup": {
+    "message": "Move the series to the archive"
+  },
+  "unarchiveGroup": {
+    "message": "Restore the series from the archive"
+  },
+  "archivedToast": {
+    "message": "Series archived"
+  },
+  "unarchivedToast": {
+    "message": "Series restored"
+  },
+  "emptyArchiveTitle": {
+    "message": "Nothing archived"
+  },
+  "emptyArchiveBody": {
+    "message": "A series that has run its course goes here, from the archive icon beside its name."
+  },
   "emptyGroupsTitle": {
     "message": "No series yet"
   },

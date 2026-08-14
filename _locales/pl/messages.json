@@ -371,6 +371,33 @@
   "newGroup": {
     "message": "Nowy cykl"
   },
+  "groupsArchive": {
+    "message": "Archiwum"
+  },
+  "groupsActive": {
+    "message": "Aktywne cykle"
+  },
+  "archiveSubtitle": {
+    "message": "Cykle odłożone na bok. Zachowują swoje dane, ale nie pojawiają się przy dodawaniu spotkania do cyklu."
+  },
+  "archiveGroup": {
+    "message": "Przenieś cykl do archiwum"
+  },
+  "unarchiveGroup": {
+    "message": "Przywróć cykl z archiwum"
+  },
+  "archivedToast": {
+    "message": "Cykl w archiwum"
+  },
+  "unarchivedToast": {
+    "message": "Cykl przywrócony"
+  },
+  "emptyArchiveTitle": {
+    "message": "Archiwum jest puste"
+  },
+  "emptyArchiveBody": {
+    "message": "Zakończony cykl możesz stąd odłożyć ikoną archiwum przy jego nazwie."
+  },
   "emptyGroupsTitle": {
     "message": "Brak cykli"
   },
