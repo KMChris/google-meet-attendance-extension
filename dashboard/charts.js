@@ -17,6 +17,8 @@
  *   · text wears ink tokens; colour identity comes from the mark beside it
  */
 
+import { showTipAt, hideTip } from './tooltip.js';
+
 const FONT = '11px "IBM Plex Mono", monospace';
 const FONT_MED = '500 11px "IBM Plex Mono", monospace';
 const BAR_MAX = 24;   // px — never let a bar fill its whole slot
@@ -40,64 +42,13 @@ export function palette() {
   };
 }
 
-/* ============================ tooltip ============================ */
-
-function tipEl() {
-  let el = document.getElementById('chart-tip');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'chart-tip';
-    el.className = 'chart-tip';
-    el.hidden = true;
-    el.innerHTML = '<div class="ct-title"></div><div class="ct-rows"></div>';
-    document.body.appendChild(el);
-  }
-  return el;
-}
-
-export function hideTip() {
-  const el = document.getElementById('chart-tip');
-  if (el) el.hidden = true;
-}
+/* ============================ hover ============================ */
 
 /**
- * Show the readout for one hotspot. Category and series names are meeting titles and
- * participant names — untrusted text — so every one of them goes in via textContent.
+ * A hotspot is a rectangle in canvas space with nothing to hover in the DOM, so the readout
+ * follows the cursor. What it says (category and series names, meeting titles, participant
+ * names) is untrusted text, and `tooltip.js` puts all of it in as text.
  */
-function showTip(hit, ev) {
-  const el = tipEl();
-  el.querySelector('.ct-title').textContent = hit.title || '';
-  const rows = el.querySelector('.ct-rows');
-  rows.textContent = '';
-  (hit.rows || []).forEach(r => {
-    const row = document.createElement('div');
-    row.className = 'ct-row';
-    const key = document.createElement('span');
-    key.className = 'ct-key';
-    if (r.color) key.style.background = r.color; else key.style.visibility = 'hidden';
-    row.appendChild(key);
-    const val = document.createElement('span');
-    val.className = 'ct-val';
-    val.textContent = r.value;
-    row.appendChild(val);
-    if (r.label) {
-      const lbl = document.createElement('span');
-      lbl.className = 'ct-lbl';
-      lbl.textContent = r.label;
-      row.appendChild(lbl);
-    }
-    rows.appendChild(row);
-  });
-  el.hidden = false;
-
-  const pad = 14, w = el.offsetWidth, h = el.offsetHeight;
-  let x = ev.clientX + pad, y = ev.clientY + pad;
-  if (x + w > window.innerWidth - 8) x = ev.clientX - w - pad;
-  if (y + h > window.innerHeight - 8) y = ev.clientY - h - pad;
-  el.style.left = Math.max(8, x) + 'px';
-  el.style.top = Math.max(8, y) + 'px';
-}
-
 function bindHover(canvas) {
   if (BOUND.has(canvas)) return;
   BOUND.add(canvas);
@@ -106,11 +57,10 @@ function bindHover(canvas) {
     const r = canvas.getBoundingClientRect();
     const x = ev.clientX - r.left, y = ev.clientY - r.top;
     const hit = spots.find(s => x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
-    if (hit) showTip(hit, ev); else hideTip();
+    if (hit) showTipAt(hit, ev); else hideTip();
   });
   canvas.addEventListener('pointerleave', hideTip);
 }
-window.addEventListener('scroll', hideTip, { passive: true, capture: true });
 
 /* ============================ primitives ============================ */
 

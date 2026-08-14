@@ -4,6 +4,7 @@ import * as i18n from '../src/lib/i18n.js';
 import * as sheets from '../src/lib/sheets-api.js';
 import * as importers from '../src/lib/importers.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
+import { initTips } from './tooltip.js';
 
 const { t } = i18n;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -23,7 +24,12 @@ const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-vi
 const GRP_KEYS = Object.keys(GRP_COLORS);
 
 /* ------------------------------ utils ------------------------------ */
-function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+// Quotes included: half of these strings land inside an HTML attribute, and a participant name
+// or a meeting title can hold one.
+function esc(s) {
+  const d = document.createElement('div'); d.textContent = s == null ? '' : s;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 function initials(name) {
   const p = String(name || '').trim().split(/\s+/);
   return ((p.length >= 2 ? p[0][0] + p[p.length - 1][0] : (name || '').slice(0, 2)) || '?').toUpperCase();
@@ -402,6 +408,19 @@ function renderDetail(m) {
   renderAttendance(m, $('#participant-search').value.trim());
 }
 
+/**
+ * The hover readout for one presence block: whose lane it is, the hours it covers and how long
+ * it ran. A session still open says so instead of naming an end; the meeting's end is only
+ * where the block stops being drawn.
+ */
+function segTip(title, s, joinedMs, endedMs) {
+  const from = i18n.formatTime(s.joinedAt);
+  const to = s.leftAt ? i18n.formatTime(s.leftAt) : t('stillInCall');
+  const secs = Math.max(0, Math.floor((endedMs - joinedMs) / 1000));
+  return ` data-tip-title="${esc(title)}" data-tip-color="var(--present)"` +
+    ` data-tip-value="${esc(from)} → ${esc(to)}" data-tip-label="${esc(fmtDur(secs))}"`;
+}
+
 function renderTimeline(m) {
   const { startMs, endMs } = A.meetingBounds(m);
   const span = Math.max(1, endMs - startMs);
@@ -426,7 +445,7 @@ function renderTimeline(m) {
       const eMs = s.leftAt ? Date.parse(s.leftAt) : endMs;
       const left = Math.max(0, (Math.max(sMs, startMs) - startMs) / span * 100);
       const width = Math.max(0.6, (Math.min(eMs, endMs) - Math.max(sMs, startMs)) / span * 100);
-      segs += `<div class="seg" style="left:${left}%;width:${width}%"></div>`;
+      segs += `<div class="seg"${segTip(name, s, sMs, eMs)} style="left:${left}%;width:${width}%"></div>`;
     });
     lanes += `<div class="tl-lane"><div class="tl-name"><span class="dot" style="background:var(--present)"></span><span class="who">${esc(name)}</span></div><div class="tl-track">${segs}</div></div>`;
   });
@@ -865,7 +884,7 @@ function personSessionBlock(m, a) {
     const eMs = open ? endMs : Date.parse(s.leftAt);
     const left = Math.max(0, (Math.max(sMs, startMs) - startMs) / span * 100);
     const width = Math.max(0.6, (Math.min(eMs, endMs) - Math.max(sMs, startMs)) / span * 100);
-    segs += `<div class="seg" style="left:${left}%;width:${width}%"></div>`;
+    segs += `<div class="seg"${segTip(m.meetingTitle, s, sMs, eMs)} style="left:${left}%;width:${width}%"></div>`;
     ranges += `<span class="pm-range"><i class="rdot ${open ? 'open' : ''}"></i>${i18n.formatTime(s.joinedAt)} → ${open ? esc(t('stillInCall')) : i18n.formatTime(s.leftAt)} <b>${fmtDur(Math.max(0, Math.floor((eMs - sMs) / 1000)))}</b></span>`;
   });
 
@@ -1506,6 +1525,7 @@ i18n.onLocaleChange(() => {
 /* ============================ boot ============================ */
 (async function boot() {
   await i18n.initI18n();
+  initTips();   // one delegated listener for every mark that carries a readout
   // A CSV exported in either language has to import, so the reader needs every locale's headers.
   importers.configureLocaleLabels(await i18n.getAllMessages());
   await initAnalytics({

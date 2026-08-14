@@ -13,6 +13,7 @@ import * as store from '../src/lib/storage.js';
 import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 import * as C from './charts.js';
+import { hideTip } from './tooltip.js';
 
 const { t } = i18n;
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -378,7 +379,7 @@ function bindCards() {
       $('canvas', card).hidden = showTable;
       $('.cc-table', card).hidden = !showTable;
       if (showTable) renderTable(card, card.dataset.chart);
-      else { C.hideTip(); renderAnalytics(); }
+      else { hideTip(); renderAnalytics(); }
     });
   });
 }
