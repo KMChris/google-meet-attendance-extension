@@ -235,9 +235,6 @@
   "exportCsv": {
     "message": "Export CSV"
   },
-  "copyText": {
-    "message": "Copy"
-  },
   "addToGroup": {
     "message": "Add to series"
   },
@@ -477,6 +474,9 @@
   },
   "assignedToast": {
     "message": "Added to series"
+  },
+  "removedFromGroupToast": {
+    "message": "Removed from series"
   },
   "peopleSubtitle": {
     "message": "Everyone across your meetings"

@@ -235,9 +235,6 @@
   "exportCsv": {
     "message": "Eksport CSV"
   },
-  "copyText": {
-    "message": "Kopiuj"
-  },
   "addToGroup": {
     "message": "Dodaj do cyklu"
   },
@@ -477,6 +474,9 @@
   },
   "assignedToast": {
     "message": "Dodano do cyklu"
+  },
+  "removedFromGroupToast": {
+    "message": "Usunięto z cyklu"
   },
   "peopleSubtitle": {
     "message": "Wszyscy z Twoich spotkań"

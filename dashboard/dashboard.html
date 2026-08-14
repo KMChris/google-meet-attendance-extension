@@ -92,17 +92,25 @@
               <button class="title-edit" id="btn-rename" data-i18n-title="rename" data-i18n-aria="rename"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             </div>
             <div class="detail-badges">
-              <button class="hours-badge" id="btn-hours">
+              <button class="badge hours-badge" id="btn-hours">
                 <svg class="hb-ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
-                <span class="hb-val" id="hours-value"></span>
-                <svg class="hb-edit" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                <span id="hours-value"></span>
+                <svg class="badge-tool" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
               </button>
+              <!-- which series this meeting belongs to is a property of it, so it reads as a badge
+                   beside the hours and changes right there, not in a modal over the whole page -->
+              <div class="badge-menu">
+                <button class="badge group-badge" id="btn-group" aria-haspopup="true" aria-expanded="false">
+                  <span class="gdot" id="group-badge-dot"></span>
+                  <span id="group-badge-name"></span>
+                  <svg class="badge-tool" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="menu group-menu" id="group-menu" role="menu" hidden></div>
+              </div>
               <div class="detail-meta mono" id="detail-meta"></div>
             </div>
           </div>
           <div class="detail-actions">
-            <button class="btn ghost" id="btn-group" data-i18n="addToGroup">Add to series</button>
-            <button class="btn ghost" id="btn-copy" data-i18n="copyText">Copy</button>
             <button class="btn ghost" id="btn-export" data-i18n="exportCsv">Export CSV</button>
             <button class="btn" id="btn-pdf" data-i18n="savePdf">PDF report</button>
             <button class="btn subtle icon" id="btn-delete" data-i18n-title="delete" data-i18n-aria="delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>

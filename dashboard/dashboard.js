@@ -394,9 +394,7 @@ function renderDetail(m) {
   setStat($('#d-share'), share, '%');
   setStat($('#d-length'), fmtDur(A.meetingDurationSeconds(m)), '');
 
-  // group button label
-  const g = m.groupId ? groupById(m.groupId) : null;
-  $('#btn-group').textContent = g ? g.name : t('addToGroup');
+  renderGroupBadge(m);
 
   // the hours badge reads them out and edits them; pinned hours are marked, not spelled out
   const hours = $('#btn-hours'), pinned = A.hasSchedule(m);
@@ -705,12 +703,51 @@ $('#btn-delete').addEventListener('click', async () => {
 });
 
 // export — the same three controls the series head offers, in the same order
-$('#btn-copy').addEventListener('click', () => { const m = currentMeeting(); if (m) copyMeeting(m); });
 $('#btn-export').addEventListener('click', () => { if (curMeetingId) downloadMeetingCSV(curMeetingId); });
 $('#btn-pdf').addEventListener('click', () => { if (curMeetingId) openReport('meeting', curMeetingId); });
 
-// assign to group
-$('#btn-group').addEventListener('click', () => openAssignModal(currentMeeting()));
+/* ---- the series this meeting belongs to ---- */
+/** The badge reads the series out; the menu under it is where it changes. */
+function renderGroupBadge(m) {
+  const g = m.groupId ? groupById(m.groupId) : null;
+  $('#group-badge-name').textContent = g ? g.name : t('addToGroup');
+  $('#group-badge-dot').style.background = g ? `var(${groupColorVar(g)})` : 'var(--absent)';
+  $('#btn-group').classList.toggle('none', !g);
+  $('#btn-group').title = g ? g.name : t('assignTitle');
+}
+
+const MI_CHECK = '<svg class="mi-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>';
+function groupMenuItems(m) {
+  let html = groups.map(g => `<button class="menu-item" role="menuitem" data-id="${esc(g.id)}">
+      <span class="gdot" style="background:var(${groupColorVar(g)})"></span><span class="mi-name">${esc(g.name)}</span>${g.id === m.groupId ? MI_CHECK : ''}</button>`).join('');
+  if (m.groupId) html += `<button class="menu-item" role="menuitem" data-id="__none">
+      <span class="gdot" style="background:var(--absent)"></span><span class="mi-name">${esc(t('removeFromGroup'))}</span></button>`;
+  if (html) html += '<div class="menu-sep"></div>';
+  return html + `<button class="menu-item" role="menuitem" data-id="__new"><span class="mi-name">${esc(t('assignNew'))}</span></button>`;
+}
+function setGroupMenu(open) {
+  const m = currentMeeting();
+  if (open && m) $('#group-menu').innerHTML = groupMenuItems(m);
+  $('#group-menu').hidden = !(open && m);
+  $('#btn-group').setAttribute('aria-expanded', String(!!(open && m)));
+}
+$('#btn-group').addEventListener('click', e => {
+  e.stopPropagation();
+  const opening = $('#group-menu').hidden;
+  $$('.menu').forEach(mn => mn.hidden = true);
+  setGroupMenu(opening);
+});
+$('#group-menu').addEventListener('click', async e => {
+  const item = e.target.closest('.menu-item'); if (!item) return;
+  e.stopPropagation();
+  setGroupMenu(false);
+  const m = currentMeeting(); if (!m) return;
+  if (item.dataset.id === '__new') { openGroupModal([m.id]); return; }
+  const gid = item.dataset.id === '__none' ? null : item.dataset.id;
+  await store.assignMeetingsToGroup([m.id], gid);
+  await load();
+  toast(t(gid ? 'assignedToast' : 'removedFromGroupToast'));
+});
 
 /* ============================ GROUPS ============================ */
 function renderGroups() {
@@ -1202,11 +1239,6 @@ function downloadGroupCSV(id) {
   ];
   downloadCSV(rows, `${safe(g.name)}-series.csv`);
 }
-function copyMeeting(m) {
-  let text = `${m.meetingTitle}\n${new Date(m.date).toLocaleString()}\n\n`;
-  Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).forEach(([name, a]) => { text += `${name} — ${i18n.formatTime(a.firstSeen)} — ${fmtHMS(A.liveSecondsFor(a, m))}\n`; });
-  navigator.clipboard.writeText(text).then(() => toast(t('copiedToast')));
-}
 // Same tab: the report is a view of this data, not a second app. It carries its own back
 // button (hidden on paper), and this page comes back from history with its route intact.
 function openReport(kind, id) {
@@ -1231,7 +1263,7 @@ function toggleMenu(btnSel, menuSel) {
   const btn = $(btnSel), menu = $(menuSel);
   btn.addEventListener('click', e => { e.stopPropagation(); const wasHidden = menu.hidden; $$('.menu').forEach(m => m.hidden = true); menu.hidden = !wasHidden; });
 }
-document.addEventListener('click', () => $$('.menu').forEach(m => m.hidden = true));
+document.addEventListener('click', () => { $$('.menu').forEach(m => m.hidden = true); $('#btn-group').setAttribute('aria-expanded', 'false'); });
 
 let groupModalColor = 'teal';
 function openGroupModal(assignIds) {
