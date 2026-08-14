@@ -432,10 +432,17 @@ function renderMeetings(filter = '') {
       : groupCell;
     const action = inTrash
       ? `<button class="row-action" data-act="restore" data-id="${esc(m.id)}">${esc(t('trashRestore'))}</button>`
-      : `<button class="row-action" data-act="export" data-id="${esc(m.id)}">${t('export')}</button>`;
+      : `<button class="row-ic" data-act="export" data-id="${esc(m.id)}" title="${esc(t('exportCsv'))}" aria-label="${esc(t('exportCsv'))}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg></button>`;
+    // a finished meeting reads as its full span; one still running only names its start,
+    // the "in call" chip beside the title says the rest
+    const endIso = A.meetingEndIso(m);
+    const hours = !endIso || A.isInProgress(m)
+      ? i18n.formatTime(startIso)
+      : `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}`;
     return `<div class="row meetings-grid" data-id="${esc(m.id)}">
       <div class="col-date">${pickHandle(m.id, badge)}</div>
-      <div class="col-title"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${i18n.formatTime(startIso)}</div></div>
+      <div class="col-title"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${hours}</div></div>
       <div class="col-group">${middle}</div>
       <div class="col-people num">${people}</div>
       <div class="col-avg num">${fmtDur(avg)}</div>

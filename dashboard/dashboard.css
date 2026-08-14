@@ -11,13 +11,15 @@
 .readout{font-size:12px;color:var(--ink-2);letter-spacing:.03em;text-align:right}
 .readout b{color:var(--ink);font-weight:500}
 
-/* tab rail: five labels outgrow a phone, so the rail scrolls sideways instead of spilling;
-   the half-cut tab at the edge is the affordance, no scrollbar needed */
-.tabrail{display:flex;gap:24px;margin-top:22px;border-bottom:1.5px solid var(--line);
+/* tab rail: one rail at every width. The type and the gaps compress fluidly as the window
+   narrows, so all five tabs stay on screen down to 320px (Polish, the longest locale, ends
+   ~285px wide there); the sideways scroll below is only the net for anything longer. */
+.tabrail{display:flex;gap:clamp(10px,5vw - 6px,24px);margin-top:22px;border-bottom:1.5px solid var(--line);
   overflow-x:auto;scrollbar-width:none}
 .tabrail::-webkit-scrollbar{display:none}
-.tab{background:none;border:none;cursor:pointer;font-family:var(--mono);font-weight:500;font-size:12px;
-  text-transform:uppercase;letter-spacing:.12em;color:var(--ink-3);padding:0 0 13px;position:relative;white-space:nowrap}
+.tab{background:none;border:none;cursor:pointer;font-family:var(--mono);font-weight:500;
+  font-size:clamp(10px,2vw + 3.6px,12px);letter-spacing:clamp(.4px,.45vw - 1px,1.44px);
+  text-transform:uppercase;color:var(--ink-3);padding:0 0 13px;position:relative;white-space:nowrap}
 .tab:hover{color:var(--ink-2)}
 .tab.on{color:var(--ink)}
 /* inside the tab's box (bottom:0, not -1.5px), or the scrolling rail would clip it */
@@ -57,7 +59,7 @@
 .row:hover{background:var(--panel-2)}
 .row .num{text-align:right;font-variant-numeric:tabular-nums}
 
-.meetings-grid{grid-template-columns:58px 1fr 130px 64px 84px 72px}
+.meetings-grid{grid-template-columns:58px 1fr 130px 64px 84px 40px}
 .people-grid{grid-template-columns:1fr 84px 108px 150px 108px}
 
 /* ===================================================================
@@ -241,10 +243,12 @@
 
 /* participant rename / merge */
 .rc-table th.cell-actions,.rc-table td.cell-actions{width:40px;text-align:right;padding-left:0;padding-right:12px}
-.edit-name{display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;
+/* .row-ic is the same quiet glyph in a list row (the per-meeting export) */
+.edit-name,.row-ic{display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;
   color:var(--ink-3);padding:6px;border-radius:7px;opacity:.45;transition:opacity .12s,background .12s,color .12s}
-.rc-table tr:hover .edit-name,.edit-name:focus-visible{opacity:1}
-.edit-name:hover{background:var(--panel-2);color:var(--ink)}
+.rc-table tr:hover .edit-name,.edit-name:focus-visible,
+.row:hover .row-ic,.row-ic:focus-visible{opacity:1}
+.edit-name:hover,.row-ic:hover{background:var(--panel-2);color:var(--ink)}
 .merge-note{display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:10px 12px;border-radius:var(--radius-sm);
   background:var(--late-2);color:var(--late);font-size:12.5px;line-height:1.45}
 .merge-note svg{flex:none;margin-top:2px}
@@ -626,7 +630,7 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
   .masthead{flex-direction:column;align-items:flex-start;gap:8px}
   .readout{text-align:left}
 
-  .tabrail{gap:18px;margin-top:16px}
+  .tabrail{margin-top:16px}
   .view-head{margin:20px 0 14px}
   .back{margin:18px 0 12px}
 
@@ -645,10 +649,12 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 
   .list-head,.row{padding-left:14px;padding-right:14px}
   .pager{padding:11px 14px}
-  /* the per-row export is a shortcut the phone has no room for; the detail view, the bulk
-     export and the selection bar all still carry it. Restoring from the trash stays. */
-  .row-action[data-act="export"]{display:none}
   .row-action{padding:6px 8px}
+
+  /* a person's name is the datum: it wraps to its full length on a phone, taking
+     another line if it must, rather than ellipsing behind its own row */
+  .name-cell .nm,.tl-name .who,.merge-item .nm{white-space:normal;overflow-wrap:anywhere}
+  .tl-lane{height:auto;min-height:34px}
 
   /* five range presets outgrow the filter card the way the tabs outgrow the rail */
   .segmented{max-width:100%;overflow-x:auto;scrollbar-width:none}
@@ -663,9 +669,9 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
   .detail-actions{flex:1 1 100%;margin-left:0;justify-content:flex-start}
   .row-panel{padding:2px 14px 16px}
 
-  /* chevrons and pencils that waited for a hover are visible on touch */
+  /* chevrons, pencils and the export glyph that waited for a hover are visible on touch */
   .cell-go .go,.matrix .m-name .go{opacity:.55}
-  #attendance-table .edit-name{opacity:.7}
+  #attendance-table .edit-name,.row-ic{opacity:.7}
 
   /* attendance folds: who and their status, then the times, then the share */
   #attendance-table,#attendance-table tbody{display:block}
