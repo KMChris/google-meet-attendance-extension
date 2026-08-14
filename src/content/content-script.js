@@ -14,6 +14,18 @@
   let isTracking = false;
   let scheduledWindow = null;   // { start, end } ISO, scraped from the calendar event
   let scheduleAttempts = 0;
+  let stoppedMeetingId = null;  // the call already finished at this URL — don't start it again
+  let panelAttempts = 0;
+
+  // Mirrors the stored setting; null until it has been read, so nothing starts on a guess.
+  let autoTrack = null;
+  chrome.storage.local.get(['autoTrack'], (res) => {
+    autoTrack = !(res && res.autoTrack === false);
+    if (!autoTrack) console.log('[Attendance] Auto-track disabled — not tracking');
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.autoTrack) autoTrack = changes.autoTrack.newValue !== false;
+  });
 
   // Multiple selectors for participant detection (Google Meet DOM changes frequently)
   const PARTICIPANT_SELECTORS = [
@@ -53,7 +65,12 @@
     return null;
   }
 
+  // ~30s of retries. Meet's controls are up long before that, and a page that never shows them
+  // is not one we are going to read — retrying for the life of the tab only burns cycles.
+  const PANEL_MAX_ATTEMPTS = 15;
+
   function openParticipantPanelOnce() {
+    if (!isTracking) return;   // the call ended while we were waiting for the button
     const panelBtn = findParticipantPanelButton();
 
     if (panelBtn) {
@@ -64,6 +81,7 @@
       let attempts = 0;
       const waitForDOM = setInterval(() => {
         attempts++;
+        if (!isTracking) { clearInterval(waitForDOM); return; }
         const found = document.querySelector('div[role="listitem"][aria-label], .KV1GEc');
         console.log('[Attendance] Waiting for participant DOM... attempt', attempts, 'found:', !!found);
 
@@ -82,9 +100,11 @@
           console.log('[Attendance] Timeout waiting for participant DOM');
         }
       }, 500);
-    } else {
+    } else if (++panelAttempts < PANEL_MAX_ATTEMPTS) {
       console.log('[Attendance] Participant panel button not found, retrying...');
       setTimeout(openParticipantPanelOnce, 2000);
+    } else {
+      console.log('[Attendance] Participant panel button not found, giving up');
     }
   }
 
@@ -204,6 +224,20 @@
   }
 
   /**
+   * Is this a plausible participant name, or DOM noise? Meet's markup carries internal ids
+   * next to the names, and a container we read by mistake hands back its whole text — either
+   * one would be stored as a person and follow the meeting into every export.
+   */
+  function isValidName(name) {
+    if (!name || name.length < 1 || name.length > 100) return false;
+    return !(name.startsWith('spaces/') ||
+             name.startsWith('devices/') ||
+             /^[a-zA-Z0-9_-]{20,}$/.test(name) ||
+             name.includes('/devices/') ||
+             name.includes('/participants/'));
+  }
+
+  /**
    * Extract participant info from DOM element
    */
   function extractParticipantInfo(element) {
@@ -245,19 +279,7 @@
               emailElement.textContent.trim();
     }
 
-    // Validate name
-    if (!name || name.length < 1 || name.length > 100) {
-      return null;
-    }
-
-    // Filter out internal IDs (not real participant names)
-    if (name.startsWith('spaces/') ||
-        name.startsWith('devices/') ||
-        name.match(/^[a-zA-Z0-9_-]{20,}$/) ||
-        name.includes('/devices/') ||
-        name.includes('/participants/')) {
-      return null;
-    }
+    if (!isValidName(name)) return null;
 
     return { name, email };
   }
@@ -336,9 +358,9 @@
     for (const selector of selfSelectors) {
       const selfElement = document.querySelector(selector);
       if (selfElement) {
-        const selfName = selfElement.getAttribute('data-self-name') ||
-                         selfElement.textContent.trim();
-        if (selfName && !participants[selfName]) {
+        const selfName = (selfElement.getAttribute('data-self-name') ||
+                          selfElement.textContent || '').trim();
+        if (isValidName(selfName) && !participants[selfName]) {
           participants[selfName] = {
             name: selfName,
             email: null,
@@ -395,24 +417,19 @@
   }
 
   /**
-   * Start tracking attendance
+   * Start tracking the call this page is on, if there is one and auto-tracking is on.
+   *
+   * Idempotent and cheap, because the watchdog calls it every few seconds while idle: that is
+   * what picks up a second meeting joined in the same tab, which Meet enters without a page
+   * load. A call already finished at this URL is not started again — leaving a meeting keeps
+   * its code in the address bar, and re-entering it would record everyone as joining twice.
    */
   function startTracking() {
-    currentMeetingId = getMeetingId();
-    if (!currentMeetingId) {
-      console.log('[Attendance] Not in a meeting, waiting...');
-      setTimeout(startTracking, 2000);
-      return;
-    }
-
-    // Respect the auto-track setting (default on). If disabled, stay idle.
-    chrome.storage.local.get(['autoTrack'], (res) => {
-      if (res && res.autoTrack === false) {
-        console.log('[Attendance] Auto-track disabled — not tracking this meeting');
-        return;
-      }
-      beginTracking();
-    });
+    if (isTracking || autoTrack !== true) return;
+    const id = getMeetingId();
+    if (!id || id === stoppedMeetingId) return;
+    currentMeetingId = id;
+    beginTracking();
   }
 
   function beginTracking() {
@@ -421,6 +438,7 @@
     participants = {};
     scheduledWindow = null;
     scheduleAttempts = 0;
+    panelAttempts = 0;
 
     // Auto-open participant panel to initialize DOM, then close it
     openParticipantPanelOnce();
@@ -488,6 +506,7 @@
       console.warn('[Attendance] Failed to notify meeting end:', err);
     });
 
+    stoppedMeetingId = currentMeetingId;
     currentMeetingId = null;
     participants = {};
   }
@@ -593,11 +612,13 @@
       setTimeout(startTracking, 2000);
     }
 
-    // Monitor for meeting end
+    // One watchdog for both ends of the meeting: it closes the call we are in, and picks up
+    // the next one. Landing back on the home screen clears the finished call, so re-entering
+    // the same link later starts a fresh session rather than being mistaken for it.
     setInterval(() => {
-      if (isTracking) {
-        detectMeetingEnd();
-      }
+      if (isTracking) { detectMeetingEnd(); return; }
+      if (!getMeetingId()) stoppedMeetingId = null;
+      else startTracking();
     }, 3000);
 
     // Handle page unload
