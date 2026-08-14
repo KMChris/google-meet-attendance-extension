@@ -305,18 +305,27 @@ function backupRows(kind, id, obj) {
 }
 
 /**
- * Sync one meeting (an attendanceHistory record) — the readable rows plus the backup rows
- * that make it restorable.
+ * Add records the sheet does not have yet: the readable rows plus the backup rows that make
+ * them restorable. Rows already there are left alone, and however many records come in it is
+ * one append per tab.
  */
-export async function syncMeeting(spreadsheetId, meeting) {
+export async function appendRecords(spreadsheetId, { meetings = [], groups = [] } = {}) {
+  if (!meetings.length && !groups.length) return { meetings: 0, groups: 0 };
   await ensureSheets(spreadsheetId);
-  await appendData(spreadsheetId, `${SHEET_MEETINGS}!A:G`, [meetingRow(meeting)]);
 
-  const rows = participantRows(meeting);
-  if (rows.length) await appendData(spreadsheetId, `${SHEET_PARTICIPANTS}!A:E`, rows);
-  await appendData(spreadsheetId, `${SHEET_BACKUP}!A:D`, backupRows('meeting', meeting.id, meeting));
+  if (meetings.length) {
+    await appendData(spreadsheetId, `${SHEET_MEETINGS}!A:G`, meetings.map(meetingRow));
+    const rows = meetings.flatMap(participantRows);
+    if (rows.length) await appendData(spreadsheetId, `${SHEET_PARTICIPANTS}!A:E`, rows);
+  }
 
-  return { success: true, meetingId: meeting.id, participantCount: Object.keys(meeting.attendance || {}).length };
+  const backup = [
+    ...groups.flatMap(g => backupRows('series', g.id, g)),
+    ...meetings.flatMap(m => backupRows('meeting', m.id, m))
+  ];
+  await appendData(spreadsheetId, `${SHEET_BACKUP}!A:D`, backup);
+
+  return { meetings: meetings.length, groups: groups.length };
 }
 
 /**
@@ -342,18 +351,12 @@ export async function pushAll(spreadsheetId, { meetings = [], groups = [] } = {}
 }
 
 /**
- * Read everything back out of the sheet. Rows are read in order and a part 0 starts a fresh
- * record, so a meeting appended several times restores as the last version written.
+ * Records out of backup rows. Rows are read in order and a part 0 starts a fresh record, so a
+ * meeting appended several times reads as the last version written.
  */
-export async function restoreAll(spreadsheetId) {
-  let rows = [];
-  try {
-    const data = await getData(spreadsheetId, `${SHEET_BACKUP}!A2:D`);
-    rows = data.values || [];
-  } catch { rows = []; }               // no Backup tab: nothing was ever written for restore
-
+export function parseBackupRows(rows) {
   const byKey = new Map();
-  rows.forEach(([kind, id, part, json]) => {
+  (rows || []).forEach(([kind, id, part, json]) => {
     if (!kind || !id) return;
     const key = `${kind}::${id}`;
     const idx = Number(part) || 0;
@@ -370,6 +373,50 @@ export async function restoreAll(spreadsheetId) {
     (rec.kind === 'series' ? groups : meetings).push(obj);
   });
   return { meetings, groups };
+}
+
+/** Every backup row, or none at all when the sheet has no Backup tab to read. */
+async function readBackup(spreadsheetId, range = `${SHEET_BACKUP}!A2:D`) {
+  try {
+    const data = await getData(spreadsheetId, range);
+    return data.values || [];
+  } catch { return []; }               // nothing was ever written there for restore
+}
+
+/** Read everything back out of the sheet. */
+export async function restoreAll(spreadsheetId) {
+  return parseBackupRows(await readBackup(spreadsheetId));
+}
+
+/**
+ * What the sheet holds, without reading the records themselves: two short columns, so asking
+ * whether there is anything new costs one small read. Each entry keeps the row it sits on,
+ * which is how `readBackupRecords` can then read just those.
+ */
+export async function readBackupIndex(spreadsheetId) {
+  const values = await readBackup(spreadsheetId, `${SHEET_BACKUP}!A2:B`);
+  return values
+    .map(([kind, id], i) => ({ kind, id, row: i + 2 }))
+    .filter(r => r.kind && r.id);
+}
+
+/** Past this many separate ranges, reading the whole tab is the cheaper request. */
+const RANGE_BUDGET = 40;
+
+/** Read back only the records asked for, named by the rows the index put them on. */
+export async function readBackupRecords(spreadsheetId, rows) {
+  const wanted = [...new Set(rows)].sort((a, b) => a - b);
+  if (!wanted.length) return { meetings: [], groups: [] };
+
+  const blocks = [];                   // rows next to each other travel as one range
+  wanted.forEach(row => {
+    const last = blocks[blocks.length - 1];
+    if (last && row === last[1] + 1) last[1] = row; else blocks.push([row, row]);
+  });
+  if (blocks.length > RANGE_BUDGET) return parseBackupRows(await readBackup(spreadsheetId));
+
+  const read = await getRanges(spreadsheetId, blocks.map(([a, b]) => `${SHEET_BACKUP}!A${a}:D${b}`));
+  return parseBackupRows((read.valueRanges || []).flatMap(v => v.values || []));
 }
 
 async function clearValues(spreadsheetId, ranges) {

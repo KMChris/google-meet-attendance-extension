@@ -14,7 +14,7 @@
 
 import * as storage from '../lib/storage.js';
 import * as attendance from '../lib/attendance.js';
-import * as sheetsApi from '../lib/sheets-api.js';
+import * as sheetsSync from '../lib/sheets-sync.js';
 
 const BADGE_COLOR = '#1e7a4e'; // present-green, matches the status palette
 
@@ -123,21 +123,14 @@ async function handleMeetingEnded(message, tabId) {
 
   const record = attendance.buildMeetingRecord(raw);
   record.endedAt = message.endTime || new Date().toISOString();
-  // The stored record has the user's renames/merges (nameMap) applied — sync that one.
   const saved = await storage.upsertMeeting(record);
 
   if (tabId != null) activeMeetings.delete(tabId);
   updateBadge(tabId, '', '');
 
-  const settings = await storage.getSettings();
-  if (settings.autoSync && settings.spreadsheetId) {
-    try {
-      await sheetsApi.syncMeeting(settings.spreadsheetId, saved);
-      console.log('[GM Attendance] auto-synced to Sheets:', saved.id);
-    } catch (err) {
-      console.warn('[GM Attendance] auto-sync failed:', err);
-    }
-  }
+  // The call is over: the moment to hand the sheet this meeting, and to take from it whatever
+  // was recorded elsewhere in the meantime.
+  await syncWithSheet({ force: true });
   return { success: true, id: saved.id };
 }
 
@@ -184,19 +177,31 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
 });
 
+/** Two-way sync, whenever this worker is a good place to run one. Failures are never fatal. */
+async function syncWithSheet(opts) {
+  try {
+    const moved = await sheetsSync.autoSync(opts);
+    if (moved) console.log('[GM Attendance] synced with Sheets:', moved);
+  } catch (err) {
+    console.warn('[GM Attendance] auto-sync failed:', err);
+  }
+}
+
 /**
- * Sweep the trash whenever the worker wakes. The dashboard does the same on load; between the
- * two, a retention window measured in days is kept without an alarm of its own.
+ * Housekeeping whenever the worker wakes: drop what has waited out its stay in the trash, and
+ * take from the sheet anything recorded on another machine. The dashboard does the same on load;
+ * between the two, neither needs an alarm of its own.
  */
-async function sweepTrash() {
+async function catchUp() {
   try {
     const gone = await storage.purgeExpiredTrash();
     if (gone) console.log('[GM Attendance] trash purged:', gone);
   } catch (err) {
     console.warn('[GM Attendance] trash purge failed:', err);
   }
+  await syncWithSheet();
 }
-chrome.runtime.onStartup.addListener(sweepTrash);
-sweepTrash();
+chrome.runtime.onStartup.addListener(catchUp);
+catchUp();
 
 console.log('[GM Attendance] service worker started');

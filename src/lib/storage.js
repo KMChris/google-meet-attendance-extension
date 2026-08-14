@@ -7,6 +7,7 @@
  *   meetingGroups     : Group[]    ({ id, name, color, roster[], createdAt })
  *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings,
  *                         trashRetentionDays, theme }
+ *   syncState         : { lastSyncAt } (when the sheet and this store last agreed)
  *   savedRoster       : string[]   (global default roster)
  *   autoTrack         : boolean    (own key — the content script reads it directly)
  *   schemaVersion     : number
@@ -16,7 +17,7 @@
 
 import {
   buildMeetingRecord, normalizeMeeting, resolveMappedName, splitConcatenatedEvents,
-  annotateMerges, lastActivityMs, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
+  annotateMerges, adoptMergeAnnotations, lastActivityMs, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -27,6 +28,7 @@ export const STORAGE_KEYS = {
   SETTINGS: 'settings',
   ROSTER: 'savedRoster',
   AUTO_TRACK: 'autoTrack',
+  SYNC_STATE: 'syncState',
   SCHEMA_VERSION: 'schemaVersion'
 };
 
@@ -204,6 +206,53 @@ export async function purgeExpiredTrash(now = Date.now()) {
 
 export async function clearHistory() {
   await saveHistory([]);
+}
+
+/* ============================ records from elsewhere ============================ */
+/**
+ * An import, a restore and a sync all bring in records recorded somewhere else, and they all
+ * add rather than overwrite: a meeting already here keeps whatever was edited about it, and one
+ * in the trash stays deleted, because a backup that still carries it must not undo the deletion.
+ *
+ * Records land *unmerged*: the merge annotations a record travels with become its nameMap
+ * (adoptMergeAnnotations) and the participants stay as they were recorded. Folding them together
+ * on the way in would bake two people into one and make the merge impossible to undo, which is
+ * the same reason upsertMeeting keeps the map beside the attendance rather than in it.
+ *
+ * Returns how many were added.
+ */
+export async function mergeMeetings(records) {
+  const [history, trash] = await Promise.all([getHistory(), getTrash()]);
+  const seen = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
+
+  const fresh = [];
+  (records || []).forEach(rec => {
+    if (!rec || !rec.id || seen.has(rec.id)) return;
+    seen.add(rec.id);
+    fresh.push(adoptMergeAnnotations(rec));
+  });
+  if (!fresh.length) return 0;
+
+  const merged = history.concat(fresh)
+    .map(m => normalizeMeeting(m, { mergeAliases: false }))
+    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+  await saveHistory(merged);
+  return fresh.length;
+}
+
+/** Series from elsewhere, under the same rule: only the ones this store does not have. */
+export async function mergeGroups(list) {
+  const groups = await getGroups();
+  const known = new Set(groups.map(g => g.id));
+
+  const fresh = [];
+  (list || []).forEach(g => {
+    if (!g || !g.id || known.has(g.id)) return;
+    known.add(g.id);
+    fresh.push(g);
+  });
+  if (fresh.length) await saveGroups(groups.concat(fresh));
+  return fresh.length;
 }
 
 /**
@@ -404,6 +453,20 @@ export async function getSettings() {
 export async function updateSettings(patch) {
   const next = { ...(await getSettings()), ...patch };
   await set(STORAGE_KEYS.SETTINGS, next);
+  return next;
+}
+
+/**
+ * When the spreadsheet and this store last agreed. Kept out of `settings` because it is not a
+ * preference: it is the timestamp the sync schedule reads to decide whether a pass is due.
+ */
+export async function getSyncState() {
+  const s = await get(STORAGE_KEYS.SYNC_STATE);
+  return (s && typeof s === 'object') ? s : {};
+}
+export async function setSyncState(patch) {
+  const next = { ...(await getSyncState()), ...patch };
+  await set(STORAGE_KEYS.SYNC_STATE, next);
   return next;
 }
 

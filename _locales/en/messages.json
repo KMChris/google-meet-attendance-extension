@@ -1066,7 +1066,17 @@
     "message": "Use it"
   },
   "sheetsStepDataHint": {
-    "message": "The sheet holds all the meeting data, so it can serve as a backup."
+    "message": "The sheet holds all the meeting data, so it can serve as a backup. Auto-sync sends finished meetings and brings back any the sheet has that are missing here."
+  },
+  "sheetsLastSync": {
+    "message": "Last sync: $WHEN$",
+    "description": "Shown under step 3 of the Google Sheets setup.",
+    "placeholders": {
+      "when": {
+        "content": "$1",
+        "example": "14 Aug, 09:41"
+      }
+    }
   },
   "sheetsNoSheet": {
     "message": "No spreadsheet yet"
@@ -1127,6 +1137,16 @@
   "sheetsRestoreFailed": {
     "message": "Could not read the sheet"
   },
+  "sheetsPulledToast": {
+    "message": "Brought in from the sheet: $COUNT$ meetings",
+    "description": "Confirmation after an automatic sync found meetings recorded elsewhere.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
   "sheetsNoBackup": {
     "message": "Nothing to restore — send everything to this sheet first"
   },
@@ -1134,7 +1154,7 @@
     "message": "Add everything stored in the sheet? Meetings already here are kept as they are."
   },
   "autoSync": {
-    "message": "Auto-sync on meeting end"
+    "message": "Keep the sheet and this list in step"
   },
   "importTitle": {
     "message": "Import backup"

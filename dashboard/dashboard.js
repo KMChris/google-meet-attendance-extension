@@ -2,6 +2,7 @@ import * as store from '../src/lib/storage.js';
 import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 import * as sheets from '../src/lib/sheets-api.js';
+import * as sheetsSync from '../src/lib/sheets-sync.js';
 import * as importers from '../src/lib/importers.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
 import { initTips } from './tooltip.js';
@@ -1668,23 +1669,12 @@ async function resolveGroupNames(records) {
 }
 
 /**
- * Add imported records to the history, keeping every meeting already stored. Merge annotations
- * become the meeting's nameMap, and records are written *unmerged* — merging on write would
- * bake two people into one and make the merge impossible to undo (see storage.upsertMeeting).
- *
- * Starts from what is on disk rather than from `history`, which is the merged *view*: writing
- * that back would bake every existing merge in as a side effect of importing.
+ * Add imported records to the history, keeping every meeting already stored (storage.mergeMeetings
+ * is the same door a restore and a sync come through), then re-read the page from what is now on
+ * disk.
  */
 async function mergeImportedMeetings(records) {
-  const byId = new Map((await store.getHistory()).map(m => [m.id, m]));
-  let added = 0;
-  records.forEach(rec => {
-    if (rec && rec.id && !byId.has(rec.id)) { byId.set(rec.id, A.adoptMergeAnnotations(rec)); added++; }
-  });
-  const merged = Array.from(byId.values())
-    .map(m => A.normalizeMeeting(m, { mergeAliases: false }))
-    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  await store.saveHistory(merged);
+  const added = await store.mergeMeetings(records);
   await load();
   return added;
 }
@@ -1706,11 +1696,7 @@ readTextFile($('#import-file'), async text => {
   try { data = JSON.parse(text); } catch { toast(t('importInvalid')); return; }
   const meetings = Array.isArray(data) ? data : (Array.isArray(data.meetings) ? data.meetings : null);
   if (!meetings) { toast(t('importInvalid')); return; }
-  if (data.groups && Array.isArray(data.groups)) {
-    const gids = new Set(groups.map(g => g.id));
-    data.groups.forEach(g => { if (g && g.id && !gids.has(g.id)) groups.push(g); });
-    await store.saveGroups(groups);
-  }
+  if (Array.isArray(data.groups)) await store.mergeGroups(data.groups);
   toast(t('importedToast', { count: await mergeImportedMeetings(meetings) }));
 });
 
@@ -1755,9 +1741,37 @@ async function refreshSheets() {
   if (linked) $('#sheets-open').href = sheets.spreadsheetUrl(settings.spreadsheetId);
 
   // step 3 counts as done once the sheet keeps itself up to date without being told to
+  const auto = linked && !!settings.autoSync;
   $('#sheets-step-data').classList.toggle('off', !linked);
-  $('#sheets-step-data').classList.toggle('done', linked && !!settings.autoSync);
+  $('#sheets-step-data').classList.toggle('done', auto);
   $('#set-autosync').checked = !!settings.autoSync;
+
+  // an unattended sync is only believable if you can see when it last ran
+  const { lastSyncAt } = await store.getSyncState();
+  const stamp = $('#sheets-sync-state');
+  stamp.hidden = !(auto && lastSyncAt);
+  if (!stamp.hidden) {
+    stamp.textContent = t('sheetsLastSync', {
+      when: `${i18n.formatDate(lastSyncAt, { day: 'numeric', month: 'short' })}, ${i18n.formatTime(lastSyncAt)}`
+    });
+  }
+}
+
+/**
+ * Opening the register is when it matters that it is current, so a pass runs here as well as in
+ * the worker, throttled so a reload does not sync again. Whatever came in is loaded into the page.
+ */
+async function syncOnOpen() {
+  let moved = null;
+  try { moved = await sheetsSync.autoSync({ maxAgeMs: sheetsSync.OPEN_INTERVAL_MS }); }
+  catch (e) { console.warn('[GM Attendance] sync on open failed:', (e && e.message) || e); }
+  if (!moved) return;
+
+  if (moved.pulled || moved.pulledGroups) {
+    await load();
+    toast(t('sheetsPulledToast', { count: moved.pulled }));
+  }
+  refreshSheets();
 }
 
 /**
@@ -1828,11 +1842,9 @@ $('#sheets-restore').addEventListener('click', async () => {
     const { meetings, groups: restoredGroups } = await sheets.restoreAll(settings.spreadsheetId);
     if (!meetings.length && !restoredGroups.length) { toast(t('sheetsNoBackup')); }
     else {
-      const known = new Set(groups.map(g => g.id));
-      const fresh = restoredGroups.filter(g => g && g.id && !known.has(g.id));
-      if (fresh.length) { groups = groups.concat(fresh); await store.saveGroups(groups); }
+      const freshGroups = await store.mergeGroups(restoredGroups);
       const added = await mergeImportedMeetings(meetings);
-      toast(added || fresh.length ? t('sheetsRestoredToast', { count: added }) : t('importNothingNew'));
+      toast(added || freshGroups ? t('sheetsRestoredToast', { count: added }) : t('importNothingNew'));
     }
   } catch (e) { console.error('[GM Attendance] restore from Sheets failed:', (e && e.message) || e); toast(t('sheetsRestoreFailed')); }
   $('#sheets-restore').disabled = false;
@@ -1866,5 +1878,6 @@ i18n.onLocaleChange(() => {
     exportCSV
   });
   await load();
-  refreshSheets();
+  await refreshSheets();
+  syncOnOpen();
 })();

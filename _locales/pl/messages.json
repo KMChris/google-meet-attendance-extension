@@ -1066,7 +1066,17 @@
     "message": "Korzystaj"
   },
   "sheetsStepDataHint": {
-    "message": "Arkusz przechowuje wszystkie dane spotkania, więc może działać jako kopia zapasowa."
+    "message": "Arkusz przechowuje wszystkie dane spotkania, więc może działać jako kopia zapasowa. Automat wysyła zakończone spotkania i pobiera te, których tutaj brakuje."
+  },
+  "sheetsLastSync": {
+    "message": "Ostatnia synchronizacja: $WHEN$",
+    "description": "Shown under step 3 of the Google Sheets setup.",
+    "placeholders": {
+      "when": {
+        "content": "$1",
+        "example": "14 sie, 09:41"
+      }
+    }
   },
   "sheetsNoSheet": {
     "message": "Brak arkusza"
@@ -1127,6 +1137,16 @@
   "sheetsRestoreFailed": {
     "message": "Nie udało się odczytać arkusza"
   },
+  "sheetsPulledToast": {
+    "message": "Pobrano z arkusza spotkania: $COUNT$",
+    "description": "Confirmation after an automatic sync found meetings recorded elsewhere.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
   "sheetsNoBackup": {
     "message": "Nie ma czego przywracać — najpierw wyślij wszystko do tego arkusza"
   },
@@ -1134,7 +1154,7 @@
     "message": "Dodać wszystko, co jest w arkuszu? Spotkania, które już tu są, zostaną bez zmian."
   },
   "autoSync": {
-    "message": "Auto-synchronizacja po zakończeniu"
+    "message": "Synchronizuj automatycznie w obie strony"
   },
   "importTitle": {
     "message": "Importuj kopię"

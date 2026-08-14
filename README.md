@@ -20,7 +20,7 @@ every time they left and rejoined.
 - **Dark mode**: Follows the browser's light/dark preference, with a System / Light / Dark override in Settings
 - **Localized**: Full English + Polish interface (auto-detected, switchable in Settings)
 - **Local Storage**: Local data storage using the Chrome Storage API
-- **Google Sheets Integration** (Optional): Sync finished meetings to a spreadsheet of your own via OAuth2 — and restore everything from it, since the sheet keeps the full record
+- **Google Sheets Integration** (Optional): Two-way sync with a spreadsheet of your own via OAuth2. Finished meetings go up, meetings recorded on another machine come down, and everything can be restored from it, since the sheet keeps the full record
 
 ## Installation
 
@@ -142,13 +142,14 @@ google-meet-attendance-extension/
         ├── importers.js       # Read our own CSV and other extensions' backups
         ├── i18n.js            # Runtime i18n (EN/PL) over the _locales catalogues
         ├── sheets-api.js      # Google Sheets API
+        ├── sheets-sync.js     # Two-way sync with the spreadsheet, and when it runs
         ├── ui.css             # design system (tokens light/dark, primitives, timeline)
         └── fonts/             # Self-hosted woff2 (Space Grotesk, IBM Plex Sans, IBM Plex Mono)
 ```
 
 Pages (dashboard, report, popup) load their scripts as `<script type="module">` and import the
 shared library directly; the service worker only ingests attendance events, keeps the badge
-live, and auto-syncs to Sheets.
+live, and runs a Sheets sync when a meeting ends or when it wakes.
 
 ## Data Structure
 
