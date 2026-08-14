@@ -66,8 +66,13 @@ function effectiveRoster(meeting) {
 /* ------------------------------ theme ------------------------------ */
 function applyTheme(theme) {
   const root = document.documentElement;
+  // the tokens move under everything that transitions a colour, so the swap lands with
+  // transitions off (see .theme-swap in ui.css) and they are let back in once it has settled
+  root.classList.add('theme-swap');
   if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
   else root.removeAttribute('data-theme');
+  void root.offsetWidth;   // resolve the new colours before transitions come back
+  requestAnimationFrame(() => root.classList.remove('theme-swap'));
   $$('#theme-seg button').forEach(b => b.classList.toggle('on', b.dataset.themeVal === (theme || 'system')));
   if ($('#view-analytics').classList.contains('on')) renderAnalytics();
 }

@@ -7,9 +7,14 @@ const { t } = i18n;
 const $ = s => document.querySelector(s);
 const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
 
+// the stored theme lands after the first paint, so the same transition guard the dashboard needs
+// applies here: without it every .btn keeps the background of the theme being left
 function applyTheme(theme) {
   const r = document.documentElement;
+  r.classList.add('theme-swap');
   if (theme === 'light' || theme === 'dark') r.setAttribute('data-theme', theme); else r.removeAttribute('data-theme');
+  void r.offsetWidth;
+  requestAnimationFrame(() => r.classList.remove('theme-swap'));
 }
 function openDashboard(hash) {
   const url = chrome.runtime.getURL('dashboard/dashboard.html') + (hash || '');
