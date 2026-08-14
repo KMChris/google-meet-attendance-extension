@@ -2,6 +2,54 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.3] 2026-08-14
+
+### Added
+- **The dashboard reads on a phone.** The tab rail compresses its type and its gaps rather than
+  wrapping, so all five tabs hold down to 320px, and it scrolls as a net for anything longer with
+  the tab just opened brought into frame. The masthead stacks, so the read-out is a line instead of
+  a one-word-wide column. The three wide tables (a meeting's attendance, a series' sessions, a
+  person's meetings) fold each row into two or three lines rather than running off the viewport. A
+  name wraps to its full length instead of ellipsing behind its own row. The batch toolbar becomes
+  the head's content rather than an overlay that landed over the rows. Chevrons, pencils and the
+  export glyph, which waited for a hover, are visible where there is no pointer to hover with.
+- **A meeting row says the hours it ran**, start to end, where it gave only the start. A call still
+  in progress keeps to its start; the chip beside the title says the rest.
+
+### Changed
+- **The text buttons carry a leading icon**, on the dashboard, in the report and in the popup.
+- **The language is picked from a menu, and its flags are drawn.** An `<option>` holds text and
+  nothing else, and a flag emoji is a pair of regional indicators that Windows has no glyphs for,
+  so the old `<select>` read as bare "GB" and "PL"; the flags are SVG now, which needs a menu to
+  hold them. It answers the same arrow keys and Escape the select did, and Automatic gets a globe.
+- **How the head actions give way is decided by the row's own width**, not the window's: the same
+  bar sits beside a short title on a wide page and alone under a long one. The search field spreads
+  into what is left, dropping to a line of its own when a list switch is out too. Narrower still,
+  the labels give way to their glyphs and a switch keeps only its count, with the whole label left
+  as the button's name for a pointer and for a screen reader.
+- **Exporting a single meeting is a glyph in its row**, quiet until the row is hovered, which gives
+  the column back to the columns that carry numbers.
+- Between the phone layout and the width where every column fits, a table slides inside its card
+  with the name column holding the left edge, rather than pushing the card wider.
+
+### Fixed
+- **A theme change no longer leaves elements painted in the theme being left.** Chrome will not
+  re-resolve a property that is mid-transition when its value comes from a custom property, and
+  switching theme moves the tokens under every transitioned background and border; ghost buttons
+  ended up dark text on a dark panel until the page was reloaded. The swap now lands with
+  transitions off and lets them back in once the new colours have settled. The popup needed the
+  same guard, where the stored theme arrives after the first paint.
+- A long toast is capped and centred instead of running past the edge of the window.
+- The fifth headline tile fills the bare cell left by a three-column row, which showed the hairline
+  background through as a grey block.
+- A series badge's menu, the series grid's cards and the trash's *Restore* no longer overflow or
+  clip on a narrow window: the menu is capped to the viewport, a card may be narrower than 300px,
+  and the action column takes the width its label needs.
+- Four ticks collide over a phone-width presence timeline, so only the ends are drawn and the hover
+  read-out carries the middle.
+- A person's name column in the meetings and people lists may shrink, as the title column already
+  could, instead of setting the column width and pushing the rest of the grid off the card.
+
 ## [1.3.2] 2026-08-14
 
 ### Added
