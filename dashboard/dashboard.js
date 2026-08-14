@@ -14,6 +14,7 @@ let history = [];         // normalized meetings, newest-first
 let groups = [];
 let settings = {};
 let roster = [];          // global default roster
+let autoTrack = true;     // own storage key, not part of settings
 let curMeetingId = null;
 let curGroupId = null;
 let assignContextIds = []; // meeting ids awaiting a series assignment
@@ -159,9 +160,11 @@ $('#btn-back-group').addEventListener('click', () => goBack('groups'));
 
 /* ------------------------------ load ------------------------------ */
 async function load() {
-  const [h, g, s, r] = await Promise.all([store.getHistory(), store.getGroups(), store.getSettings(), store.getRoster()]);
+  const [h, g, s, r, at] = await Promise.all([
+    store.getHistory(), store.getGroups(), store.getSettings(), store.getRoster(), store.getAutoTrack()
+  ]);
   history = h.map(A.normalizeMeeting).sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  groups = g; settings = s; roster = r;
+  groups = g; settings = s; roster = r; autoTrack = at;
   applyTheme(settings.theme || 'system');
   renderReadout();
   syncSettingsUI();
@@ -1249,15 +1252,16 @@ $$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target ==
 
 /* ============================ SETTINGS ============================ */
 function syncSettingsUI() {
-  $('#set-auto-track').checked = settings.autoTrack !== false; // read below from local
+  $('#set-auto-track').checked = autoTrack;
   $('#set-max').value = String(settings.maxStoredMeetings ?? 200);
   $('#set-language').value = i18n.getLanguagePreference();
   applyTheme(settings.theme || 'system');
   renderRosterChips();
 }
-// auto-track lives in its own local key
-chrome.storage.local.get(['autoTrack'], r => { $('#set-auto-track').checked = r.autoTrack !== false; });
-$('#set-auto-track').addEventListener('change', () => chrome.storage.local.set({ autoTrack: $('#set-auto-track').checked }));
+$('#set-auto-track').addEventListener('change', async () => {
+  autoTrack = $('#set-auto-track').checked;
+  await store.setAutoTrack(autoTrack);
+});
 
 $$('#theme-seg button').forEach(b => b.addEventListener('click', async () => { settings = await store.updateSettings({ theme: b.dataset.themeVal }); applyTheme(b.dataset.themeVal); }));
 $('#set-max').addEventListener('change', async () => {

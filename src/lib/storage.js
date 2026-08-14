@@ -320,6 +320,17 @@ export async function saveRoster(roster) {
   await set(STORAGE_KEYS.ROSTER, Array.isArray(roster) ? roster : []);
 }
 
+/**
+ * Auto-tracking has its own key rather than living in `settings`, because the content script
+ * reads it on a Meet page where nothing else about the settings matters. Absent means on.
+ */
+export async function getAutoTrack() {
+  return (await get(STORAGE_KEYS.AUTO_TRACK)) !== false;
+}
+export async function setAutoTrack(on) {
+  await set(STORAGE_KEYS.AUTO_TRACK, !!on);
+}
+
 /* ============================ migration ============================ */
 
 /**
