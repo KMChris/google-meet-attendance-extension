@@ -65,12 +65,13 @@ export async function isAuthenticated() {
 }
 
 /**
- * Make authenticated API request to Google Sheets
+ * Make authenticated API request to Google Sheets.
+ *
+ * An expired token is the one failure worth retrying on its own — the second attempt is held to
+ * the same standard as the first, so a sync that did not land can never report that it did.
  */
 async function apiRequest(url, options = {}) {
-  const token = await getAuthToken();
-
-  const response = await fetch(url, {
+  const send = (token) => fetch(url, {
     ...options,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -79,23 +80,19 @@ async function apiRequest(url, options = {}) {
     }
   });
 
+  const token = await getAuthToken();
+  let response = await send(token);
+
   if (response.status === 401) {
-    // Token expired, remove and retry
     await removeCachedToken(token);
-    const newToken = await getAuthToken();
-    return fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${newToken}`,
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
-    }).then(r => r.json());
+    response = await send(await getAuthToken());
   }
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'API request failed');
+    // An error body is not always JSON (a proxy or a sign-in page is not), so the status is
+    // what we can always say.
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.error?.message || `Sheets API request failed (HTTP ${response.status})`);
   }
 
   return response.json();
