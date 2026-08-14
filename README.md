@@ -140,8 +140,7 @@ google-meet-attendance-extension/
         ├── attendance.js      # Pure derivation & aggregation (sessions, status, groups)
         ├── storage.js         # chrome.storage CRUD (history, series, settings) + migration
         ├── importers.js       # Read our own CSV and other extensions' backups
-        ├── i18n.js            # Runtime i18n (EN/PL)
-        ├── translations.js    # EN + PL string tables
+        ├── i18n.js            # Runtime i18n (EN/PL) over the _locales catalogues
         ├── sheets-api.js      # Google Sheets API
         ├── ui.css             # design system (tokens light/dark, primitives, timeline)
         └── fonts/             # Self-hosted woff2 (Space Grotesk, IBM Plex Sans, IBM Plex Mono)
@@ -231,9 +230,8 @@ the extension first and copy the ID shown for it on `chrome://extensions`.
 This extension uses the following permissions:
 
 - `storage`: Local storage for attendance data
-- `activeTab`: Access to current Google Meet page
 - `identity`: Google OAuth2 authentication (for Sheets integration)
-- `host_permissions (meet.google.com)`: Run content scripts on Google Meet pages
+- `host_permissions (meet.google.com)`: Run content scripts on Google Meet pages and talk to that tab
 
 ## Known Limitations
 

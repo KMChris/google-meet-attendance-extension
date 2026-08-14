@@ -36,8 +36,7 @@ Off until the user turns it on. If the user connects a Google account and enable
 | Permission | Reason |
 |------------|--------|
 | `storage` | Store attendance records and settings locally on the user's device |
-| `activeTab` | Communicate with the Google Meet tab to detect participants |
-| `host_permissions (meet.google.com)` | Run content script on Google Meet pages |
+| `host_permissions (meet.google.com)` | Run the content script on Google Meet pages and communicate with that tab to detect participants |
 | `identity` | Google OAuth2 authentication for optional Sheets sync to the user's own spreadsheet |
 
 ## Contact

@@ -5,10 +5,10 @@
   "short_name": "__MSG_extShortName__",
   "version": "1.3.1",
   "description": "__MSG_extDescription__",
+  "minimum_chrome_version": "91",
   "permissions": [
     "storage",
-    "identity",
-    "activeTab"
+    "identity"
   ],
   "host_permissions": [
     "https://meet.google.com/*"
