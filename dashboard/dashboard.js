@@ -291,8 +291,10 @@ async function removeNamesFromRoster(names, group) {
 }
 
 /* ============================ MEETINGS ============================ */
+// An imported record is not required to carry a title, and one missing it must not take the
+// whole list down with it.
 function meetingMatches(m, q) {
-  if (m.meetingTitle.toLowerCase().includes(q)) return true;
+  if (String(m.meetingTitle || '').toLowerCase().includes(q)) return true;
   return Object.keys(m.attendance).some(n => n.toLowerCase().includes(q));
 }
 function renderMeetings(filter = '') {
