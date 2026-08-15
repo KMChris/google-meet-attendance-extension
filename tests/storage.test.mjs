@@ -172,6 +172,37 @@ test('nothing to drop is nothing written', async () => {
   assert.equal(data.attendanceHistoryRev, before, 'the register was left exactly as it was');
 });
 
+/* ---------------------------- what a meeting is called ---------------------------- */
+
+test('a meeting stops being called by its code once the page says what it is', async () => {
+  const data = useStorage({
+    attendanceHistory: [meeting('abc-defg-hij-1', { meetingTitle: 'abc-defg-hij' })]
+  });
+
+  assert.ok(await store.nameUntitledMeeting('abc-defg-hij-1', 'Poniedziałkowy przegląd'),
+    'the record takes the name up');
+  assert.equal(data.attendanceHistory[0].meetingTitle, 'Poniedziałkowy przegląd');
+
+  // and a tab still holding the bare code does not write it back over the name
+  await store.upsertMeeting(meeting('abc-defg-hij-1', { meetingTitle: 'abc-defg-hij' }));
+  assert.equal(data.attendanceHistory[0].meetingTitle, 'Poniedziałkowy przegląd');
+});
+
+test('a name already given is not taken up again', async () => {
+  const data = useStorage({
+    attendanceHistory: [
+      meeting('abc-defg-hij-1', { meetingTitle: 'Przegląd', titleEdited: true }),
+      meeting('abc-defg-hij-2', { meetingTitle: 'Szkolenie' })
+    ]
+  });
+
+  assert.equal(await store.nameUntitledMeeting('abc-defg-hij-1', 'Coś ze strony'), null,
+    'a name given by hand is nobody else\'s to change');
+  assert.equal(await store.nameUntitledMeeting('abc-defg-hij-2', 'Coś ze strony'), null,
+    'and neither is one the page already gave');
+  assert.deepEqual(data.attendanceHistory.map(m => m.meetingTitle), ['Przegląd', 'Szkolenie']);
+});
+
 /* ---------------------------- the trash ---------------------------- */
 
 test('a deletion is written out of the register and into the trash', async () => {

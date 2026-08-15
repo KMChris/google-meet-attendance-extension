@@ -167,6 +167,11 @@ async function handleMeetingStarted(message, tabId) {
 async function handleHeartbeat(message, tabId) {
   const raw = await resolveRawMeeting(message, tabId);
   await storage.touchMeetingLive(raw.id, message.at || new Date().toISOString());
+  // Meet puts the calendar event in the tab title once the call is up, which is after the record
+  // was opened and named after its bare code. The page says what it sees every minute, so this is
+  // where a meeting stops being called abc-defg-hij.
+  const named = await storage.nameUntitledMeeting(raw.id, message.meetingTitle);
+  if (named) raw.meetingTitle = named.meetingTitle;   // or the next scan writes the code back
   return { success: true, id: raw.id };
 }
 

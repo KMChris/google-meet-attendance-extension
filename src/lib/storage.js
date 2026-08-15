@@ -21,7 +21,7 @@
 import {
   buildMeetingRecord, normalizeMeeting, resolveMappedName, splitConcatenatedEvents,
   annotateMerges, adoptMergeAnnotations, lastActivityMs, hasEventsAfter, closeOpenEvents,
-  deriveAttendee, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
+  deriveAttendee, isMeetCode, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -234,6 +234,12 @@ export async function upsertMeeting(record) {
     // A name given by hand stays given. The tracker holds the title it scraped when the call
     // opened and writes it again every few seconds, which would otherwise take a rename back.
     if (idx >= 0 && history[idx].titleEdited) next.meetingTitle = history[idx].meetingTitle;
+    // Nor does a placeholder take a name back. A tab that landed on the call before Meet put the
+    // calendar event in its title holds the bare code and writes it on every scan, and a second
+    // tab on the same call holds whatever it was told when it opened.
+    if (idx >= 0 && isPlaceholderName(next, next.meetingTitle) && !isPlaceholderName(next, history[idx].meetingTitle)) {
+      next.meetingTitle = history[idx].meetingTitle;
+    }
     // An end is only undone by a write that carries something later than it — the call coming back
     // after a reload, which is a rejoin somebody records. A scan still in flight when the meeting
     // finished reports nothing newer than the end, and reopening the record on it would leave a
@@ -273,6 +279,15 @@ export async function trimHistoryToCap() {
 }
 
 /**
+ * Is this all the title says: the call's own code, or the id it is filed under? That is what a
+ * record is opened with, and it is a stand-in for a name rather than one.
+ */
+function isPlaceholderName(meeting, title) {
+  const name = String(title == null ? '' : title).trim();
+  return !name || name === meeting.meetingCode || name === meeting.id || isMeetCode(name);
+}
+
+/**
  * Name a meeting by hand. Marked as named here (`titleEdited`), which is what keeps a live
  * meeting's own writes from putting the scraped title back — see upsertMeeting.
  */
@@ -283,6 +298,28 @@ export async function setMeetingTitle(id, title) {
     const meeting = history.find(m => m.id === id);
     if (meeting) { meeting.meetingTitle = name; meeting.titleEdited = true; }
     return { save: !!meeting, value: meeting || null };
+  });
+}
+
+/**
+ * Take up the name the page is showing, while the record has none of its own.
+ *
+ * A record is opened the moment a tab is on a call, and at that moment the tab title is usually
+ * still the bare code: Meet puts the calendar event there once the call is up, by which time
+ * nothing was left that would notice. The page says what it sees on every heartbeat, and this
+ * takes it up the first time it says something better. A name given by hand is never touched.
+ */
+export async function nameUntitledMeeting(id, title) {
+  const name = String(title || '').trim();
+  if (!name) return null;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === id);
+    if (!meeting || meeting.titleEdited ||
+        isPlaceholderName(meeting, name) || !isPlaceholderName(meeting, meeting.meetingTitle)) {
+      return { save: false, value: null };
+    }
+    meeting.meetingTitle = name;
+    return { value: meeting };
   });
 }
 
