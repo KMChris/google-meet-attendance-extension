@@ -82,6 +82,10 @@
 .row .num{text-align:right;font-variant-numeric:tabular-nums}
 
 .meetings-grid{grid-template-columns:58px 1fr 130px 64px 84px 40px}
+/* in the trash the row holds two glyphs where the list holds one, so its last column is
+   the wider of the two — on the head as well, or the grids would part company */
+.trash-list .meetings-grid{grid-template-columns:58px 1fr 130px 64px 84px 58px}
+.trash-list .col-actions{display:flex;justify-content:flex-end;gap:2px}
 .people-grid{grid-template-columns:1fr 84px 108px 150px 108px}
 
 /* ===================================================================
@@ -143,9 +147,6 @@
 .col-title,.col-name{min-width:0}
 .m-title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .m-sub{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:2px}
-.row-action{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);
-  background:var(--panel);border:1.5px solid var(--line-2);border-radius:7px;padding:6px 10px;cursor:pointer}
-.row-action:hover{border-color:var(--ink-3);color:var(--ink)}
 
 /* group pill */
 .group-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-2);
@@ -271,6 +272,8 @@
 .rc-table tr:hover .edit-name,.edit-name:focus-visible,
 .row:hover .row-ic,.row-ic:focus-visible{opacity:1}
 .edit-name:hover,.row-ic:hover{background:var(--panel-2);color:var(--ink)}
+/* the glyph that ends a meeting for good says so under the pointer, the way the batch action does */
+.row-ic.danger:hover{color:var(--red)}
 .merge-note{display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:10px 12px;border-radius:var(--radius-sm);
   background:var(--late-2);color:var(--late);font-size:12.5px;line-height:1.45}
 .merge-note svg{flex:none;margin-top:2px}
@@ -638,8 +641,10 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
   .stats:not(.kpi) .stat:nth-child(2){border-right:none}
   .stats:not(.kpi) .stat:nth-child(1),.stats:not(.kpi) .stat:nth-child(2){border-bottom:1px solid var(--line)}
   .fb-key{width:100%}
-  /* the action column takes what its label needs; a fixed 60px clipped "Restore" */
-  .meetings-grid{grid-template-columns:50px 1fr 48px auto}
+  /* the action column is one glyph wide, two in the trash — no longer a label to fit, so it
+     can be fixed again, and the head's columns stand where the rows' columns do */
+  .meetings-grid{grid-template-columns:50px 1fr 48px 40px}
+  .trash-list .meetings-grid{grid-template-columns:50px 1fr 48px 58px}
   .meetings-grid > :nth-child(3),.meetings-grid > :nth-child(5){display:none}
   .row.meetings-grid > .col-group,.row.meetings-grid > .col-avg{display:none}
   .people-grid{grid-template-columns:1fr 70px 90px}
@@ -679,7 +684,6 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 
   .list-head,.row{padding-left:14px;padding-right:14px}
   .pager{padding:11px 14px}
-  .row-action{padding:6px 8px}
 
   /* a person's name is the datum: it wraps to its full length on a phone, taking
      another line if it must, rather than ellipsing behind its own row */

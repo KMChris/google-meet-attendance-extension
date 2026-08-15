@@ -396,6 +396,8 @@ function renderMeetings(filter = '') {
   tab($('#btn-meetings-archive'), 'meetingsArchive', history.filter(m => m.archived).length, meetingsList === 'archive');
   tab($('#btn-meetings-trash'), 'meetingsTrash', trash.length, inTrash);
   $('#btn-trash-empty').hidden = !(inTrash && trash.length);
+  // the head and the rows are grids of their own: the card carries the mode, so both widen together
+  $('#meetings-table').classList.toggle('trash-list', inTrash);
 
   // stats
   const people = new Set(); let durSum = 0, shareSum = 0, shareN = 0;
@@ -443,8 +445,13 @@ function renderMeetings(filter = '') {
     const middle = inTrash
       ? `<span class="group-pill"><span class="gname">${esc(trashLeft(m))}</span></span>`
       : groupCell;
+    // a row in the trash carries both ways out — back to the history, or gone for good — as the
+    // same quiet glyphs the export is, since two worded buttons would not fit the column
     const action = inTrash
-      ? `<button class="row-action" data-act="restore" data-id="${esc(m.id)}">${esc(t('trashRestore'))}</button>`
+      ? `<button class="row-ic" data-act="restore" data-id="${esc(m.id)}" title="${esc(t('trashRestore'))}" aria-label="${esc(t('trashRestore'))}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3v6h6"/><path d="M3.5 9a9 9 0 1 0 2.1-3.4L3 8"/></svg></button>
+        <button class="row-ic danger" data-act="purge" data-id="${esc(m.id)}" title="${esc(t('trashDeleteNow'))}" aria-label="${esc(t('trashDeleteNow'))}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="m10 10.5 4 5m0-5-4 5"/></svg></button>`
       : `<button class="row-ic" data-act="export" data-id="${esc(m.id)}" title="${esc(t('exportCsv'))}" aria-label="${esc(t('exportCsv'))}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg></button>`;
     // a finished meeting reads as its full span; one still running only names its start,
@@ -476,6 +483,7 @@ function renderMeetings(filter = '') {
   }));
   $$('#meetings-body [data-act="export"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); downloadMeetingCSV(b.dataset.id); }));
   $$('#meetings-body [data-act="restore"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); restoreMeetings([b.dataset.id]); }));
+  $$('#meetings-body [data-act="purge"]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); purgeMeetings([b.dataset.id]); }));
 
   renderPager($('#meetings-pager'), {
     page: meetingsPage, pages, from, count: page.length, total: list.length,
