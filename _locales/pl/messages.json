@@ -171,26 +171,6 @@
   "rosterNotThere": {
     "message": "Nie ma ich na liście"
   },
-  "confirmDeleteMeetings": {
-    "message": "Trwale usunąć spotkania ($COUNT$)?",
-    "description": "Confirmation prompt before deleting the selected meetings.",
-    "placeholders": {
-      "count": {
-        "content": "$1",
-        "example": "3"
-      }
-    }
-  },
-  "deletedMeetingsToast": {
-    "message": "Usunięto spotkania: $COUNT$",
-    "description": "Confirmation after deleting meetings.",
-    "placeholders": {
-      "count": {
-        "content": "$1",
-        "example": "3"
-      }
-    }
-  },
   "meetingsSubtitle": {
     "message": "Twoje śledzone sesje Google Meet"
   },

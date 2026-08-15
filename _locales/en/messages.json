@@ -171,26 +171,6 @@
   "rosterNotThere": {
     "message": "Not on the roster"
   },
-  "confirmDeleteMeetings": {
-    "message": "Delete $COUNT$ meetings permanently?",
-    "description": "Confirmation prompt before deleting the selected meetings.",
-    "placeholders": {
-      "count": {
-        "content": "$1",
-        "example": "3"
-      }
-    }
-  },
-  "deletedMeetingsToast": {
-    "message": "Deleted $COUNT$ meetings",
-    "description": "Confirmation after deleting meetings.",
-    "placeholders": {
-      "count": {
-        "content": "$1",
-        "example": "3"
-      }
-    }
-  },
   "meetingsSubtitle": {
     "message": "Your tracked Google Meet sessions"
   },
