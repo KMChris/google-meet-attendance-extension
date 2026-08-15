@@ -53,7 +53,7 @@ export function get(key) {
   return new Promise((resolve) => chrome.storage.local.get([key], (r) => resolve(r[key])));
 }
 export function set(key, value) {
-  return new Promise((resolve) => chrome.storage.local.set({ [key]: value }, resolve));
+  return setMany({ [key]: value });
 }
 export function remove(key) {
   return new Promise((resolve) => chrome.storage.local.remove([key], resolve));
@@ -61,8 +61,19 @@ export function remove(key) {
 function getMany(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
 }
+
+/**
+ * Chrome refuses a write by saying so afterwards and doing nothing, which is how a store that has
+ * filled up loses a meeting without anybody noticing: the call goes on being recorded into a
+ * register that no longer takes it. Nothing here can put that right — the cap on stored meetings
+ * is what keeps it from happening — but a record that vanished should not have to be guessed at.
+ */
 function setMany(obj) {
-  return new Promise((resolve) => chrome.storage.local.set(obj, resolve));
+  return new Promise((resolve) => chrome.storage.local.set(obj, () => {
+    const err = chrome.runtime && chrome.runtime.lastError;
+    if (err) console.error('[GM Attendance] the store refused a write:', err.message, '·', Object.keys(obj).join(', '));
+    resolve();
+  }));
 }
 
 function uid(prefix) {
