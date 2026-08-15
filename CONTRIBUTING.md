@@ -21,9 +21,11 @@ node --test "tests/**/*.test.mjs"
 Anything that can be exercised without `chrome.*` belongs there: `attendance.js` and
 `importers.js` are pure by design, which is what makes the derivation testable at all.
 
-`storage.test.mjs` is the exception, and stands on a fake `chrome.storage.local` of its own: what
-it covers is two writers on one key at the same moment, which is a thing about `chrome.storage`
-rather than about our code, and cannot be shown any other way.
+Two files are the exception, and each stands on fakes of its own, because what they cover is
+timing between contexts and cannot be shown any other way. `storage.test.mjs` puts two writers on
+one key at the same moment over a fake `chrome.storage.local`. `sync-pass.test.mjs` runs two
+unattended passes over a fake spreadsheet (`chrome.identity` and `fetch`) and pins down that the
+sheet is only ever offered a meeting once.
 
 ## Project layout
 

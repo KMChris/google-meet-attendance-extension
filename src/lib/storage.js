@@ -8,7 +8,8 @@
  *   meetingGroups     : Group[]    ({ id, name, color, roster[], createdAt })
  *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings,
  *                         trashRetentionDays, theme }
- *   syncState         : { lastSyncAt } (when the sheet and this store last agreed)
+ *   syncState         : { lastSyncAt, claimedAt } (when the sheet and this store last agreed, and
+ *                       when a pass took up the one-at-a-time claim — see sheets-sync.autoSync)
  *   savedRoster       : string[]   (global default roster)
  *   autoTrack         : boolean    (own key — the content script reads it directly)
  *   schemaVersion     : number
@@ -682,8 +683,9 @@ export async function updateSettings(patch) {
 }
 
 /**
- * When the spreadsheet and this store last agreed. Kept out of `settings` because it is not a
- * preference: it is the timestamp the sync schedule reads to decide whether a pass is due.
+ * When the spreadsheet and this store last agreed, and whether a pass is running right now. Kept
+ * out of `settings` because neither is a preference: they are what the sync schedule reads to
+ * decide whether a pass is due and whether it is this context's to run.
  */
 export async function getSyncState() {
   const s = await get(STORAGE_KEYS.SYNC_STATE);

@@ -177,22 +177,39 @@ export async function pullEverything(spreadsheetId) {
 }
 
 /**
+ * How long a pass may hold the claim below before another context takes it as abandoned. Long
+ * enough for a slow spreadsheet, short enough that a worker stopped mid-request is not missed.
+ */
+const CLAIM_MS = 2 * 60 * 1000;
+
+/**
  * The scheduled entry point: does nothing unless auto-sync is on, a sheet is linked, the account
- * is still connected and the last pass is older than `maxAgeMs`. Returns null when it stayed out
- * of the way.
+ * is still connected, no pass is already running and the last one is older than `maxAgeMs`.
+ * Returns null when it stayed out of the way.
+ *
+ * Only one unattended pass runs at a time, across the worker and every open page alike. What a
+ * pass sends is what the sheet was missing when it started, so two overlapping passes would both
+ * find the same meetings missing and both send them — and the spreadsheet is only ever added to,
+ * so a row sent twice stays there twice. The moment a pass takes it up is written down, and that
+ * is a claim rather than a lock: two contexts reading it free in the same instant can still both
+ * go, but the window that has to be hit shrinks from a network round trip to a storage write.
  *
  * It never asks for a sign-in. A grant that has lapsed is left to the settings page, where the
  * user can see what is being asked instead of a window appearing on its own.
  */
-export async function autoSync({ maxAgeMs = BACKGROUND_INTERVAL_MS, force = false } = {}) {
+export async function autoSync({ maxAgeMs = BACKGROUND_INTERVAL_MS, force = false, now = Date.now() } = {}) {
   const settings = await storage.getSettings();
   if (!settings.autoSync || !settings.spreadsheetId) return null;
 
-  if (!force) {
-    const { lastSyncAt } = await storage.getSyncState();
-    if (Date.now() - (Date.parse(lastSyncAt) || 0) < maxAgeMs) return null;
-  }
+  const { lastSyncAt, claimedAt } = await storage.getSyncState();
+  if (!force && now - (Date.parse(lastSyncAt) || 0) < maxAgeMs) return null;
+  if (now - (Date.parse(claimedAt) || 0) < CLAIM_MS) return null;
   if (!(await api.isAuthenticated())) return null;
 
-  return syncNow(settings.spreadsheetId);
+  await storage.setSyncState({ claimedAt: new Date(now).toISOString() });
+  try {
+    return await syncNow(settings.spreadsheetId);
+  } finally {
+    await storage.setSyncState({ claimedAt: null });
+  }
 }
