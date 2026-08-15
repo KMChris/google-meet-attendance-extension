@@ -187,11 +187,17 @@ async function handleMeetingEnded(message, tabId) {
 
   const record = attendance.buildMeetingRecord(raw);
   record.endedAt = endTime;
-  const saved = await storage.upsertMeeting(record);
+
+  // Nothing was ever recorded in this one: the link was opened and the call was never joined. It
+  // is not a meeting that happened, and ended it would sit in the register empty — and from there
+  // in the spreadsheet, which only ever adds.
+  const empty = !Object.keys(record.attendance).length &&
+    (await storage.discardEmptyMeetings([record.id])).length > 0;
+  const saved = empty ? record : await storage.upsertMeeting(record);
 
   if (tabId != null) activeMeetings.delete(tabId);
   updateBadge(tabId, '', '');
-  return { success: true, id: saved.id };
+  return { success: true, id: saved.id, discarded: empty };
 }
 
 function updateBadge(tabId, text, color) {
@@ -319,7 +325,14 @@ async function reconcileOpenMeetings({ browserStart = false, ignoreTabId = null 
     stranded = stranded.filter(m => !live.has(m.meetingCode));
   }
 
-  const closed = await storage.endInterruptedMeetings(stranded.map(m => m.id));
+  const ids = stranded.map(m => m.id);
+  // The green room left standing, a Meet address in a tab nobody went back to: a record nothing was
+  // ever recorded in goes rather than being ended, or the register fills with meetings that never
+  // happened.
+  const dropped = await storage.discardEmptyMeetings(ids);
+  if (dropped.length) console.log('[GM Attendance] dropped records of calls nobody joined:', dropped.length);
+
+  const closed = await storage.endInterruptedMeetings(ids);
   if (closed.length) console.log('[GM Attendance] ended interrupted meetings:', closed.length);
 }
 

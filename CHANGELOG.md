@@ -129,6 +129,13 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   nothing left to tell the two apart with, and everything after the rejoin went unrecorded. Meet's
   own call controls coming back on screen is what says the call is up again, and the record is
   resumed rather than started over.
+- **A link you opened and never joined is no longer a meeting in the register.** The record is
+  opened as soon as the tab is on a call, which is what puts a call in progress on the panel the
+  moment it starts — but a green room left standing, or a Meet address in a tab nobody went back
+  to, then ended as a meeting with nobody in it and stayed there, and went up to the spreadsheet,
+  which never forgets. A record with no participant, no event and nothing given to it by hand goes
+  instead of being ended. One that was named, filed under a series or set aside is the user's, and
+  stays whatever it holds.
 
 ## [1.3.3] 2026-08-14
 
