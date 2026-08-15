@@ -391,6 +391,34 @@
   }
 
   /**
+   * Note that somebody is in the call at `at`: a first sighting opens their record, one after a
+   * departure opens their next session, and either way the name goes into `found`.
+   *
+   * Both ways of spotting a person report through here — the participant panel and the separate
+   * look for the user themselves — because what the scan below reads to decide who has left is
+   * `found`. A name only one of the two ever produces would be marked as gone on the very next
+   * scan and never picked up again, which is what became of whoever was running the meeting.
+   */
+  function markPresent(name, email, at, found) {
+    found.add(name);
+    const known = participants[name];
+    if (!known) {
+      participants[name] = { name, email: email || null, events: [{ time: at, type: 'Join' }], isPresent: true };
+      console.log('[Attendance] Participant joined:', name);
+      notifyBackground('participantJoined', participants[name]);
+      return;
+    }
+    // an address Meet only reveals later says nothing about presence, so it is not either/or
+    if (email && !known.email) known.email = email;
+    if (!known.isPresent) {
+      known.events.push({ time: at, type: 'Join' });
+      known.isPresent = true;
+      console.log('[Attendance] Participant rejoined:', name);
+      notifyBackground('participantRejoined', known);
+    }
+  }
+
+  /**
    * Scan for participants in the DOM
    */
   function scanParticipants() {
@@ -402,40 +430,18 @@
     // Try each selector
     for (const selector of PARTICIPANT_SELECTORS) {
       try {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(element => {
+        document.querySelectorAll(selector).forEach(element => {
           const info = extractParticipantInfo(element);
-          if (info && info.name) {
-            foundParticipants.add(info.name);
-
-            // New participant
-            if (!participants[info.name]) {
-              participants[info.name] = {
-                name: info.name,
-                email: info.email || null,
-                events: [{ time: currentTime, type: 'Join' }],
-                isPresent: true
-              };
-              console.log('[Attendance] Participant joined:', info.name);
-              notifyBackground('participantJoined', participants[info.name]);
-            }
-            // Update email if newly available
-            else if (info.email && !participants[info.name].email) {
-              participants[info.name].email = info.email;
-            }
-            // Rejoined after leaving
-            else if (!participants[info.name].isPresent) {
-              participants[info.name].events.push({ time: currentTime, type: 'Join' });
-              participants[info.name].isPresent = true;
-              console.log('[Attendance] Participant rejoined:', info.name);
-              notifyBackground('participantRejoined', participants[info.name]);
-            }
-          }
+          if (info && info.name) markPresent(info.name, info.email, currentTime, foundParticipants);
         });
       } catch (e) {
         console.warn('[Attendance] Selector failed:', selector, e);
       }
     }
+
+    // The user themselves, whom the panel does not always list under the name they are shown by.
+    // Before the check below rather than after it: they are in the call like anyone else.
+    detectSelf(currentTime, foundParticipants);
 
     // Check for participants who left
     for (const name in participants) {
@@ -446,15 +452,12 @@
         notifyBackground('participantLeft', participants[name]);
       }
     }
-
-    // Also try to detect self (the current user)
-    detectSelf();
   }
 
   /**
    * Detect the current user (self)
    */
-  function detectSelf() {
+  function detectSelf(at, found) {
     const selfSelectors = [
       '[data-self-name]',
       '[data-is-self="true"]',
@@ -466,16 +469,7 @@
       if (selfElement) {
         const selfName = (selfElement.getAttribute('data-self-name') ||
                           selfElement.textContent || '').trim();
-        if (isValidName(selfName) && !participants[selfName]) {
-          participants[selfName] = {
-            name: selfName,
-            email: null,
-            events: [{ time: new Date().toISOString(), type: 'Join' }],
-            isPresent: true,
-            isSelf: true
-          };
-          notifyBackground('participantJoined', participants[selfName]);
-        }
+        if (isValidName(selfName)) markPresent(selfName, null, at, found);
         break;
       }
     }
