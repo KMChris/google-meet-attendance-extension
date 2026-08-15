@@ -446,13 +446,18 @@ export async function mergeGroups(list) {
  * reloading a Meet tab ends the meeting on the way out: the page reports everyone as gone
  * before it goes away. Rejoining the same link a minute later is that same call coming back,
  * while the same link tomorrow is a new session and must stay one.
+ *
+ * Participants come back unmerged, the way they are stored. The worker seeds the tab's own record
+ * of the call from this and writes it out again on the next scan, so a merged view handed back
+ * here would be written to disk as one participant holding both people's events — the merge baked
+ * in, and no longer undoable. The map beside them merges the view on read, as it does everywhere.
  */
 export async function findResumableSession(code) {
   if (!code) return null;
   const now = Date.now();
   let best = null, bestT = 0;
   for (const raw of await getHistory()) {
-    const m = normalizeMeeting(raw);
+    const m = normalizeMeeting(raw, { mergeAliases: false });
     if (m.meetingCode !== code) continue;
     const window = m.endedAt ? REJOIN_WINDOW_MS : RESUME_WINDOW_MS;
     const t = lastActivityMs(m) || Date.parse(m.date) || 0;

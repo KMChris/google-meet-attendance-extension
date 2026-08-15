@@ -68,6 +68,7 @@ const person = (joinIso) => ({ email: null, events: [{ time: joinIso, type: 'Joi
 
 globalThis.chrome = { storage: fakeStorage() };
 const store = await import('../src/lib/storage.js');
+const A = await import('../src/lib/attendance.js');
 
 const useStorage = (seed) => globalThis.chrome.storage.reset(seed);
 
@@ -185,4 +186,43 @@ test('lowering the cap trims the store, not the copy a page was holding', async 
 
   assert.equal(await store.trimHistoryToCap(), 1);
   assert.deepEqual(data.attendanceHistory.map(m => m.id), ['m-3', 'm-2']);
+});
+
+/* ---------------------------- picking a call back up ---------------------------- */
+
+test('a merge survives the tab being reloaded without being baked in', async () => {
+  // the window a record resumes in is measured against the clock, so this one happened just now
+  const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
+  const data = useStorage({
+    attendanceHistory: [meeting('abc-defg-hij-1000', {
+      date: ago(40), liveAt: ago(1),
+      nameMap: { 'jan k': 'Jan Kowalski' },
+      attendance: {
+        'Jan K': { email: null, events: [{ time: ago(40), type: 'Join' }, { time: ago(30), type: 'Leave' }] },
+        'Jan Kowalski': { email: null, events: [{ time: ago(30), type: 'Join' }] }
+      }
+    })]
+  });
+
+  // what the worker does with a tab that has just come back: resume the record, fold the fresh
+  // scan into it, write the whole thing out again
+  const resumed = await store.findResumableSession('abc-defg-hij');
+  assert.deepEqual(Object.keys(resumed.attendance).sort(), ['Jan K', 'Jan Kowalski'],
+    'the two Meet identities come back as they were recorded');
+
+  const scan = (name) => ({ name, email: null, events: [{ time: ago(0), type: 'Join' }], isPresent: true });
+  await store.upsertMeeting(A.buildMeetingRecord({
+    id: resumed.id, meetingCode: 'abc-defg-hij', startTime: resumed.date, meetingTitle: resumed.meetingTitle,
+    participants: A.mergeRawParticipants(A.rawParticipantsFromMeeting(resumed), {
+      'Jan K': scan('Jan K'), 'Jan Kowalski': scan('Jan Kowalski')
+    })
+  }));
+
+  const merged = A.normalizeMeeting(data.attendanceHistory[0]).attendance['Jan Kowalski'];
+  assert.equal(A.presenceSeconds(merged, Date.now()), 40 * 60, 'the person was there for the whole forty minutes');
+
+  await store.unmergeParticipant('abc-defg-hij-1000', 'Jan Kowalski');
+  const split = A.normalizeMeeting(data.attendanceHistory[0]).attendance;
+  assert.equal(A.presenceSeconds(split['Jan K'], Date.now()), 10 * 60,
+    'and taking the merge back hands the first ten minutes to the identity that recorded them');
 });
