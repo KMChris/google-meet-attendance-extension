@@ -35,8 +35,6 @@ const MEET_URL = 'https://meet.google.com/*';
  * alone say nothing about where the page is.
  */
 const activeMeetings = new Map();
-/** tabId -> the resolve in flight, so two messages from one page load can't open two records. */
-const resolving = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // One at a time (see serial): every one of these reads the history, changes it and writes it
@@ -89,26 +87,20 @@ function sameCall(raw, code) {
  * Resolve the raw meeting for a tab, resuming a stored session or starting a new one.
  *
  * A page load reports its first participants and its start at the same moment, and reading the
- * store to decide which session they belong to takes long enough for both to arrive first. They
- * share the answer rather than each opening a record of their own, which they would stamp a
- * millisecond apart and so give two ids to one call.
+ * store to decide which session they belong to takes long enough for both to arrive first. What
+ * keeps them from each opening a record of their own — stamped a millisecond apart, so two ids for
+ * one call — is that every message is handled in turn: see `serial`, which the second one waits
+ * behind until the first has put the tab in `activeMeetings`.
  */
-function resolveRawMeeting(message, tabId) {
+async function resolveRawMeeting(message, tabId) {
   const code = message.meetingId || null;
 
   const held = tabId != null ? activeMeetings.get(tabId) : null;
   if (held) {
-    if (sameCall(held, code)) return Promise.resolve(held);
+    if (sameCall(held, code)) return held;
     activeMeetings.delete(tabId);   // this tab has moved on; what it says now is about another call
   }
-  if (tabId != null && resolving.has(tabId)) {
-    return resolving.get(tabId).then(raw => (sameCall(raw, code) ? raw : openRawMeeting(message, tabId)));
-  }
-
-  const pending = openRawMeeting(message, tabId);
-  if (tabId == null) return pending;
-  resolving.set(tabId, pending);
-  return pending.finally(() => resolving.delete(tabId));
+  return openRawMeeting(message, tabId);
 }
 
 async function openRawMeeting(message, tabId) {
@@ -417,6 +409,10 @@ function syncWithSheet(opts) {
  * One at a time: everything that changes the history reads it, changes it and writes it back, so
  * two at once would lose whichever wrote first. The caller still gets its own result and its own
  * failure, and neither leaves the queue broken for what is waiting behind it.
+ *
+ * It is also what keeps one page load to one record: the start of a meeting and its first scan
+ * arrive together, and the second waits here while the first works out which session they belong
+ * to and writes the tab down.
  */
 let queued = Promise.resolve();
 function serial(task) {
