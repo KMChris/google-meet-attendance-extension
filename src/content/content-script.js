@@ -195,6 +195,25 @@
   }
 
   /**
+   * Meet's own call controls, which are on screen for exactly as long as the call is.
+   *
+   * Their going is how a call that ended without saying so is noticed, and their coming back is
+   * how a call rejoined in place is noticed. Both readings ask the same question of the same
+   * markup on purpose: read differently, the two would take turns starting and stopping the
+   * same call.
+   */
+  function meetingControls() {
+    return document.querySelector('[data-is-muted]') ||
+           document.querySelector('[aria-label*="microphone"]') ||
+           document.querySelector('[aria-label*="마이크"]');
+  }
+
+  /** Is the call at this address up right now? */
+  function callIsUp() {
+    return !callHasEnded() && !!meetingControls();
+  }
+
+  /**
    * Derive a friendly meeting title from the tab title, falling back to the code.
    * Google Meet titles look like "Meet – abc-defg-hij" or a Calendar event name.
    */
@@ -668,12 +687,9 @@
     }
 
     // Method 4: Check if video/audio controls are gone (meeting UI disappeared)
-    const meetingControls = document.querySelector('[data-is-muted]') ||
-                            document.querySelector('[aria-label*="microphone"]') ||
-                            document.querySelector('[aria-label*="마이크"]');
     const hasMeetingId = getMeetingId();
 
-    if (hasMeetingId && !meetingControls && isTracking) {
+    if (hasMeetingId && !meetingControls() && isTracking) {
       // Wait a bit before confirming - UI might be loading
       if (!window._noControlsCount) window._noControlsCount = 0;
       window._noControlsCount++;
@@ -708,14 +724,19 @@
     }
 
     // One watchdog for both ends of the meeting: it closes the call we are in, and picks up
-    // the next one. Landing back on the home screen clears the finished call, so re-entering
-    // the same link later starts a fresh session rather than being mistaken for it. It is also
-    // where a copy that has been cut off from the extension finds out and stops.
+    // the next one. It is also where a copy that has been cut off from the extension finds out
+    // and stops.
+    //
+    // A call we already finished is not started again on the strength of its code still being in
+    // the address bar, which it is for as long as you stay on the screen you land on when you
+    // leave. Two things clear it: landing back on the home screen, so the same link later is a
+    // fresh session rather than this one, and the call itself coming back up — which is what
+    // "Rejoin" does, in place, with no page load for anything else to notice.
     watchdogInterval = setInterval(() => {
       if (!isExtensionAlive()) { teardown(); return; }
       if (isTracking) { detectMeetingEnd(); return; }
-      if (!getMeetingId()) stoppedMeetingId = null;
-      else startTracking();
+      if (!getMeetingId() || callIsUp()) stoppedMeetingId = null;
+      startTracking();
     }, 3000);
 
     heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_MS);

@@ -123,6 +123,12 @@ All notable changes to this project. This project adheres to [Semantic Versionin
 - **Lowering "meetings to keep" no longer writes back the register as the page found it.** The trim
   was made from the copy the dashboard was holding, which could be an hour old and knew nothing of
   the call recorded into it since; it reads the store now.
+- **Rejoining a call you left is tracked.** Meet puts you back in from the "you left the meeting"
+  screen without a page load, and the call keeps its code in the address bar the whole time it is
+  up — so the tracker, which refuses to start a call it has already finished at this address, had
+  nothing left to tell the two apart with, and everything after the rejoin went unrecorded. Meet's
+  own call controls coming back on screen is what says the call is up again, and the record is
+  resumed rather than started over.
 
 ## [1.3.3] 2026-08-14
 
