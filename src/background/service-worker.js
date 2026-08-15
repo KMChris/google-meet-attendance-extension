@@ -32,8 +32,21 @@ const activeMeetings = new Map();
 const resolving = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  handleMessage(message, sender)
-    .then(sendResponse)
+  // One at a time (see serial): every one of these reads the history, changes it and writes it
+  // back, and two at once would lose whichever wrote first — a page reporting into two calls, or
+  // a recovery pass running while one of them is being tracked.
+  serial(() => handleMessage(message, sender))
+    .then(result => {
+      sendResponse(result);
+      // A call that is over is the moment to hand the sheet this meeting, and to take from it
+      // whatever was recorded elsewhere meanwhile. Outside the queue: it goes to the network, and
+      // nothing being tracked can wait behind a request that may never answer.
+      //
+      // A page merely going away says nothing about the call — it comes straight back on a
+      // reload, and the record with it. That one waits for a later pass, because the sheet is
+      // written once and a half a meeting sent to it could never be corrected.
+      if (message.type === 'MEETING_ENDED' && message.reason !== 'unload') syncWithSheet({ force: true });
+    })
     .catch(error => {
       console.error('[GM Attendance] message error:', error);
       sendResponse({ error: error.message });
@@ -166,16 +179,18 @@ async function handleMeetingEnded(message, tabId) {
   const raw = await resolveRawMeeting(message, tabId);
   if (message.participants) raw.participants = attendance.mergeRawParticipants(raw.participants, message.participants);
 
+  const endTime = message.endTime || new Date().toISOString();
+  // Nobody is left standing in a call that is over. The page reports on the people this load of
+  // it knew about, and a resumed record holds more than that — anyone it never saw would keep
+  // their session open and read as still in the call for the life of the record.
+  raw.participants = attendance.closeOpenParticipants(raw.participants, endTime);
+
   const record = attendance.buildMeetingRecord(raw);
-  record.endedAt = message.endTime || new Date().toISOString();
+  record.endedAt = endTime;
   const saved = await storage.upsertMeeting(record);
 
   if (tabId != null) activeMeetings.delete(tabId);
   updateBadge(tabId, '', '');
-
-  // The call is over: the moment to hand the sheet this meeting, and to take from it whatever
-  // was recorded elsewhere in the meantime.
-  await syncWithSheet({ force: true });
   return { success: true, id: saved.id };
 }
 
@@ -189,26 +204,21 @@ function updateBadge(tabId, text, color) {
 }
 
 /**
- * Tab closed mid-meeting — close out any still-present sessions and finalize.
+ * Tab closed mid-meeting.
  *
- * The tab is only known here while this worker has been up as long as the call. When it hasn't,
- * nothing in memory says what the tab held, so the meeting is found the other way round: by the
- * Meet link that is no longer open anywhere.
+ * What the tab held is only known here while this worker has been up as long as the call, and a
+ * link can be open in more than one tab — a second one sitting in the green room is still a tab
+ * on that call. So closing one is not taken as the call ending: it says the call was live until
+ * this moment, and which records that leaves abandoned is worked out the way every other recovery
+ * works it out, by the Meet links no longer open anywhere.
  */
-chrome.tabs.onRemoved.addListener(async (tabId) => {
+chrome.tabs.onRemoved.addListener((tabId) => {
   const raw = activeMeetings.get(tabId);
-  if (!raw) {
-    await serial(() => reconcileOpenMeetings({ ignoreTabId: tabId }));
-    return;
-  }
-
-  const endTime = new Date().toISOString();
-  raw.participants = attendance.closeOpenParticipants(raw.participants, endTime);
-
-  const record = attendance.buildMeetingRecord(raw);
-  record.endedAt = endTime;
-  await storage.upsertMeeting(record);
-  activeMeetings.delete(tabId);
+  activeMeetings.delete(tabId);   // before the pass below, or it reads as still being reported into
+  serial(async () => {
+    if (raw) await storage.touchMeetingLive(raw.id, new Date().toISOString());
+    await reconcileOpenMeetings({ ignoreTabId: tabId });
+  }).catch(err => console.warn('[GM Attendance] could not close out the tab:', err));
 });
 
 /** Install / update: migrate to the current schema, default autoTrack on. */
@@ -240,10 +250,16 @@ async function meetTabs() {
   }
 }
 
-/** The meeting code a tab sits on, read from its URL the way the content script reads it. */
+/**
+ * The meeting code a tab sits on, read from its URL the way the content script reads it: out of
+ * the path, wherever in it the code sits. Reading it any more narrowly than the page does would
+ * leave a call whose link this cannot recognise looking like one nobody has open, and this is
+ * the judgement that ends abandoned meetings.
+ */
 function meetCodeOf(url) {
-  const m = /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})(?:[/?#]|$)/.exec(url || '');
-  return m ? m[1] : null;
+  const path = /^https?:\/\/meet\.google\.com(\/[^?#]*)/.exec(url || '');
+  const code = path && /\/([a-z]{3}-[a-z]{4}-[a-z]{3})/.exec(path[1]);
+  return code ? code[1] : null;
 }
 
 /**
@@ -284,6 +300,11 @@ async function ensureTrackers() {
  * tab shows, no call survived the browser going away.
  */
 async function reconcileOpenMeetings({ browserStart = false, ignoreTabId = null } = {}) {
+  // A browser that has just started is not tracking anything yet, whatever this worker has been
+  // told since it came up: a record being reported into at this point can only be one that a
+  // tracker put back into a restored tab has resumed, and no call survived the browser going away.
+  if (browserStart) activeMeetings.clear();
+
   const open = (await storage.getHistory()).filter(m => !m.endedAt);
   if (!open.length) return;
 
@@ -312,18 +333,21 @@ async function syncWithSheet(opts) {
   }
 }
 
-/** One pass at a time: these all rewrite the history, and two at once would lose one of them. */
+/**
+ * One at a time: everything that changes the history reads it, changes it and writes it back, so
+ * two at once would lose whichever wrote first. The caller still gets its own result and its own
+ * failure, and neither leaves the queue broken for what is waiting behind it.
+ */
 let queued = Promise.resolve();
 function serial(task) {
-  queued = queued.then(task).catch(err => console.warn('[GM Attendance] background pass failed:', err));
-  return queued;
+  const run = queued.then(task);
+  queued = run.catch(() => {});
+  return run;
 }
 
 /**
  * Housekeeping whenever the worker wakes: end what nothing got to end, give every Meet tab a
- * tracker back, drop what has waited out its stay in the trash, and take from the sheet anything
- * recorded on another machine. The dashboard does the last two on load as well; between the two,
- * neither needs an alarm of its own.
+ * tracker back, and drop what has waited out its stay in the trash.
  *
  * Ending comes before injecting, so a tracker put back into a tab resumes a record this pass has
  * already made up its mind about.
@@ -341,11 +365,23 @@ async function catchUp({ browserStart = false } = {}) {
   } catch (err) {
     console.warn('[GM Attendance] trash purge failed:', err);
   }
-  await syncWithSheet();
+}
+
+/**
+ * Waking up: the housekeeping, and then whatever was recorded on another machine. The dashboard
+ * takes from the sheet on load as well; between the two, neither needs an alarm of its own.
+ *
+ * The sheet is asked for afterwards rather than as part of the pass, because it is reached over
+ * the network: a request that never answers would hold up every call being tracked behind it.
+ */
+function wakeUp(opts) {
+  return serial(() => catchUp(opts))
+    .catch(err => console.warn('[GM Attendance] catch-up pass failed:', err))
+    .then(() => syncWithSheet());
 }
 // A browser that has just started took every call with it when it went, however its restored tabs
 // look, so that pass ends them all rather than asking which links are still on screen.
-chrome.runtime.onStartup.addListener(() => serial(() => catchUp({ browserStart: true })));
-serial(catchUp);
+chrome.runtime.onStartup.addListener(() => wakeUp({ browserStart: true }));
+wakeUp();
 
 console.log('[GM Attendance] service worker started');

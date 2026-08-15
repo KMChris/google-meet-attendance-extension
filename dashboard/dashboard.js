@@ -963,8 +963,7 @@ async function commitRename() {
   const v = input.value.trim();
   if (m && v) {
     m.meetingTitle = v;
-    const stored = await store.getMeetingById(m.id);
-    if (stored) { stored.meetingTitle = v; await store.upsertMeeting(stored); }
+    await store.setMeetingTitle(m.id, v);   // marked as named by hand: a live call won't undo it
     $('#detail-title').textContent = v;
   }
   setTitleEditing(input, false);

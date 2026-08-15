@@ -71,6 +71,49 @@ All notable changes to this project. This project adheres to [Semantic Versionin
 - **A tracker cut off from the extension stands down** instead of scanning the call every five
   seconds for the rest of the day and throwing on every send. Sending from a page whose extension
   has gone throws rather than rejecting, which the `.catch()` on it never held.
+- **Closing a second tab on the same link no longer ends the call.** A link opened twice — the
+  green room left in one tab while the call runs in another — meant the second tab held its own
+  copy of the record, taken when it opened, and closing it wrote that copy back over the call and
+  marked it finished: everyone who had arrived in the meantime was gone from the register. A tab
+  closing now only says the call was live until that moment, and which records that leaves
+  abandoned is worked out the way every other recovery works it out, by the links no longer open
+  anywhere.
+- **A finished meeting no longer has people standing in it.** The page reports on the people the
+  current load of it has seen, and a resumed record holds more than that — anyone it never saw kept
+  an open session and read as "in call" for the life of the record, in the panel, the report and
+  the export alike. Everyone still open is closed where the meeting ended.
+- **A scan that was on its way when the call finished no longer reopens it.** The last few seconds
+  of a call are busy, and a report already in flight arrived after the end and undid it, leaving a
+  meeting that had finished cleanly marked as one nobody ever ended. A record only reopens for a
+  write that carries something later than the end, which is what a rejoin is.
+- **A tracker put into a tab where the call is already over leaves it alone.** Leaving a call keeps
+  its code in the address bar, so a tab still showing "you left the meeting" looked exactly like one
+  in a call: putting a tracker back into it — after an update, or after switching the extension back
+  on — opened a record for a call that had finished hours ago, or ended a real one at the wrong
+  hour. Meet says plainly when a call is over, and that is now asked before anything is recorded.
+- **A restored tab no longer brings yesterday's call back to life.** At browser start a tab put back
+  on a Meet link got a tracker, and the tracker resumed the record the crash had left open, so a
+  call that ended when the browser did carried on growing. Nothing a browser has just started can
+  be tracking a call that predates it, and the pass that ends abandoned meetings now says so.
+- **A meeting renamed while it is still running keeps its name.** The tracker holds the title it
+  scraped when the call opened and writes it again every few seconds, which took the rename back
+  within seconds of it being made.
+- **A meeting is named after its calendar event, not its code, when a tracker joins a call already
+  in progress.** The first message to reach the worker is the one that opens the record, and only
+  the start of the meeting carries the title and the link; a first scan that got there ahead of it
+  left the meeting named `abc-defg-hij` for good.
+- **Reloading a Meet tab mid-call no longer hands the spreadsheet half a meeting.** A reload ends
+  the record on the way out and resumes it a moment later, and the sheet was written the instant it
+  ended — where, being append-only, that half stayed as the backup's version of the call. A page
+  going away is now told apart from a call ending, and only the second is worth writing home about.
+- **Entering another call in the same tab closes the first.** Meet can move between calls without a
+  page load, and the end was only noticed when the address bar lost its code altogether, so the
+  second call was recorded into the first one's register.
+- **Two things at once can no longer lose one of them.** Every write reads the whole register,
+  changes it and writes it back, and the worker did that from several places at the same time: a
+  heartbeat, a scan, a recovery pass, and the end of a call all racing. They queue now, one at a
+  time, with the spreadsheet left outside the queue where a request that never answers cannot hold
+  up a call being tracked behind it.
 
 ## [1.3.3] 2026-08-14
 

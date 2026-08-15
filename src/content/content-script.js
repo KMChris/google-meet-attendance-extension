@@ -181,6 +181,20 @@
   }
 
   /**
+   * Meet saying the call at this address is already over.
+   *
+   * Leaving a call keeps its code in the address bar, so the URL alone cannot tell a call in
+   * progress from the screen you land on when you leave one. It matters because this script is
+   * also put into tabs that were open long before it arrived (see the worker's ensureTrackers):
+   * without asking, a tab still showing "you left the meeting" would open a record for a call
+   * that finished hours ago, and then close it again at the wrong hour.
+   */
+  function callHasEnded() {
+    return !!(document.querySelector('[data-call-ended="true"]') ||
+              document.querySelector('[data-mdc-dialog-action="returnToHomePage"]'));
+  }
+
+  /**
    * Derive a friendly meeting title from the tab title, falling back to the code.
    * Google Meet titles look like "Meet – abc-defg-hij" or a Calendar event name.
    */
@@ -499,7 +513,7 @@
   function startTracking() {
     if (isTracking || autoTrack !== true) return;
     const id = getMeetingId();
-    if (!id || id === stoppedMeetingId) return;
+    if (!id || id === stoppedMeetingId || callHasEnded()) return;
     currentMeetingId = id;
     beginTracking();
   }
@@ -511,6 +525,18 @@
     scheduledWindow = null;
     scheduleAttempts = 0;
     panelAttempts = 0;
+
+    // Say what call this is before anything is reported into it. Whichever message reaches the
+    // worker first is the one that opens the record, and only this one carries the title and the
+    // link — a scan that got there first would leave the meeting named after its bare code.
+    send({
+      type: 'MEETING_STARTED',
+      meetingId: currentMeetingId,
+      startTime: new Date().toISOString(),
+      url: window.location.href,
+      meetingTitle: getMeetingTitle()
+    });
+    if (!isTracking) return;   // there was nobody left to send to: teardown has already run
 
     // Auto-open participant panel to initialize DOM, then close it
     openParticipantPanelOnce();
@@ -527,23 +553,18 @@
     }
     pollingInterval = setInterval(scanParticipants, 5000);
 
-    // Notify background that tracking started
-    send({
-      type: 'MEETING_STARTED',
-      meetingId: currentMeetingId,
-      startTime: new Date().toISOString(),
-      url: window.location.href,
-      meetingTitle: getMeetingTitle()
-    });
-
     // Read the event's scheduled hours while they may still be on screen
     pollScheduledWindow();
   }
 
   /**
-   * Stop tracking attendance
+   * Stop tracking attendance.
+   *
+   * `reason` says whether the call is over ('left') or this page is going away with the call
+   * still running ('unload'), which the worker needs because the second one comes back: a
+   * reload ends the record here and resumes it a moment later.
    */
-  function stopTracking() {
+  function stopTracking(reason = 'left') {
     console.log('[Attendance] Stopping tracking');
     isTracking = false;
 
@@ -571,7 +592,8 @@
       type: 'MEETING_ENDED',
       meetingId: currentMeetingId,
       endTime: endTime,
-      participants: participants
+      participants: participants,
+      reason: reason
     });
 
     stoppedMeetingId = currentMeetingId;
@@ -619,9 +641,10 @@
    * Detect when user leaves the meeting
    */
   function detectMeetingEnd() {
-    // Method 1: Check if URL no longer contains a meeting ID
+    // Method 1: the address bar is no longer on the call being tracked — the home screen, or
+    // another call entered without a page load, which is a second meeting and not this one.
     const currentUrlMeetingId = getMeetingId();
-    if (!currentUrlMeetingId && currentMeetingId) {
+    if (currentMeetingId && currentUrlMeetingId !== currentMeetingId) {
       console.log('[Attendance] Meeting end detected: URL changed');
       stopTracking();
       return true;
@@ -697,10 +720,11 @@
 
     heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_MS);
 
-    // Handle page unload
+    // Handle page unload — the page is going, the call is not: a reload picks the record
+    // straight back up, so the worker is told which of the two this is.
     window.addEventListener('beforeunload', () => {
       if (isTracking) {
-        stopTracking();
+        stopTracking('unload');
       }
     });
   }

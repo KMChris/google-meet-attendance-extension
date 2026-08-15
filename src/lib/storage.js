@@ -17,8 +17,8 @@
 
 import {
   buildMeetingRecord, normalizeMeeting, resolveMappedName, splitConcatenatedEvents,
-  annotateMerges, adoptMergeAnnotations, lastActivityMs, closeOpenEvents, deriveAttendee,
-  RESUME_WINDOW_MS, REJOIN_WINDOW_MS
+  annotateMerges, adoptMergeAnnotations, lastActivityMs, hasEventsAfter, closeOpenEvents,
+  deriveAttendee, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -101,6 +101,16 @@ export async function upsertMeeting(record) {
   const toStore = (nameMap && Object.keys(nameMap).length) ? { ...record, nameMap } : record;
 
   const merged = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
+  // A name given by hand stays given. The tracker holds the title it scraped when the call
+  // opened and writes it again every few seconds, which would otherwise take a rename back.
+  if (idx >= 0 && history[idx].titleEdited) merged.meetingTitle = history[idx].meetingTitle;
+  // An end is only undone by a write that carries something later than it — the call coming back
+  // after a reload, which is a rejoin somebody records. A scan still in flight when the meeting
+  // finished reports nothing newer than the end, and reopening the record on it would leave a
+  // finished call reading as one nobody ever ended.
+  if (idx >= 0 && history[idx].endedAt && !merged.endedAt && !hasEventsAfter(record, history[idx].endedAt)) {
+    merged.endedAt = history[idx].endedAt;
+  }
   if (idx >= 0) history[idx] = merged; else history.push(merged);
 
   history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
@@ -114,6 +124,22 @@ export async function upsertMeeting(record) {
   // worth a look when the record is new here — during a call this runs every few seconds.
   if (idx < 0) await purgeMeetings([record.id]);
   return normalizeMeeting(merged);
+}
+
+/**
+ * Name a meeting by hand. Marked as named here (`titleEdited`), which is what keeps a live
+ * meeting's own writes from putting the scraped title back — see upsertMeeting.
+ */
+export async function setMeetingTitle(id, title) {
+  const name = String(title || '').trim();
+  if (!name) return null;
+  const history = await getHistory();
+  const meeting = history.find(m => m.id === id);
+  if (!meeting) return null;
+  meeting.meetingTitle = name;
+  meeting.titleEdited = true;
+  await saveHistory(history);
+  return meeting;
 }
 
 /** Set aside (or bring back) meetings: a flag on the record, so nothing else about it changes. */
@@ -288,11 +314,17 @@ export async function findResumableSession(code) {
  * the watermark says has been abandoned.
  */
 
-/** Note that the page was still reporting at `at`. Costs one field on the record. */
+/**
+ * Note that the page was still reporting at `at`. Costs one field on the record.
+ *
+ * A record that carries an end is left alone: the watermark says when tracking was last known to
+ * be running, which is nothing a finished meeting has left to say, and moving it would stretch
+ * the window the meeting was observed over past the end it already has.
+ */
 export async function touchMeetingLive(id, at = new Date().toISOString()) {
   const history = await getHistory();
   const meeting = history.find(m => m.id === id);
-  if (!meeting || meeting.liveAt === at) return null;
+  if (!meeting || meeting.endedAt || meeting.liveAt === at) return null;
   meeting.liveAt = at;
   await saveHistory(history);
   return meeting;

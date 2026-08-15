@@ -179,7 +179,7 @@ link never overwrite each other, and can be recognised as a series.
   date: "2026-02-15T09:00:00Z",      // meeting start
   endedAt: "2026-02-15T10:00:00Z",
   liveAt: "2026-02-15T09:59:00Z",    // last sign of life — what says a call is live, and where a recovery ends an abandoned one
-  meetingTitle: "Weekly Standup",    // editable in the dashboard
+  meetingTitle: "Weekly Standup",    // editable in the dashboard; an edit is marked (titleEdited) so a live call cannot take it back
   url: "https://meet.google.com/abc-defg-hij",
   groupId: "grp-…",                  // optional — links to meetingGroups
   attendance: {

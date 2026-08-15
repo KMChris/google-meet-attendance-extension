@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   mergeRawParticipants, deriveAttendee, presenceSeconds, sessionsFromEvents,
-  closeOpenEvents, closeOpenParticipants, lastActivityMs,
+  closeOpenEvents, closeOpenParticipants, lastActivityMs, hasEventsAfter,
   meetingState, isLive, meetingDurationSeconds
 } from '../src/lib/attendance.js';
 
@@ -126,6 +126,31 @@ test('closing a meeting leaves nobody in the call, whoever was still in it', () 
   assert.equal(closed.Anna.isPresent, false);
   assert.equal(deriveAttendee(closed.Anna).totalSeconds, 45 * 60);
   assert.equal(deriveAttendee(closed.Bob).totalSeconds, 15 * 60, 'someone who had left keeps their own time');
+});
+
+/* ---- what may undo an end ----
+ * A scan is still on its way to the worker when the call finishes, and a record is written from
+ * whatever the page last reported. What that write shows is the only thing that can tell the
+ * call coming back from a message that was simply late.
+ */
+
+test('a rejoin after the end is the call coming back', () => {
+  const meeting = { attendance: { Anna: deriveAttendee({ events: [join('10:00'), leave('10:20'), join('10:22')] }) } };
+
+  assert.equal(hasEventsAfter(meeting, at('10:20')), true);
+});
+
+test('a scan that was merely late carries nothing after the end', () => {
+  const meeting = { attendance: { Anna: deriveAttendee({ events: [join('10:00'), leave('10:20')] }) } };
+
+  assert.equal(hasEventsAfter(meeting, at('10:20')), false, 'the closing Leave is the end, not something after it');
+  assert.equal(hasEventsAfter({ attendance: {} }, at('10:20')), false, 'and an empty scan says nothing at all');
+});
+
+test('with no end to protect, anything goes', () => {
+  const meeting = { attendance: { Anna: deriveAttendee({ events: [join('10:00')] }) } };
+
+  assert.equal(hasEventsAfter(meeting, null), true);
 });
 
 test('the watermark is what a quiet call is known by', () => {

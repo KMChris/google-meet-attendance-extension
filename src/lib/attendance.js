@@ -163,6 +163,20 @@ export function lastActivityMs(meeting) {
   return latest;
 }
 
+/**
+ * Does this meeting carry a Join or a Leave later than `iso`?
+ *
+ * What a write has to show before it is allowed to reopen a call that already ended: the call
+ * coming back is somebody arriving after the end, while a message still in flight when it
+ * finished carries nothing newer than the end it would otherwise undo.
+ */
+export function hasEventsAfter(meeting, iso) {
+  const after = ms(iso);
+  if (Number.isNaN(after)) return true;   // no end to protect
+  return Object.values((meeting && meeting.attendance) || {})
+    .some(p => (p.events || []).some(e => ms(e.time) > after));
+}
+
 /** Time since anything was known to be reporting into this meeting (Infinity if nothing ever was). */
 function sinceLastSignMs(meeting, now) {
   const last = lastActivityMs(meeting);
