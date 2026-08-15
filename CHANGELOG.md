@@ -157,6 +157,34 @@ All notable changes to this project. This project adheres to [Semantic Versionin
 - **The spreadsheet's Meetings tab says what the dashboard says.** Its start, end and duration were
   the moments tracking happened to begin and stop, so a meeting with hours of its own read minutes
   longer up there than it did here.
+- **Leaving a call in one tab no longer ends it in another.** Two tabs on one link are two pages on
+  one meeting, and one of them leaving says nothing about the other: the record was cut short at
+  that moment and everyone still in the call was marked as gone, and it stayed that way until the
+  last page left — long enough for the spreadsheet, which is written once, to be handed half a
+  meeting. The end that ends a record is now the last one. A page that has never seen anybody
+  itself, which is what sitting in the green room of the same link looks like, does not hold a call
+  open behind it.
+- **A tab that goes from one call to the next keeps the two apart.** The page says it has left on
+  its way out, and that is the one message that can go missing, being sent while the page is being
+  taken down: everything the tab reported from then on was recorded into the call it had left,
+  under that meeting's title, and the second meeting was never written down at all. What a page
+  says now has to be about the call the tab is reporting into.
+- **The screen you land on when you leave a call can no longer put the tracker in a loop.** There
+  were two readings of "this call is over", and they did not agree about one of Meet's markers: the
+  end detection stopped the call on it, and the watchdog, which had never heard of it, started the
+  call again three seconds later — over and over for as long as the page was left open, each turn
+  opening a record, ending it, and sending the spreadsheet after it. There is one list of them now,
+  and everything that asks the question reads it.
+- **A meeting goes up to the spreadsheet once, not twice.** A pass works out what to send by
+  reading what the sheet already has, so two passes running at once both found the same meetings
+  missing and both sent them — and the sheet is only ever added to, so a row sent twice stays there
+  twice. The worker is told to wake twice when the browser starts, which made that the ordinary
+  case rather than a rare one. It now runs one pass at a time, and an unattended pass writes down
+  that it is running, so an open dashboard and the worker no longer set off together.
+- **A write the store refuses is no longer silent.** Chrome answers a store that has filled up by
+  doing nothing and saying so afterwards, which nothing here was listening for: the call went on
+  being recorded into a register that was no longer taking it. It is reported now, so a record that
+  vanished can be traced to the reason rather than guessed at.
 
 ## [1.3.3] 2026-08-14
 
