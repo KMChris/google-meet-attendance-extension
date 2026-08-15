@@ -285,6 +285,24 @@ async function getRanges(spreadsheetId, ranges) {
 /* ------------------------- what a meeting looks like in the sheet ------------------------- */
 
 /**
+ * A cell that says what it holds instead of doing something.
+ *
+ * These rows are written with USER_ENTERED, which is what makes a duration arrive as a number and
+ * an hour as an hour — and also what makes a value beginning with `=`, `+`, `-` or `@` arrive as a
+ * formula. Half of what goes in here is other people's names, chosen by them and scraped off the
+ * page, so a participant called `=IMAGE("http://…")` would be writing into the user's own
+ * spreadsheet. A leading apostrophe is the sheet's own way of saying "this is text": it is not
+ * shown and is not part of the value.
+ *
+ * The backup rows below are left alone. They hold JSON, which begins with a brace and is read
+ * straight back out again.
+ */
+function text(value) {
+  const s = String(value == null ? '' : value);
+  return /^[=+\-@]/.test(s) ? `'${s}` : s;
+}
+
+/**
  * The readable row: the meeting's hours as the app reads them, not the moments tracking happened
  * to start and stop. A meeting with hours of its own (from its calendar event, or set by hand) is
  * that long here too — joining ten minutes early made the row say ten minutes more than the
@@ -293,9 +311,9 @@ async function getRanges(spreadsheetId, ranges) {
 export function meetingRow(meeting) {
   const names = Object.keys(meeting.attendance || {});
   const seconds = meetingDurationSeconds(meeting);
-  return [meeting.id, meeting.meetingTitle || '',
-    meetingStartIso(meeting) || '', meetingEndIso(meeting) || '',
-    seconds ? Math.round(seconds / 60).toString() : '', names.length, meeting.url || ''];
+  return [text(meeting.id), text(meeting.meetingTitle),
+    text(meetingStartIso(meeting)), text(meetingEndIso(meeting)),
+    seconds ? Math.round(seconds / 60).toString() : '', names.length, text(meeting.url)];
 }
 
 /** One row per raw Join/Leave event — a summary row only when a record carries no events. */
@@ -303,9 +321,10 @@ function participantRows(meeting) {
   const attendance = meeting.attendance || {};
   return Object.keys(attendance).flatMap(name => {
     const p = attendance[name] || {};
+    const id = text(meeting.id), who = text(name), mail = text(p.email);
     const events = Array.isArray(p.events) ? p.events : [];
-    if (events.length) return events.map(e => [meeting.id, name, p.email || '', e.time || '', e.type]);
-    return [[meeting.id, name, p.email || '', p.joinedAt || '', p.present ? 'In call' : 'Left']];
+    if (events.length) return events.map(e => [id, who, mail, text(e.time), text(e.type)]);
+    return [[id, who, mail, text(p.joinedAt), p.present ? 'In call' : 'Left']];
   });
 }
 
