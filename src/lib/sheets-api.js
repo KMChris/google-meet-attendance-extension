@@ -8,7 +8,7 @@
  * row that is empty — rows somebody else put there are pushed down, never overwritten.
  */
 
-import { meetingStartIso, meetingEndIso, meetingDurationSeconds } from './attendance.js';
+import { meetingStartIso, meetingEndIso, meetingDurationSeconds, normalizeMeeting } from './attendance.js';
 
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -326,8 +326,13 @@ export async function appendRecords(spreadsheetId, { meetings = [], groups = [] 
   await ensureSheets(spreadsheetId);
 
   if (meetings.length) {
-    await appendData(spreadsheetId, `${SHEET_MEETINGS}!A:G`, meetings.map(meetingRow));
-    const rows = meetings.flatMap(participantRows);
+    // The two readable tabs show a meeting the way the app does, with renames and merges folded
+    // in: someone recorded under two Meet identities is one person here too, and the count beside
+    // the meeting agrees with the dashboard. The backup rows below are the stored record itself,
+    // participants still separate, which is what keeps a restored merge undoable.
+    const readable = meetings.map(m => normalizeMeeting(m));
+    await appendData(spreadsheetId, `${SHEET_MEETINGS}!A:G`, readable.map(meetingRow));
+    const rows = readable.flatMap(participantRows);
     if (rows.length) await appendData(spreadsheetId, `${SHEET_PARTICIPANTS}!A:E`, rows);
   }
 

@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSpreadsheetRef, spreadsheetUrl, headerRepair, meetingRow } from '../src/lib/sheets-api.js';
+import { parseSpreadsheetRef, spreadsheetUrl, headerRepair, meetingRow, appendRecords } from '../src/lib/sheets-api.js';
 
 const ID = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
 
@@ -94,4 +94,59 @@ test('a meeting with no hours of its own is the span it was tracked over', () =>
   assert.equal(start, '2026-08-14T09:00:00.000Z');
   assert.equal(end, '2026-08-14T09:30:00.000Z');
   assert.equal(minutes, '30');
+});
+
+/* ---- what a send puts in each tab ---- */
+
+globalThis.chrome = {
+  runtime: { lastError: null, getManifest: () => ({ oauth2: { client_id: 'test.apps.googleusercontent.com' } }) },
+  identity: { getAuthToken: (_o, cb) => cb('token'), removeCachedAuthToken: (_o, cb) => cb() }
+};
+
+/** Every append, kept by the tab it went to. The rest of the API is answered and ignored. */
+const appends = new Map();
+globalThis.fetch = async (url, opts = {}) => {
+  const reply = (obj) => ({ ok: true, status: 200, json: async () => obj });
+  const append = /values\/([^:]+):append/.exec(url);
+  if (append) {
+    const tab = decodeURIComponent(append[1]).split('!')[0];
+    appends.set(tab, (appends.get(tab) || []).concat(JSON.parse(opts.body).values));
+    return reply({});
+  }
+  if (/values:batchGet/.test(url)) return reply({ valueRanges: [] });
+  if (/values:batchUpdate/.test(url)) return reply({});
+  if (/spreadsheets\/[^/:]+$/.test(url)) {
+    return reply({ sheets: ['Meetings', 'Participants', 'Backup'].map((title, i) => ({
+      properties: { title, sheetId: i, gridProperties: { frozenRowCount: 1 } }
+    })) });
+  }
+  return reply({});
+};
+
+test('a person recorded twice by Meet is one person in the tabs people read', async () => {
+  appends.clear();
+  // as it is stored: the two identities separate, the merge beside them as an alias
+  const meeting = {
+    id: 'abc-defg-hij-3', meetingCode: 'abc-defg-hij', meetingTitle: 'Standup', url: '',
+    date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T10:00:00.000Z',
+    nameMap: { 'jan k': 'Jan Kowalski' },
+    attendance: {
+      'Jan K': { email: null, events: [
+        { time: '2026-08-14T09:00:00.000Z', type: 'Join' }, { time: '2026-08-14T09:30:00.000Z', type: 'Leave' }] },
+      'Jan Kowalski': { email: null, events: [
+        { time: '2026-08-14T09:30:00.000Z', type: 'Join' }, { time: '2026-08-14T10:00:00.000Z', type: 'Leave' }] }
+    }
+  };
+
+  await appendRecords('a'.repeat(30), { meetings: [meeting] });
+
+  const [row] = appends.get('Meetings');
+  assert.equal(row[5], 1, 'one person attended, which is what the dashboard says too');
+
+  const names = new Set(appends.get('Participants').map(r => r[1]));
+  assert.deepEqual([...names], ['Jan Kowalski'], 'and their joins and leaves are listed under one name');
+
+  const backup = appends.get('Backup').map(r => r[3]).join('');
+  assert.deepEqual(Object.keys(JSON.parse(backup).attendance), ['Jan K', 'Jan Kowalski'],
+    'the backup keeps the record as it is stored, or restoring it could not take the merge back');
 });
