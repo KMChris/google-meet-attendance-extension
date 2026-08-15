@@ -3,7 +3,7 @@
  *
  * The CSV is the awkward one: it is the only export a person opens in a spreadsheet, and the only
  * one that comes back in again. So the row shape is a contract between the dashboard and this
- * module, and what these pin down is that the contract survives a round trip — including the names
+ * module, and what these pin down is that the contract survives a round trip, including the names
  * a spreadsheet would rather run than read.
  */
 import test from 'node:test';

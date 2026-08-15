@@ -196,7 +196,7 @@ async function load() {
 
 /**
  * Meetings that are still in play. A meeting set aside is out of the list, and out of the counts
- * that stand for the whole register with it — the read-out above, and the people below. Analytics
+ * that stand for the whole register with it: the read-out above, and the people below. Analytics
  * carries a switch for the times you want it all; nothing else does, and nothing is lost either
  * way: bringing a meeting back out of the archive brings its figures with it.
  */

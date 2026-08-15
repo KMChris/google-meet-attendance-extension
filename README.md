@@ -247,6 +247,7 @@ the extension first and copy the ID shown for it on `chrome://extensions`.
 This extension uses the following permissions:
 
 - `storage`: Local storage for attendance data
+- `unlimitedStorage`: Keep the register from running into the ceiling an extension is otherwise held to. A few hundred meetings with every join and leave can be several megabytes, and a write Chrome refuses is a meeting lost
 - `identity`: Google OAuth2 authentication (for Sheets integration)
 - `scripting`: Put the tracker back into a Google Meet tab that is already open — after an update, a reload or the extension being switched back on, and when the extension is installed while a call is already running
 - `host_permissions (meet.google.com)`: Run content scripts on Google Meet pages and talk to that tab

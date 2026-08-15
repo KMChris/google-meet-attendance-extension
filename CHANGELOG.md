@@ -219,6 +219,40 @@ All notable changes to this project. This project adheres to [Semantic Versionin
 - **The extension says which Chrome it actually needs.** It asked for 91 while its colours are
   mixed with `color-mix()`, which arrived in 111, so on anything older it installed and then came
   up with pieces of itself missing.
+- **A change put back is put back whole.** Where two contexts wrote at once, the one that landed
+  second re-worked its change on what it had gone over and wrote the two together, unless the
+  re-run found nothing left of its own to do: then it returned, and what stood in the store was
+  its own write, still sitting on top of the other. Emptying the trash beside a single deletion
+  brought the trash back. It now puts back what it went over either way.
+- **The trash is guarded like the register.** Deleting is two writes, and the second is the one
+  that matters: the record leaves the register first and only then arrives in the trash. Both
+  halves go through the same guarded write now, so nothing that clears the trash beside a deletion
+  can drop the meeting out of both at once.
+- **Restoring a backup keeps the meetings it says it keeps.** A sheet or a file can carry more
+  than "meetings to keep" allows, and all of them were taken in and counted, then quietly thinned
+  by the first call recorded afterwards. The limit is applied on the way in, the count is what was
+  kept, and the note under the sheet says how many were left up there and how to fetch them.
+- **A meeting stops being called `abc-defg-hij`.** The record is opened the moment a tab is on a
+  call, when the tab title is usually still the bare code; Meet puts the calendar event there once
+  the call is up, by which time nothing was left that would notice. The page says what it sees
+  every minute, and the record takes the name up the first time it says something better. A name
+  given by hand is still never touched, and a tab that has not been told the meeting's name can no
+  longer write its code over one that has.
+- **The archive is out of the figures, not just out of the list.** Meetings set aside still
+  counted in the read-out at the top and in the People tab, so putting a meeting away moved it and
+  changed nothing about the numbers standing for the whole register. Analytics carries a switch for
+  counting them anyway, which appears once there is an archive to count.
+- **A name is written to a CSV as a name.** Excel, Sheets and LibreOffice all read a cell
+  beginning with `=` as a formula, and the export carries other people's display names. The export
+  marks such a cell as text and the import takes the mark back off, so a file this app wrote still
+  imports as the names it was written from.
+- **Every CSV this app writes now goes out the same way**, the analytics slice included: it had a
+  copy of the writer with a different line ending, which is exactly the sort of thing a second copy
+  does.
+- **The register has room for what the setting allows.** Two hundred meetings with every join and
+  leave can run to several megabytes, which is close enough to the ceiling an extension is held to
+  that a write could be refused and a meeting lost. The extension asks for `unlimitedStorage`,
+  which grants nothing beyond its own local storage.
 
 ## [1.3.3] 2026-08-14
 

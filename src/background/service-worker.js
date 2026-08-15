@@ -88,8 +88,8 @@ function sameCall(raw, code) {
  *
  * A page load reports its first participants and its start at the same moment, and reading the
  * store to decide which session they belong to takes long enough for both to arrive first. What
- * keeps them from each opening a record of their own — stamped a millisecond apart, so two ids for
- * one call — is that every message is handled in turn: see `serial`, which the second one waits
+ * keeps them from each opening a record of their own (stamped a millisecond apart, so two ids for
+ * one call) is that every message is handled in turn: see `serial`, which the second one waits
  * behind until the first has put the tab in `activeMeetings`.
  */
 async function resolveRawMeeting(message, tabId) {
