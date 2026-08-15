@@ -74,6 +74,18 @@ async function handleMessage(message, sender) {
 }
 
 /**
+ * Is what a page is saying about the call this tab is already reporting into?
+ *
+ * A tab is not tied to one meeting: entering another call from the same tab is a page load, and
+ * leaving one for the next is not even that. The page says so on its way out, and that message —
+ * sent while the page is being taken down — is the one that can go missing. Without asking, the
+ * second meeting's people would be recorded into the first meeting's record, under its title.
+ */
+function sameCall(raw, code) {
+  return !code || !raw.meetingCode || raw.meetingCode === code;
+}
+
+/**
  * Resolve the raw meeting for a tab, resuming a stored session or starting a new one.
  *
  * A page load reports its first participants and its start at the same moment, and reading the
@@ -82,8 +94,16 @@ async function handleMessage(message, sender) {
  * millisecond apart and so give two ids to one call.
  */
 function resolveRawMeeting(message, tabId) {
-  if (tabId != null && activeMeetings.has(tabId)) return Promise.resolve(activeMeetings.get(tabId));
-  if (tabId != null && resolving.has(tabId)) return resolving.get(tabId);
+  const code = message.meetingId || null;
+
+  const held = tabId != null ? activeMeetings.get(tabId) : null;
+  if (held) {
+    if (sameCall(held, code)) return Promise.resolve(held);
+    activeMeetings.delete(tabId);   // this tab has moved on; what it says now is about another call
+  }
+  if (tabId != null && resolving.has(tabId)) {
+    return resolving.get(tabId).then(raw => (sameCall(raw, code) ? raw : openRawMeeting(message, tabId)));
+  }
 
   const pending = openRawMeeting(message, tabId);
   if (tabId == null) return pending;
