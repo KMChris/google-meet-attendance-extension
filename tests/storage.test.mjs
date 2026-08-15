@@ -233,6 +233,23 @@ test('lowering the cap trims the store, not the copy a page was holding', async 
   assert.deepEqual(data.attendanceHistory.map(m => m.id), ['m-3', 'm-2']);
 });
 
+test('a restore brings home what the register keeps, and says how many', async () => {
+  const data = useStorage({
+    settings: { maxStoredMeetings: 2 },
+    attendanceHistory: [meeting('m-3', { date: '2026-08-14T11:00:00.000Z' })]
+  });
+
+  // a backup carrying more than this register holds: the two newest belong here, the old one
+  // would only be dropped again by the next call recorded
+  const added = await store.mergeMeetings([
+    meeting('m-2', { date: '2026-08-14T10:00:00.000Z' }),
+    meeting('m-1', { date: '2026-08-14T09:00:00.000Z' })
+  ]);
+
+  assert.equal(added, 1, 'what was reported is what was kept');
+  assert.deepEqual(data.attendanceHistory.map(m => m.id), ['m-3', 'm-2']);
+});
+
 /* ---------------------------- picking a call back up ---------------------------- */
 
 test('a merge survives the tab being reloaded without being baked in', async () => {

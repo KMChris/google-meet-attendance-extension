@@ -155,14 +155,16 @@ export async function pushEverything(spreadsheetId) {
  * never seen are added. A meeting already here keeps whatever was edited about it, and one in the
  * trash stays deleted — a backup that still carries it must not undo the deletion.
  *
- * Which of the two a record was skipped for is counted separately, because there is something to
- * do about the second (the trash) and nothing to do about the first.
+ * Which of the three a record was skipped for is counted separately, because there is something to
+ * do about the second (the trash) and about the third ("meetings to keep"), and nothing to do
+ * about the first.
  */
 export async function pullEverything(spreadsheetId) {
   const { meetings, groups } = await api.restoreAll(spreadsheetId);
   const [history, trash] = await Promise.all([storage.getHistory(), storage.getTrash()]);
   const here = new Set(history.map(m => m.id));
   const deleted = new Set(trash.map(m => m.id));
+  const fresh = meetings.filter(m => m && m.id && !here.has(m.id) && !deleted.has(m.id)).length;
 
   const pulledGroups = await storage.mergeGroups(groups);    // series first: a meeting may name one
   const pulled = await storage.mergeMeetings(meetings);
@@ -172,6 +174,8 @@ export async function pullEverything(spreadsheetId) {
     pulled, pulledGroups,
     kept: meetings.filter(m => here.has(m.id)).length,
     trashed: meetings.filter(m => deleted.has(m.id)).length,
+    // older than the register keeps: taken in, they would only be dropped by the next write
+    capped: Math.max(0, fresh - pulled),
     keptGroups: groups.length - pulledGroups
   };
 }

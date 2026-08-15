@@ -422,7 +422,7 @@ export async function clearHistory() {
  * Returns how many were added.
  */
 export async function mergeMeetings(records) {
-  const trash = await getTrash();
+  const [trash, settings] = await Promise.all([getTrash(), getSettings()]);
   return mutateHistory(history => {
     const seen = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
 
@@ -434,12 +434,16 @@ export async function mergeMeetings(records) {
     });
     if (!fresh.length) return { save: false, value: 0 };
 
-    return {
-      list: history.concat(fresh)
-        .map(m => normalizeMeeting(m, { mergeAliases: false }))
-        .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
-      value: fresh.length
-    };
+    // Held to "meetings to keep" here rather than by whatever writes next. A file or a sheet can
+    // carry more than the register keeps, and taking all of them in would report every one and
+    // then lose the oldest to the first call recorded afterwards, without a word. What is left out
+    // is still in the file and still in the sheet, and comes home when the setting is raised.
+    const next = capped(history.concat(fresh)
+      .map(m => normalizeMeeting(m, { mergeAliases: false }))
+      .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)), settings);
+
+    const kept = new Set(next.map(m => m.id));
+    return { list: next, value: fresh.filter(m => kept.has(m.id)).length };
   });
 }
 

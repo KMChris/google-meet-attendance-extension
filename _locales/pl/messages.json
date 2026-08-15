@@ -1235,6 +1235,16 @@
       }
     }
   },
+  "sheetsRestoreCapped": {
+    "message": "Spotkania z arkusza starsze, niż pozwala ustawienie \"przechowywane spotkania\": $COUNT$. Zostały w arkuszu, zamiast trafić tutaj i zniknąć przy pierwszym nagranym połączeniu. Podnieś limit w Ustawieniach i przywróć ponownie, aby je ściągnąć.",
+    "description": "Note after restoring from Sheets, when records were older than the stored-meetings cap.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "18"
+      }
+    }
+  },
   "sheetsRestoreFailed": {
     "message": "Nie udało się odczytać arkusza"
   },

@@ -1235,6 +1235,16 @@
       }
     }
   },
+  "sheetsRestoreCapped": {
+    "message": "Meetings from the sheet older than \"meetings to keep\" allows: $COUNT$. They were left in the sheet rather than brought in and dropped again by the next call recorded. Raise the limit in Settings and restore again to bring them home.",
+    "description": "Note after restoring from Sheets, when records were older than the stored-meetings cap.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "18"
+      }
+    }
+  },
   "sheetsRestoreFailed": {
     "message": "Could not read the sheet"
   },

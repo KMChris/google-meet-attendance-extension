@@ -2217,7 +2217,8 @@ $('#sheets-restore').addEventListener('click', async () => {
       toast(res.pulled || res.pulledGroups ? t('sheetsRestoredToast', { count: res.pulled }) : t('importNothingNew'));
       sheetsNote(
         res.kept && t('sheetsRestoreKept', { count: res.kept }),
-        res.trashed && t('sheetsRestoreTrashed', { count: res.trashed })
+        res.trashed && t('sheetsRestoreTrashed', { count: res.trashed }),
+        res.capped && t('sheetsRestoreCapped', { count: res.capped })
       );
     }
   } catch (e) { console.error('[GM Attendance] restore from Sheets failed:', (e && e.message) || e); toast(t('sheetsRestoreFailed')); }
