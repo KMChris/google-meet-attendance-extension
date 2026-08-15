@@ -306,6 +306,10 @@ async function ensureTrackers() {
  * tab shows, no call survived the browser going away.
  */
 async function reconcileOpenMeetings({ browserStart = false, ignoreTabId = null } = {}) {
+  // What this worker holds open in a tab, which is the one thing that says a record has only just
+  // been opened rather than been left behind. Kept before the line below takes it away.
+  const held = new Set([...activeMeetings.values()].map(raw => raw.id));
+
   // A browser that has just started is not tracking anything yet, whatever this worker has been
   // told since it came up: a record being reported into at this point can only be one that a
   // tracker put back into a restored tab has resumed, and no call survived the browser going away.
@@ -328,8 +332,10 @@ async function reconcileOpenMeetings({ browserStart = false, ignoreTabId = null 
   const ids = stranded.map(m => m.id);
   // The green room left standing, a Meet address in a tab nobody went back to: a record nothing was
   // ever recorded in goes rather than being ended, or the register fills with meetings that never
-  // happened.
-  const dropped = await storage.discardEmptyMeetings(ids);
+  // happened. A record this worker has just opened in a tab is not one of those — it is empty
+  // because the first scan has not come back yet, and only the message that opened it carries the
+  // meeting's name and link.
+  const dropped = await storage.discardEmptyMeetings(ids.filter(id => !held.has(id)));
   if (dropped.length) console.log('[GM Attendance] dropped records of calls nobody joined:', dropped.length);
 
   const closed = await storage.endInterruptedMeetings(ids);
