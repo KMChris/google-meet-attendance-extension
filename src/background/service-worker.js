@@ -389,14 +389,23 @@ async function reconcileOpenMeetings({ browserStart = false, ignoreTabId = null 
   if (closed.length) console.log('[GM Attendance] ended interrupted meetings:', closed.length);
 }
 
-/** Two-way sync, whenever this worker is a good place to run one. Failures are never fatal. */
-async function syncWithSheet(opts) {
-  try {
-    const moved = await sheetsSync.autoSync(opts);
-    if (moved) console.log('[GM Attendance] synced with Sheets:', moved);
-  } catch (err) {
-    console.warn('[GM Attendance] auto-sync failed:', err);
-  }
+/**
+ * Two-way sync, whenever this worker is a good place to run one. Failures are never fatal.
+ *
+ * One pass at a time. This worker is told to wake twice when the browser starts — once because it
+ * started, once because Chrome says the browser did — and a pass decides what to send by reading
+ * what the sheet already has: two of them reading before either has written would both find the
+ * same meetings missing, and both send them. The spreadsheet is only ever added to, so a row sent
+ * twice stays there twice.
+ */
+let syncing = null;
+function syncWithSheet(opts) {
+  if (syncing) return syncing;
+  syncing = sheetsSync.autoSync(opts)
+    .then(moved => { if (moved) console.log('[GM Attendance] synced with Sheets:', moved); })
+    .catch(err => console.warn('[GM Attendance] auto-sync failed:', err))
+    .finally(() => { syncing = null; });
+  return syncing;
 }
 
 /**
