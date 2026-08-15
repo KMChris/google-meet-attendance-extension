@@ -30,8 +30,21 @@ const state = {
   from: '',           // 'YYYY-MM-DD', only meaningful for the custom preset
   to: '',
   groups: [],         // group ids (plus UNGROUPED); [] means every series
-  titles: []          // meeting titles; [] means every meeting
+  titles: [],         // meeting titles; [] means every meeting
+  archived: false     // meetings set aside are out of these figures unless this is on
 };
+
+/**
+ * The meetings this view will consider at all.
+ *
+ * A meeting in the archive has been set aside, which is a statement about the meeting and not just
+ * about the list it is on: it stays out of the figures here as it stays out of the list. The
+ * switch in the filter bar is for the times you want the whole record anyway.
+ */
+function inScope() {
+  const all = deps.history();
+  return state.archived ? all : all.filter(m => !m.archived);
+}
 
 const tables = new Map();   // chart key -> { head, rows } for the table view
 const pickers = new Map();
@@ -58,7 +71,7 @@ function txt(el, value) { el.textContent = value == null ? '' : String(value); }
 
 /** The date window the filters currently describe, as inclusive local-day bounds. */
 function resolveRange() {
-  const all = deps.history();
+  const all = inScope();
   const now = new Date();
 
   if (state.preset === 'custom') {
@@ -332,6 +345,7 @@ async function restore() {
       if (typeof saved.to === 'string') state.to = saved.to;
       if (Array.isArray(saved.groups)) state.groups = saved.groups.filter(x => typeof x === 'string');
       if (Array.isArray(saved.titles)) state.titles = saved.titles.filter(x => typeof x === 'string');
+      state.archived = saved.archived === true;
     }
   } catch { /* first run */ }
 }
@@ -410,8 +424,13 @@ export async function initAnalytics(dependencies) {
     persist();
     renderAnalytics();
   }));
+  $('#filter-archived').addEventListener('change', e => {
+    state.archived = e.target.checked;
+    persist();
+    renderAnalytics();
+  });
   $('#filters-reset').addEventListener('click', () => {
-    state.preset = '30d'; state.from = ''; state.to = ''; state.groups = []; state.titles = [];
+    state.preset = '30d'; state.from = ''; state.to = ''; state.groups = []; state.titles = []; state.archived = false;
     persist();
     renderAnalytics();
   });
@@ -426,10 +445,12 @@ export async function initAnalytics(dependencies) {
 
 export function renderAnalytics() {
   if (!deps) return;
-  const all = deps.history();
   const empty = $('#analytics-empty'), body = $('#analytics-body');
-  if (!all.length) { body.hidden = true; empty.classList.add('visible'); return; }
+  // "nothing here at all" is about the register, not about the slice: a set of meetings that are
+  // all in the archive falls through to the filter bar, where the switch that counts them is
+  if (!deps.history().length) { body.hidden = true; empty.classList.add('visible'); return; }
   body.hidden = false; empty.classList.remove('visible');
+  const all = inScope();
 
   const { from, to } = resolveRange();
   syncFilterUI(from, to);
@@ -477,7 +498,7 @@ function syncFilterUI(from, to) {
   if (document.activeElement !== fromEl) fromEl.value = dayKey(from);
   if (document.activeElement !== toEl) toEl.value = dayKey(to);
 
-  const all = deps.history();
+  const all = inScope();
 
   // Each picker lists what the *other* filters still allow, with live counts.
   const byGroup = new Map();
@@ -504,7 +525,12 @@ function syncFilterUI(from, to) {
     .map(([label, n]) => ({ id: label, label, hint: n }));
   setPicker('#pick-titles', titleItems, state.titles, t('pickAllMeetings'));
 
-  const dirty = state.preset !== '30d' || state.groups.length || state.titles.length;
+  // the switch only earns its place while there is an archive to count
+  const archive = deps.history().some(m => m.archived);
+  $('#filter-archived').closest('.switch-row').hidden = !archive;
+  $('#filter-archived').checked = state.archived;
+
+  const dirty = state.preset !== '30d' || state.groups.length || state.titles.length || state.archived;
   $('#filters-reset').hidden = !dirty;
 }
 
@@ -815,7 +841,7 @@ function renderInsights(scoped, prev) {
 
 function exportSlice() {
   const { from, to } = resolveRange();
-  const scoped = deps.history().filter(m => matches(m, from, to)).sort((a, b) => A.meetingStartMs(a) - A.meetingStartMs(b));
+  const scoped = inScope().filter(m => matches(m, from, to)).sort((a, b) => A.meetingStartMs(a) - A.meetingStartMs(b));
   if (!scoped.length) return;
 
   const rows = [[t('colDate'), t('colMeeting'), t('colGroup'), t('statLength'), t('colPeople'),

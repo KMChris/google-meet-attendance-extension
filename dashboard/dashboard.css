@@ -445,6 +445,8 @@ tr:hover .cell-go .go,tr:focus-visible .cell-go .go{opacity:1}
 .filterbar{padding:14px 18px;margin-bottom:18px;display:flex;flex-direction:column;gap:11px}
 .fb-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fb-key{flex:none;color:var(--ink-3)}
+/* the archive switch sits in the row, not under it like the ones in a settings block */
+.fb-line .switch-row{margin-top:0;color:var(--ink-2)}
 .fb-dates{display:flex;align-items:center;gap:7px}
 .fb-dates .field{height:34px;padding:6px 9px;width:auto;font-size:12px}
 .fb-dash{color:var(--ink-3)}

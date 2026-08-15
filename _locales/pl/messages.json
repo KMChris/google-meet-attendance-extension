@@ -783,6 +783,14 @@
   "filterRange": {
     "message": "Zakres"
   },
+  "filterArchived": {
+    "message": "Licz archiwum",
+    "description": "Analytics filter: include archived meetings in the slice."
+  },
+  "filterArchivedHint": {
+    "message": "Spotkania odłożone do archiwum nie wchodzą do tych liczb. Włącz, aby liczyć je razem z resztą.",
+    "description": "Title on the analytics archive switch."
+  },
   "filterSeries": {
     "message": "Cykle"
   },

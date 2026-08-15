@@ -783,6 +783,14 @@
   "filterRange": {
     "message": "Range"
   },
+  "filterArchived": {
+    "message": "Count the archive",
+    "description": "Analytics filter: include archived meetings in the slice."
+  },
+  "filterArchivedHint": {
+    "message": "Meetings you have set aside are left out of these figures. Turn this on to count them as well.",
+    "description": "Title on the analytics archive switch."
+  },
   "filterSeries": {
     "message": "Series"
   },

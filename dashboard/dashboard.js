@@ -203,16 +203,25 @@ async function load() {
   liveSettled();
 }
 
+/**
+ * Meetings that are still in play. A meeting set aside is out of the list, and out of the counts
+ * that stand for the whole register with it — the read-out above, and the people below. Analytics
+ * carries a switch for the times you want it all; nothing else does, and nothing is lost either
+ * way: bringing a meeting back out of the archive brings its figures with it.
+ */
+function current() { return history.filter(m => !m.archived); }
+
 function renderReadout() {
   const people = new Set();
   let shareSum = 0, shareN = 0;
-  history.forEach(m => {
+  const live = current();
+  live.forEach(m => {
     Object.keys(m.attendance).forEach(n => people.add(n.toLowerCase()));
     Object.values(m.attendance).forEach(a => { shareSum += A.sharePct(a, m); shareN++; });
   });
   const att = shareN ? Math.round(shareSum / shareN) : 0;
   $('#readout').innerHTML =
-    `${t('readoutMeetings').toUpperCase()} <b>${history.length}</b> · ${t('readoutPeople').toUpperCase()} <b>${people.size}</b> · ${t('readoutPresent').toUpperCase()} <b>${att}%</b>`;
+    `${t('readoutMeetings').toUpperCase()} <b>${live.length}</b> · ${t('readoutPeople').toUpperCase()} <b>${people.size}</b> · ${t('readoutPresent').toUpperCase()} <b>${att}%</b>`;
 }
 
 /* ====================== WHAT IS HAPPENING RIGHT NOW ======================
@@ -1591,7 +1600,7 @@ $('#pick-meetings-save').addEventListener('click', async () => {
 /* ============================ PEOPLE ============================ */
 function aggregatePeople() {
   const map = new Map();
-  history.forEach(m => {
+  current().forEach(m => {
     Object.entries(m.attendance).forEach(([name, a]) => {
       const k = name.toLowerCase();
       if (!map.has(k)) map.set(k, { name, count: 0, total: 0, shares: [], last: 0, meetings: [] });
