@@ -288,7 +288,7 @@ async function getRanges(spreadsheetId, ranges) {
  * A cell that says what it holds instead of doing something.
  *
  * These rows are written with USER_ENTERED, which is what makes a duration arrive as a number and
- * an hour as an hour — and also what makes a value beginning with `=`, `+`, `-` or `@` arrive as a
+ * an hour as an hour, and also what makes a value beginning with `=`, `+`, `-` or `@` arrive as a
  * formula. Half of what goes in here is other people's names, chosen by them and scraped off the
  * page, so a participant called `=IMAGE("http://…")` would be writing into the user's own
  * spreadsheet. A leading apostrophe is the sheet's own way of saying "this is text": it is not

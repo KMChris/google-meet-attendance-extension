@@ -824,7 +824,7 @@ function segTip(title, s, joinedMs, endedMs) {
 }
 
 /**
- * Where one presence block sits on a track spanning [startMs, endMs], in percent — or null when
+ * Where one presence block sits on a track spanning [startMs, endMs], in percent, or null when
  * the block is not on that track at all.
  *
  * A meeting's hours can be pinned, and a session can fall outside them: somebody joining after the
@@ -841,7 +841,7 @@ function segBox(sMs, eMs, startMs, endMs, span) {
 function renderTimeline(m) {
   const { startMs, endMs } = A.meetingBounds(m);
   const tl = $('#timeline');
-  // A record can arrive from an import with hours nothing can read — no window to draw on, and an
+  // A record can arrive from an import with hours nothing can read: no window to draw on, and an
   // axis worked out from one is four invalid dates, which throws and takes the whole page with it.
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) { tl.innerHTML = ''; return; }
   const span = Math.max(1, endMs - startMs);

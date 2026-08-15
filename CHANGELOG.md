@@ -185,6 +185,40 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   doing nothing and saying so afterwards, which nothing here was listening for: the call went on
   being recorded into a register that was no longer taking it. It is reported now, so a record that
   vanished can be traced to the reason rather than guessed at.
+- **A merge is no longer baked in by reloading the tab.** Two Meet identities of one person are
+  kept apart on disk with the alias beside them, which is the whole reason a merge can be taken
+  back. But a call picked up again (a reload, an update, the worker being stopped and started) was
+  handed the merged view to carry on from, and wrote it back as one participant holding both
+  people's events. From then on the merge was part of the record: undoing it returned the other
+  identity with nothing in it, and every backup and export carried the lump. A resumed record now
+  comes back exactly as it is stored.
+- **Whoever is running the meeting attends more than five seconds of it.** Meet does not always
+  list you in the participant panel under the name it shows you by, so you were found by the
+  separate look for yourself instead, which ran after the check for who had left rather than
+  before it. The next scan read only what the panel gave it, recorded you as having left, and
+  never found you again. Both ways of spotting somebody now report the same way, so the host is in
+  the call like anybody else, and an address Meet only reveals later no longer costs a rejoin a
+  scan.
+- **A presence block stays on its own track.** Hours pinned behind a session, from a schedule read
+  off the wrong calendar entry or somebody joining after the hour the event was booked to end, put
+  the block past the end of a lane that nothing clips. A block with nothing left of it inside the
+  meeting's hours is no longer drawn at all, and a record whose hours cannot be read (which an
+  imported file is free to carry) no longer takes the whole detail page down with it.
+- **The spreadsheet counts a merged person once.** The two tabs meant for people to read listed
+  both Meet identities and counted them both, so a meeting that reads as eleven people here read
+  as twelve up there. They now show the meeting as the app shows it. The Backup tab still holds
+  the record exactly as it is stored, so restoring it can still take the merge back.
+- **A name goes into the spreadsheet as a name.** Rows are written as if typed, which is what makes
+  a duration arrive as a number, and also what makes anything beginning with `=` arrive as a
+  formula. Half of what goes up there is other people's display names, chosen by them: somebody
+  calling themselves `=IMAGE("http://…")` was writing into the user's own spreadsheet. Those cells
+  are marked as text now.
+- **The popup and the report escape quotes as the dashboard does.** A quote in a title or in a
+  meeting's id, which a file brought in from elsewhere is free to carry, could step out of the
+  attribute it was written into.
+- **The extension says which Chrome it actually needs.** It asked for 91 while its colours are
+  mixed with `color-mix()`, which arrived in 111, so on anything older it installed and then came
+  up with pieces of itself missing.
 
 ## [1.3.3] 2026-08-14
 

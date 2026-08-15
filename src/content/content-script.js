@@ -394,8 +394,8 @@
    * Note that somebody is in the call at `at`: a first sighting opens their record, one after a
    * departure opens their next session, and either way the name goes into `found`.
    *
-   * Both ways of spotting a person report through here — the participant panel and the separate
-   * look for the user themselves — because what the scan below reads to decide who has left is
+   * Both ways of spotting a person report through here (the participant panel, and the separate
+   * look for the user themselves), because what the scan below reads to decide who has left is
    * `found`. A name only one of the two ever produces would be marked as gone on the very next
    * scan and never picked up again, which is what became of whoever was running the meeting.
    */
