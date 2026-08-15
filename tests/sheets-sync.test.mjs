@@ -9,6 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { incoming, outgoing } from '../src/lib/sheets-sync.js';
+import { makeSessionId } from '../src/lib/attendance.js';
 
 const ended = (id) => ({ id, date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T10:00:00.000Z' });
 const running = (id) => ({ id, date: '2026-08-14T09:00:00.000Z' });
@@ -42,6 +43,47 @@ test('a row of a kind we do not write is left where it is', () => {
   assert.deepEqual(incoming({ index: index(['note', 'x-1']) }), []);
 });
 
+/* ---- and what a full register does not ask for ----
+ * "Meetings to keep" drops the oldest whenever a newer one is written. Reading one of those back
+ * would hand it straight to the next write to drop again, and every pass from then on would fetch
+ * the same records to lose them again.
+ */
+
+const day = (n) => Date.UTC(2026, 7, n, 9);
+const dated = (n) => ({ id: makeSessionId('abc-defg-hij', day(n)), date: new Date(day(n)).toISOString() });
+
+test('a full register does not ask for meetings it would only drop again', () => {
+  const wanted = incoming({
+    index: index(['meeting', dated(10).id], ['meeting', dated(20).id]),
+    history: [dated(15), dated(14)], cap: 2
+  });
+
+  assert.deepEqual(ids(wanted), [dated(20).id], 'the newer one is worth having; the older one would not survive');
+});
+
+test('a register under its cap takes everything the sheet has', () => {
+  const wanted = incoming({
+    index: index(['meeting', dated(10).id]), history: [dated(15)], cap: 2
+  });
+
+  assert.deepEqual(ids(wanted), [dated(10).id], 'there is room for it, so the cap has nothing to say');
+});
+
+test('raising the cap brings the older meetings home', () => {
+  const held = [dated(15), dated(14)];
+  assert.deepEqual(ids(incoming({ index: index(['meeting', dated(10).id]), history: held, cap: 2 })), []);
+  assert.deepEqual(ids(incoming({ index: index(['meeting', dated(10).id]), history: held, cap: 100 })),
+    [dated(10).id], 'the same sheet, the same register, a setting that now has room');
+});
+
+test('a record whose id does not say when it started is read back', () => {
+  const wanted = incoming({
+    index: index(['meeting', 'imported-from-somewhere']), history: [dated(15), dated(14)], cap: 2
+  });
+
+  assert.deepEqual(ids(wanted), ['imported-from-somewhere'], 'unknown is not old');
+});
+
 /* ------------------------------ what goes up to the sheet ------------------------------ */
 
 test('a finished meeting the sheet has not got goes up', () => {
@@ -59,6 +101,15 @@ test('a call still running waits for its end', () => {
   const out = outgoing({ index: [], history: [ended('m-1'), running('m-2')] });
   assert.deepEqual(ids(out.meetings), ['m-1']);
   assert.equal(out.running, 1, 'written mid-call it could never be corrected, since it is written once');
+});
+
+test('a call that has only just finished waits too', () => {
+  // rejoining the link, or a second tab still in the call, brings a record like this straight back
+  const justNow = { id: 'm-1', date: new Date().toISOString(), endedAt: new Date().toISOString() };
+  const out = outgoing({ index: [], history: [justNow] });
+
+  assert.deepEqual(out.meetings, [], 'the sheet cannot take back half a call it was handed early');
+  assert.equal(out.running, 1);
 });
 
 test('a series is sent once and then left alone, however it is renamed here', () => {

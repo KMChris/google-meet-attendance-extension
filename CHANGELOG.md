@@ -136,6 +136,16 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   which never forgets. A record with no participant, no event and nothing given to it by hand goes
   instead of being ended. One that was named, filed under a series or set aside is the user's, and
   stays whatever it holds.
+- **A meeting goes up to the spreadsheet once it can no longer change.** The backup is written once
+  and never corrected, and a call that has just ended is exactly the call that can still come back:
+  rejoining the link resumes the record, and a second tab still in the meeting reopens it on its
+  next scan. Either would have left the sheet holding the half of the meeting that happened before
+  it, for good. A record now waits out the window it could be resumed in — two minutes, or the next
+  pass — and what the sheet is given is the whole call.
+- **The spreadsheet no longer hands back the meetings "meetings to keep" has just dropped.** They
+  came home on the next pass and were dropped again by the next write, so a full register fetched
+  the same old meetings over and over. A register at its limit now asks for nothing older than the
+  oldest meeting it is keeping; raising the setting lifts that floor and brings them back.
 
 ## [1.3.3] 2026-08-14
 

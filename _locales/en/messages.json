@@ -1193,8 +1193,8 @@
     }
   },
   "sheetsPushRunning": {
-    "message": "$COUNT$ meetings are still running. They go up once they end, because a call written mid-way could never be corrected afterwards.",
-    "description": "Advice under step 3 when Send everything held back meetings that had not ended.",
+    "message": "$COUNT$ meetings are still running, or only just finished. They go up once they are over for good, because a call written mid-way could never be corrected afterwards.",
+    "description": "Advice under step 3 when Send everything held back meetings that had not ended, or had ended too recently to be sure of.",
     "placeholders": {
       "count": {
         "content": "$1",

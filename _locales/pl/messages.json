@@ -1193,8 +1193,8 @@
     }
   },
   "sheetsPushRunning": {
-    "message": "Spotkania wciąż trwające: $COUNT$. Trafią do arkusza, gdy się zakończą — zapisanej w połowie rozmowy nie dałoby się już poprawić.",
-    "description": "Advice under step 3 when Send everything held back meetings that had not ended.",
+    "message": "Spotkania wciąż trwające lub dopiero co zakończone: $COUNT$. Trafią do arkusza, gdy będzie po nich na pewno — zapisanej w połowie rozmowy nie dałoby się już poprawić.",
+    "description": "Advice under step 3 when Send everything held back meetings that had not ended, or had ended too recently to be sure of.",
     "placeholders": {
       "count": {
         "content": "$1",

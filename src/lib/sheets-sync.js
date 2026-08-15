@@ -15,7 +15,9 @@
  *
  * When a pass runs is a schedule rather than a timer, because freshness only matters where the
  * data is about to be read or written:
- *   - right after a meeting ends: the record is new and the call is over,
+ *   - right after a meeting ends: whatever it recorded is new, and so is what the sheet may have
+ *     to say about the meetings around it. The meeting itself goes up on a later pass, once it is
+ *     past being rejoined and can no longer change (see `settled`),
  *   - when the dashboard is opened, at most every OPEN_INTERVAL_MS,
  *   - when the worker wakes, at most every BACKGROUND_INTERVAL_MS.
  * A pass with nothing to do is one short read (two columns of the Backup tab), so firing often
@@ -26,6 +28,7 @@
 
 import * as storage from './storage.js';
 import * as api from './sheets-api.js';
+import { REJOIN_WINDOW_MS, sessionStartMs } from './attendance.js';
 
 export const OPEN_INTERVAL_MS = 5 * 60 * 1000;
 export const BACKGROUND_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -37,29 +40,65 @@ export const BACKGROUND_INTERVAL_MS = 6 * 60 * 60 * 1000;
  * Pure, and so is `outgoing` — between them they are the whole of what a pass decides, and what
  * they never produce is an instruction to remove anything.
  */
-export function incoming({ index = [], history = [], trash = [], groups = [] } = {}) {
+export function incoming({ index = [], history = [], trash = [], groups = [], cap = 0 } = {}) {
   const here = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
   const mine = new Set(groups.map(g => g.id));
-  return index.filter(r => r.kind === 'meeting' ? !here.has(r.id)
+  const floor = capFloorMs(history, cap);
+  return index.filter(r => r.kind === 'meeting' ? (!here.has(r.id) && !wouldBeDropped(r.id, floor))
     : (r.kind === 'series' && !mine.has(r.id)));
 }
 
 /**
- * What this store holds and the sheet does not. Only meetings that ended, because a call still
- * running would be written once and never corrected — and never written again, since an id the
- * sheet already carries is left alone from then on.
+ * Where "older than this store keeps" begins.
+ *
+ * A register held at "meetings to keep" drops its oldest whenever a newer one is written. Reading
+ * such a meeting back out of the sheet would only hand it to the next write to drop again, and
+ * every pass from then on would fetch the same records to lose them again — so a full register
+ * asks for nothing older than the oldest meeting it is keeping. Nothing is lost by it: the sheet
+ * holds them, which is what the setting leans on. Raising the setting lifts the floor with it and
+ * the next pass brings the older ones home.
+ */
+function capFloorMs(history, cap) {
+  if (!(cap > 0) || history.length < cap) return -Infinity;
+  const oldest = history.reduce((min, m) => Math.min(min, Date.parse(m.date) || Infinity), Infinity);
+  return Number.isFinite(oldest) ? oldest : -Infinity;
+}
+
+/** A record the cap would throw away again. An id that does not date itself is read back. */
+function wouldBeDropped(id, floor) {
+  const started = sessionStartMs(id);
+  return Number.isFinite(started) && started <= floor;
+}
+
+/**
+ * A record that has stopped being able to change.
+ *
+ * A meeting that ended a moment ago can still come back: rejoining the same link resumes the
+ * record rather than starting a new one, and a second tab still in the call reopens it on its next
+ * scan. The sheet is written once and never corrected, so what goes up has to be a call that is
+ * over rather than one that has just gone quiet — a pass later at worst, and the version in the
+ * backup is the whole meeting.
+ */
+function settled(meeting, now) {
+  return now - (Date.parse(meeting.endedAt) || 0) >= REJOIN_WINDOW_MS;
+}
+
+/**
+ * What this store holds and the sheet does not. Only meetings that ended and can no longer change,
+ * because a call still running would be written once and never corrected — and never written
+ * again, since an id the sheet already carries is left alone from then on.
  *
  * Counts what it left behind as well as what it takes, so the caller can say so: skipping is the
  * rule working, and it is worth being told about when a whole register was just sent.
  */
-export function outgoing({ index = [], history = [], groups = [] } = {}) {
+export function outgoing({ index = [], history = [], groups = [], now = Date.now() } = {}) {
   const remoteMeetings = new Set(), remoteSeries = new Set();
   index.forEach(r => {
     if (r.kind === 'meeting') remoteMeetings.add(r.id);
     else if (r.kind === 'series') remoteSeries.add(r.id);
   });
 
-  const ended = history.filter(m => m.endedAt);
+  const ended = history.filter(m => m.endedAt && settled(m, now));
   const meetings = ended.filter(m => !remoteMeetings.has(m.id));
   const series = groups.filter(g => !remoteSeries.has(g.id));
   return {
@@ -72,12 +111,12 @@ export function outgoing({ index = [], history = [], groups = [] } = {}) {
 
 /** One two-way pass over a spreadsheet. Returns what moved, in each direction. */
 export async function syncNow(spreadsheetId) {
-  const [history, trash, groups] = await Promise.all([
-    storage.getHistory(), storage.getTrash(), storage.getGroups()
+  const [history, trash, groups, settings] = await Promise.all([
+    storage.getHistory(), storage.getTrash(), storage.getGroups(), storage.getSettings()
   ]);
   const index = await api.readBackupIndex(spreadsheetId);
 
-  const wanted = incoming({ index, history, trash, groups });
+  const wanted = incoming({ index, history, trash, groups, cap: settings.maxStoredMeetings });
   let pulled = 0, pulledGroups = 0;
   if (wanted.length) {
     const back = await api.readBackupRecords(spreadsheetId, wanted.map(r => r.row));

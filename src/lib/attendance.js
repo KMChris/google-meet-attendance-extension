@@ -44,6 +44,16 @@ export function makeSessionId(code, startMs) {
   return `${base}-${stamp}`;
 }
 
+/**
+ * When a session id says it began, or NaN for an id that does not say. The other direction of
+ * makeSessionId, and the only thing that can date a record the spreadsheet lists without reading
+ * the record itself — which is what keeps the check on a backup cheap.
+ */
+export function sessionStartMs(id) {
+  const stamp = /-(\d{10,})$/.exec(String(id == null ? '' : id));
+  return stamp ? Number(stamp[1]) : NaN;
+}
+
 /* ============================ per-participant ============================ */
 
 /** Join sorts before Leave at an identical timestamp — see sessionsFromEvents. */
