@@ -97,13 +97,22 @@ extension — currently RollCall (meet-attendance.com) — and merges it in the 
 
 Settings walks it in three steps: **connect a Google account**, **create a spreadsheet** (or paste
 the ID of one you already have), then use it — auto-sync when a meeting ends, **Send everything**
-to write the whole register at once, or **Restore from the sheet** to read it back.
+to offer the whole register at once, or **Restore from the sheet** to read it all back.
 
 The sheet has three tabs. *Meetings* and *Participants* are for reading: one row per meeting and
 one row per join or leave. *Backup* is for the extension — it holds every record verbatim, which is
 what makes the spreadsheet a complete backup: restoring from it brings back raw events, e-mails,
-meeting hours, merges and series. Restoring only adds what is missing; meetings already here are
-left as they are.
+meeting hours, merges and series.
+
+**Both directions only ever add.** Nothing in the extension removes or rewrites a record in the
+sheet, and nothing the sheet holds removes a record from here:
+
+- Sending sends the finished meetings the sheet has not got. One it already carries stays exactly
+  as it was sent, so a meeting deleted here — or on another machine — survives in the backup.
+- Restoring adds the records this copy has never seen. A meeting already here keeps whatever was
+  edited about it, and one in the trash stays deleted.
+- Both buttons say what they left as it was, and what to do about it: **to change or drop what the
+  sheet holds, edit it in Google Sheets, or create a new sheet and send everything to that one.**
 
 > ⚠️ Google Sheets sync needs an OAuth client ID **bound to your own extension ID**. The `oauth2.client_id`
 > in `manifest.json` is a placeholder (`YOUR_OAUTH_CLIENT_ID…`) — create your own and paste it in, registering

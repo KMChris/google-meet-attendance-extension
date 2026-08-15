@@ -20,6 +20,21 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   be ended where somebody last arrived — an hour of it thrown away. It is ended at the last
   minute it was known to be running instead.
 
+### Changed
+- **The spreadsheet is only ever added to.** "Send everything" used to clear the three tabs and
+  write the register out afresh, which made the sheet a mirror of this machine rather than a backup
+  of it: a meeting deleted here, or one recorded on a machine this copy has never met, was wiped
+  from the sheet by the next send. It now offers the finished meetings the sheet has not got and
+  leaves everything it already carries exactly as it was sent — and there is no longer any call in
+  the extension that can clear a range, so no sequence of clicks can cost the sheet a record.
+  Restoring was already additive and stays that way. To change or drop what the backup holds, edit
+  it in Google Sheets, or create a new sheet and send everything to that one.
+- **Sending and restoring say what they left as it was, and what can be done about it.** A count in
+  a toast that has gone in two seconds is no use for a suggestion, so the advice stays under step 3
+  until the next attempt, with the sheet a click away: meetings the sheet already had, calls still
+  running that go up when they end, and — on the way back — records that stayed in the trash rather
+  than being restored behind the deletion.
+
 ### Fixed
 - **A meeting nothing got to end no longer runs on for hours.** The browser closed on it, the tab
   went while the worker was asleep, the extension was switched off: the record was left open with

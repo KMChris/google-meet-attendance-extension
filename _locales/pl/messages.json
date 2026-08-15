@@ -1072,7 +1072,7 @@
     "message": "Korzystaj"
   },
   "sheetsStepDataHint": {
-    "message": "Arkusz przechowuje wszystkie dane spotkania, więc może działać jako kopia zapasowa. Automat wysyła zakończone spotkania i pobiera te, których tutaj brakuje."
+    "message": "Arkusz przechowuje wszystkie dane spotkania, więc może działać jako kopia zapasowa. Automat wysyła zakończone spotkania i pobiera te, których tutaj brakuje. Żadna ze stron nigdy nie traci zapisu: to, co jest już w arkuszu, zmienisz lub usuniesz tylko w Arkuszach Google, a spotkanie usunięte tutaj pozostaje usunięte."
   },
   "sheetsLastSync": {
     "message": "Ostatnia synchronizacja: $WHEN$",
@@ -1111,6 +1111,9 @@
   "sheetsOpen": {
     "message": "Otwórz"
   },
+  "sheetsOpenNote": {
+    "message": "Otwórz arkusz w Arkuszach Google"
+  },
   "sheetsPush": {
     "message": "Wyślij wszystko"
   },
@@ -1127,6 +1130,29 @@
       }
     }
   },
+  "sheetsPushNothingNew": {
+    "message": "Nic nowego — arkusz ma już wszystko, co się zakończyło"
+  },
+  "sheetsPushKept": {
+    "message": "Spotkania, które są już w arkuszu: $COUNT$. Zostały dokładnie tak, jak zostały wysłane — nic stąd nie nadpisuje ani nie usuwa tego, co jest w arkuszu. Aby zmienić tamtą kopię, edytuj ją w Arkuszach Google albo utwórz nowy arkusz i wyślij wszystko do niego.",
+    "description": "Advice under step 3 when Send everything skipped meetings the sheet already had.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "sheetsPushRunning": {
+    "message": "Spotkania wciąż trwające: $COUNT$. Trafią do arkusza, gdy się zakończą — zapisanej w połowie rozmowy nie dałoby się już poprawić.",
+    "description": "Advice under step 3 when Send everything held back meetings that had not ended.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1"
+      }
+    }
+  },
   "sheetsPushFailed": {
     "message": "Nie udało się zapisać do arkusza"
   },
@@ -1137,6 +1163,26 @@
       "count": {
         "content": "$1",
         "example": "3"
+      }
+    }
+  },
+  "sheetsRestoreKept": {
+    "message": "Spotkania z arkusza, które już tu są: $COUNT$. Zostały bez zmian, razem z poprawkami. Aby wziąć zamiast nich kopię z arkusza, usuń spotkanie tutaj, opróżnij je z kosza i przywróć ponownie.",
+    "description": "Advice under step 3 when a restore skipped meetings already in the register.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "sheetsRestoreTrashed": {
+    "message": "Spotkania z arkusza, które są tutaj w koszu: $COUNT$. Pozostały usunięte — arkusz i tak zachowuje swoją kopię. Przywróć je z kosza, jeśli mają wrócić.",
+    "description": "Advice under step 3 when a restore skipped meetings sitting in the trash.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
       }
     }
   },

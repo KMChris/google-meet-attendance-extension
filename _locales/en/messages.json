@@ -1072,7 +1072,7 @@
     "message": "Use it"
   },
   "sheetsStepDataHint": {
-    "message": "The sheet holds all the meeting data, so it can serve as a backup. Auto-sync sends finished meetings and brings back any the sheet has that are missing here."
+    "message": "The sheet holds all the meeting data, so it can serve as a backup. Auto-sync sends finished meetings and brings back any the sheet has that are missing here. Neither side ever loses a record: what the sheet already holds can only be changed or removed in Google Sheets, and a meeting deleted here stays deleted."
   },
   "sheetsLastSync": {
     "message": "Last sync: $WHEN$",
@@ -1111,6 +1111,9 @@
   "sheetsOpen": {
     "message": "Open"
   },
+  "sheetsOpenNote": {
+    "message": "Open the sheet in Google Sheets"
+  },
   "sheetsPush": {
     "message": "Send everything"
   },
@@ -1127,6 +1130,29 @@
       }
     }
   },
+  "sheetsPushNothingNew": {
+    "message": "Nothing new — the sheet already has everything that ended"
+  },
+  "sheetsPushKept": {
+    "message": "$COUNT$ meetings are already in the sheet, so they were left exactly as they were sent — nothing here rewrites or removes what the sheet holds. To change the copy up there, edit it in Google Sheets, or create a new sheet and send everything to that one.",
+    "description": "Advice under step 3 when Send everything skipped meetings the sheet already had.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "sheetsPushRunning": {
+    "message": "$COUNT$ meetings are still running. They go up once they end, because a call written mid-way could never be corrected afterwards.",
+    "description": "Advice under step 3 when Send everything held back meetings that had not ended.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1"
+      }
+    }
+  },
   "sheetsPushFailed": {
     "message": "Could not write to the sheet"
   },
@@ -1137,6 +1163,26 @@
       "count": {
         "content": "$1",
         "example": "3"
+      }
+    }
+  },
+  "sheetsRestoreKept": {
+    "message": "$COUNT$ meetings from the sheet are already here and were left as they are, edits and all. To take the sheet's copy of one instead, delete it here, remove it from the trash, and restore again.",
+    "description": "Advice under step 3 when a restore skipped meetings already in the register.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "sheetsRestoreTrashed": {
+    "message": "$COUNT$ meetings from the sheet are in the trash here, so they stayed deleted — the sheet keeps its copy either way. Bring them back from the trash if you want them again.",
+    "description": "Advice under step 3 when a restore skipped meetings sitting in the trash.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
       }
     }
   },

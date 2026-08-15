@@ -590,6 +590,13 @@ button.ins:hover{border-color:var(--ink-3);background:var(--panel)}
 .step-body .inline-field .field{flex:1;min-width:180px}
 .step-body .switch-row{margin-top:2px}
 .step-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+/* what a send or a restore left as it was, and what can be done about it: it holds its place
+   under the step, since a suggestion nobody can act on before it fades is no suggestion */
+.step-note{max-width:560px;padding:11px 13px;border-radius:var(--radius-sm);border:1px solid var(--line);
+  background:var(--panel-2);font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.step-note p{margin:0}
+.step-note p + p{margin-top:7px}
+.step-note a{display:inline-block;margin-top:8px;color:var(--accent);font-weight:600}
 .link{color:var(--accent);font-size:12.5px}
 
 /* modals */

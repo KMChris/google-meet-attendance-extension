@@ -1878,6 +1878,7 @@ async function syncOnOpen() {
  * instead of showing a raw id.
  */
 async function linkSpreadsheet(id) {
+  sheetsNote();                        // advice about the last sheet does not carry to another one
   const { spreadsheet, prepared } = await sheets.ensureSheets(id);
   settings = await store.updateSettings({
     spreadsheetId: id,
@@ -1895,6 +1896,7 @@ $('#sheets-disconnect').addEventListener('click', async () => {
   if (!confirm(t('confirmSheetsDisconnect'))) return;
   try { const tok = await sheets.getAuthToken(false); if (tok) await sheets.removeCachedToken(tok); } catch {}
   settings = await store.updateSettings({ spreadsheetId: null, spreadsheetName: null, autoSync: false });
+  sheetsNote();
   toast(t('sheetsDisconnectedToast')); refreshSheets();
 });
 $('#sheets-create').addEventListener('click', async () => {
@@ -1902,6 +1904,7 @@ $('#sheets-create').addEventListener('click', async () => {
   try {
     const ss = await sheets.createSpreadsheet();
     settings = await store.updateSettings({ spreadsheetId: ss.spreadsheetId, spreadsheetName: (ss.properties && ss.properties.title) || null });
+    sheetsNote();                      // a fresh sheet has nothing to be advised about yet
     toast(t('sheetsCreatedToast'));
     window.open(sheets.spreadsheetUrl(ss.spreadsheetId), '_blank');
   } catch (e) { console.error('[GM Attendance] create spreadsheet failed:', (e && e.message) || e); toast(t('sheetsCreateFailed')); }
@@ -1919,14 +1922,33 @@ async function useSpreadsheet() {
 $('#sheets-save').addEventListener('click', useSpreadsheet);
 $('#spreadsheet-ref').addEventListener('keydown', ev => { if (ev.key === 'Enter') useSpreadsheet(); });
 
-// the sheet becomes a full backup: every stored record goes in, replacing what was there
+/**
+ * What the last send or restore left alone, and what can be done about it. A toast is gone in two
+ * seconds and this is a suggestion, so it stays under step 3 until the next attempt — with the way
+ * to act on it, which is the sheet itself, beside it.
+ */
+function sheetsNote(...lines) {
+  const el = $('#sheets-note');
+  const said = lines.filter(Boolean);
+  el.hidden = !said.length;
+  const link = settings.spreadsheetId
+    ? `<a href="${esc(sheets.spreadsheetUrl(settings.spreadsheetId))}" target="_blank" rel="noopener">${esc(t('sheetsOpenNote'))}</a>`
+    : '';
+  el.innerHTML = said.length ? said.map(s => `<p>${esc(s)}</p>`).join('') + link : '';
+}
+
+// everything the sheet has not got is added to it; everything it has stays as it was sent
 $('#sheets-push').addEventListener('click', async () => {
   if (!settings.spreadsheetId) return;
   $('#sheets-push').disabled = true;
+  sheetsNote();
   try {
-    const stored = await store.getHistory();      // raw records, merges unbaked
-    const res = await sheets.pushAll(settings.spreadsheetId, { meetings: stored, groups });
-    toast(t('sheetsPushedToast', { count: res.meetings }));
+    const res = await sheetsSync.pushEverything(settings.spreadsheetId);
+    toast(res.pushed || res.pushedGroups ? t('sheetsPushedToast', { count: res.pushed }) : t('sheetsPushNothingNew'));
+    sheetsNote(
+      res.kept && t('sheetsPushKept', { count: res.kept }),
+      res.running && t('sheetsPushRunning', { count: res.running })
+    );
   } catch (e) { console.error('[GM Attendance] push to Sheets failed:', (e && e.message) || e); toast(t('sheetsPushFailed')); }
   $('#sheets-push').disabled = false;
 });
@@ -1936,13 +1958,17 @@ $('#sheets-restore').addEventListener('click', async () => {
   if (!settings.spreadsheetId) return;
   if (!confirm(t('confirmSheetsRestore'))) return;
   $('#sheets-restore').disabled = true;
+  sheetsNote();
   try {
-    const { meetings, groups: restoredGroups } = await sheets.restoreAll(settings.spreadsheetId);
-    if (!meetings.length && !restoredGroups.length) { toast(t('sheetsNoBackup')); }
+    const res = await sheetsSync.pullEverything(settings.spreadsheetId);
+    if (!res.found) { toast(t('sheetsNoBackup')); }
     else {
-      const freshGroups = await store.mergeGroups(restoredGroups);
-      const added = await mergeImportedMeetings(meetings);
-      toast(added || freshGroups ? t('sheetsRestoredToast', { count: added }) : t('importNothingNew'));
+      await load();
+      toast(res.pulled || res.pulledGroups ? t('sheetsRestoredToast', { count: res.pulled }) : t('importNothingNew'));
+      sheetsNote(
+        res.kept && t('sheetsRestoreKept', { count: res.kept }),
+        res.trashed && t('sheetsRestoreTrashed', { count: res.trashed })
+      );
     }
   } catch (e) { console.error('[GM Attendance] restore from Sheets failed:', (e && e.message) || e); toast(t('sheetsRestoreFailed')); }
   $('#sheets-restore').disabled = false;

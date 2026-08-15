@@ -1,6 +1,11 @@
 /**
  * Google Sheets API Integration
  * Handles OAuth2 authentication and Sheets API operations
+ *
+ * Records are written by appending and by nothing else: nothing in here clears a range or writes
+ * over a row that holds data, so no bug and no sequence of clicks can cost the spreadsheet a
+ * record it was given. The header row is the one thing this module writes, and only into a first
+ * row that is empty — rows somebody else put there are pushed down, never overwritten.
  */
 
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -329,28 +334,6 @@ export async function appendRecords(spreadsheetId, { meetings = [], groups = [] 
 }
 
 /**
- * Write the whole local store to the sheet, replacing what is there. This is the operation
- * that makes the spreadsheet a full backup: after it, `restoreAll` can rebuild everything.
- */
-export async function pushAll(spreadsheetId, { meetings = [], groups = [] } = {}) {
-  await ensureSheets(spreadsheetId);
-  await clearValues(spreadsheetId, [`${SHEET_MEETINGS}!A2:Z`, `${SHEET_PARTICIPANTS}!A2:Z`, `${SHEET_BACKUP}!A2:D`]);
-
-  const backup = [
-    ...groups.flatMap(g => backupRows('series', g.id, g)),
-    ...meetings.flatMap(m => backupRows('meeting', m.id, m))
-  ];
-  const data = [
-    { range: `${SHEET_MEETINGS}!A2`, values: meetings.map(meetingRow) },
-    { range: `${SHEET_PARTICIPANTS}!A2`, values: meetings.flatMap(participantRows) },
-    { range: `${SHEET_BACKUP}!A2`, values: backup }
-  ].filter(d => d.values.length);
-  if (data.length) await batchUpdate(spreadsheetId, data);
-
-  return { meetings: meetings.length, groups: groups.length };
-}
-
-/**
  * Records out of backup rows. Rows are read in order and a part 0 starts a fresh record, so a
  * meeting appended several times reads as the last version written.
  */
@@ -417,10 +400,5 @@ export async function readBackupRecords(spreadsheetId, rows) {
 
   const read = await getRanges(spreadsheetId, blocks.map(([a, b]) => `${SHEET_BACKUP}!A${a}:D${b}`));
   return parseBackupRows((read.valueRanges || []).flatMap(v => v.values || []));
-}
-
-async function clearValues(spreadsheetId, ranges) {
-  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values:batchClear`;
-  return apiRequest(url, { method: 'POST', body: JSON.stringify({ ranges }) });
 }
 
