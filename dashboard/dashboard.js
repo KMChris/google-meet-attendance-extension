@@ -1692,9 +1692,6 @@ $('#people-search').addEventListener('input', e => {
 // The view itself lives in ./analytics.js; this page only supplies the data and the
 // handful of dashboard actions it needs to call back into.
 function groupColorVar(g) { return GRP_COLORS[(g && g.color) || 'teal'] || '--grp-teal'; }
-function exportCSV(rows, filename) {
-  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\n')], { type: 'text/csv;charset=utf-8;' }), filename);
-}
 
 let resizeTimer;
 window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if ($('#view-analytics').classList.contains('on')) renderAnalytics(); }, 200); });
@@ -1704,11 +1701,15 @@ function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); c
 // Meet titles can run to a couple of hundred characters; a file name that long is a nuisance
 // to handle and can push a path over the Windows limit, so it is cut to something readable.
 function safe(s) { return String(s || 'export').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60).replace(/-$/, '') || 'export'; }
-function csvRow(cells) { return cells.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(','); }
 
+/**
+ * Every CSV this app writes goes through here, the analytics slice included: one line ending, one
+ * quoting, and one guard against a name a spreadsheet would run rather than read. The row itself
+ * is written by importers.js, which is also what reads it back.
+ */
 function downloadCSV(rows, filename) {
   // BOM + CRLF: what Excel needs to open a UTF-8 CSV without mangling the Polish characters
-  downloadBlob(new Blob(['﻿' + rows.map(csvRow).join('\r\n')], { type: 'text/csv;charset=utf-8;' }), filename);
+  downloadBlob(new Blob(['﻿' + rows.map(r => importers.csvRow(r)).join('\r\n')], { type: 'text/csv;charset=utf-8;' }), filename);
 }
 /** Calendar day of an instant in local time — toISOString() would name the UTC day. */
 function localDay(iso) {
@@ -2251,7 +2252,7 @@ i18n.onLocaleChange(() => {
     groupColorVar,
     rosterFor: effectiveRoster,
     openMeeting: id => go('meeting=' + encodeURIComponent(id)),
-    exportCSV
+    exportCSV: downloadCSV
   });
   await load();
   watchLive();

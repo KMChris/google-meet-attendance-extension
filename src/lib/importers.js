@@ -129,6 +129,27 @@ function fromRollCall(raw) {
 
 /* ============================ our own CSV ============================ */
 
+/**
+ * A cell a spreadsheet will read rather than run, and the way back.
+ *
+ * Excel, Sheets and LibreOffice all take a value beginning with `=`, `+`, `-` or `@` for a
+ * formula, and half of what an export carries is other people's display names, chosen by them: a
+ * participant called `=IMAGE("http://…")` would be opening a file that fetches for them. A leading
+ * apostrophe is the spreadsheet's own way of saying "this is text".
+ *
+ * The two are exact inverses, apostrophes and all, because the row shape is a contract between
+ * this module and the export the dashboard writes: a file this app wrote has to import as the
+ * names it was written from.
+ */
+const FORMULA = /^'*[=+\-@]/;
+export const csvGuard = (s) => (FORMULA.test(s) ? `'${s}` : s);
+const csvUnguard = (s) => (/^'+[=+\-@]/.test(s) ? s.slice(1) : s);
+
+/** One row of CSV text, quoted as RFC 4180 wants it. The inverse of parseCSV, cell for cell. */
+export function csvRow(cells) {
+  return cells.map(c => `"${csvGuard(String(c == null ? '' : c)).replace(/"/g, '""')}"`).join(',');
+}
+
 /** Split CSV text into rows of cells (RFC 4180 quoting, LF or CRLF, BOM tolerated). */
 export function parseCSV(text) {
   const src = String(text == null ? '' : text).replace(/^﻿/, '');
@@ -262,7 +283,7 @@ export function fromOwnCSV(text) {
   for (let i = first; i < rows.length; i++) {
     const row = rows[i];
     if (!row.length || row.every(c => !String(c).trim())) break;   // a blank line ends the block
-    const get = key => (cols[key] == null ? '' : String(row[cols[key]] == null ? '' : row[cols[key]]).trim());
+    const get = key => (cols[key] == null ? '' : csvUnguard(String(row[cols[key]] == null ? '' : row[cols[key]]).trim()));
 
     const name = get('name'), day = get('day');
     if (!name || !DAY_RE.test(day)) { skipped++; continue; }
