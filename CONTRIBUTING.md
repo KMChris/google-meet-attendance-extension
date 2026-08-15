@@ -37,6 +37,9 @@ See [README → Project Structure](README.md#project-structure). In short:
 - `src/lib/storage.js` — the only `chrome.storage` layer (history, series, settings, migration).
 - `src/lib/importers.js` — **pure** readers for files we didn't write as a JSON backup: our own CSV
   and other extensions' exports. Each returns records in this app's shape; the merge path is shared.
+  It also writes the CSV rows (`csvRow`), so the format has one owner on both sides.
+- `src/lib/html.js` — `esc()` and `initials()`, shared by the three pages that build markup as
+  strings. Needs a DOM, so the service worker never imports it.
 - `src/background/service-worker.js` — ingests content-script events, keeps the badge live,
   runs migration, auto-syncs to Sheets. It does **not** serve UI reads — pages use `storage.js` directly.
 - `dashboard/`, `report/`, `src/popup/` — ES-module pages (`<script type="module">`).
@@ -44,8 +47,9 @@ See [README → Project Structure](README.md#project-structure). In short:
 
 ## Conventions
 
-- **Escape all user-supplied strings** (names, titles) before inserting into HTML — use the
-  `esc()` helpers already present.
+- **Escape all user-supplied strings** (names, titles) before inserting into HTML — use `esc()`
+  from `src/lib/html.js`, which every page shares. It escapes quotes as well as brackets, because
+  half of these values land inside an attribute.
 - **Keep light + dark working.** Colours come from CSS variables in `ui.css`; don't hard-code hex
   in components. Charts read CSS variables at draw time.
 - **Derive from `events`.** `events` (raw Join/Leave) is the source of truth; never persist a

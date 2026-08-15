@@ -4,6 +4,7 @@ import * as i18n from '../src/lib/i18n.js';
 import * as sheets from '../src/lib/sheets-api.js';
 import * as sheetsSync from '../src/lib/sheets-sync.js';
 import * as importers from '../src/lib/importers.js';
+import { esc, initials } from '../src/lib/html.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
 import { initTips } from './tooltip.js';
 
@@ -28,16 +29,6 @@ const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-vi
 const GRP_KEYS = Object.keys(GRP_COLORS);
 
 /* ------------------------------ utils ------------------------------ */
-// Quotes included: half of these strings land inside an HTML attribute, and a participant name
-// or a meeting title can hold one.
-function esc(s) {
-  const d = document.createElement('div'); d.textContent = s == null ? '' : s;
-  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-function initials(name) {
-  const p = String(name || '').trim().split(/\s+/);
-  return ((p.length >= 2 ? p[0][0] + p[p.length - 1][0] : (name || '').slice(0, 2)) || '?').toUpperCase();
-}
 function hash(str) { let h = 0; for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h); return Math.abs(h); }
 function avatarStyle(name) {
   const v = GRP_COLORS[GRP_KEYS[hash(name) % GRP_KEYS.length]];
