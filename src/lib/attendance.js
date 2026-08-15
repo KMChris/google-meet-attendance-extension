@@ -17,8 +17,12 @@ function ms(iso) {
   return Number.isNaN(t) ? NaN : t;
 }
 
-/** A "stuck" meeting still marked in-progress after this long is treated as ended. */
-export const STALE_MS = 4 * 60 * 60 * 1000;
+/**
+ * How long the last sign of life is worth believing. The page reports in once a minute even when
+ * nobody comes or goes, so a missed beat or two is a busy machine — past that, nothing is
+ * watching the call any more and the record can only be read as unfinished.
+ */
+export const LIVE_SIGNAL_MS = 3 * 60 * 1000;
 /** A meeting re-opened within this window (refresh / rejoin) resumes the same record. */
 export const RESUME_WINDOW_MS = 3 * 60 * 60 * 1000;
 /**
@@ -159,17 +163,41 @@ export function lastActivityMs(meeting) {
   return latest;
 }
 
-/** In-progress but abandoned (browser closed without a clean end) for > STALE_MS. */
-export function isStale(meeting) {
-  if (!meeting || meeting.endedAt) return false;
-  if (!anyPresent(meeting)) return false;
+/** Time since anything was known to be reporting into this meeting (Infinity if nothing ever was). */
+function sinceLastSignMs(meeting, now) {
   const last = lastActivityMs(meeting);
-  return last > 0 && (Date.now() - last) > STALE_MS;
+  return last > 0 ? now - last : Infinity;
 }
 
-export function isInProgress(meeting) {
-  if (!meeting || meeting.endedAt) return false;
-  return anyPresent(meeting) && !isStale(meeting);
+/**
+ * What a record is, which is as much a question about its last sign of life as about its end:
+ *
+ *   'live'       — no end, somebody inside it, and something reported in a moment ago.
+ *   'unfinished' — no end, and nothing has reported in for longer than that. The browser was
+ *                  killed, the extension went away mid-call, or the record came in from a CSV
+ *                  exported while the call was still running. Nothing ended it, and nothing
+ *                  about it is growing either — it stopped where its last sign of life is.
+ *   'ended'      — it carries an end; or the call is plainly over and the page is still
+ *                  reporting, which is the moment between the last person leaving and the end
+ *                  arriving.
+ *
+ * The signal is what keeps a call the browser was killed on from reading as live: presence alone
+ * cannot tell the two apart, because an abandoned record has everyone still standing inside it.
+ * Going quiet is never read as "ended", only as "nobody can say" — the difference the UI shows.
+ */
+export function meetingState(meeting, now = Date.now()) {
+  if (!meeting || meeting.endedAt) return 'ended';
+  if (sinceLastSignMs(meeting, now) >= LIVE_SIGNAL_MS) return 'unfinished';
+  return anyPresent(meeting) ? 'live' : 'ended';
+}
+
+/**
+ * Is the call happening right now? This is also the question "does its clock still run?": only a
+ * live call's does, so an abandoned record stops at its last sign of life rather than growing with
+ * the wall clock for as long as it takes somebody to notice it.
+ */
+export function isLive(meeting, now) {
+  return meetingState(meeting, now) === 'live';
 }
 
 /** Earliest join across all participants (Infinity when nobody ever joined). */
@@ -191,7 +219,7 @@ function earliestJoinMs(meeting) {
 export function observedBounds(meeting) {
   const earliest = earliestJoinMs(meeting);
   const startMs = earliest !== Infinity ? earliest : ms(meeting && meeting.date);
-  const endMs = isInProgress(meeting) ? Date.now() : lastActivityMs(meeting);
+  const endMs = isLive(meeting) ? Date.now() : lastActivityMs(meeting);
   return { startMs, endMs: endMs || startMs };
 }
 
@@ -219,7 +247,7 @@ export function meetingStartMs(meeting) {
  * else the scheduled end when known, else endedAt, else frozen at last activity.
  */
 export function meetingEndMs(meeting) {
-  if (isInProgress(meeting)) return Date.now();
+  if (isLive(meeting)) return Date.now();
   const scheduled = ms(meeting && meeting.scheduledEnd);
   if (!Number.isNaN(scheduled)) return scheduled;
   if (meeting && meeting.endedAt) return ms(meeting.endedAt);

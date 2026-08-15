@@ -29,7 +29,10 @@
 .rec-date .d{font-family:var(--disp);font-weight:700;font-size:15px}
 .rec-date .m{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-top:2px}
 .rec-body{min-width:0;flex:1}
+.rec-head{display:flex;align-items:center;gap:7px;min-width:0}
 .rec-title{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* no room for the word here: the marker is the dot alone, and the hover says which it is */
+.rec-head .live-tag{flex:none;gap:0;padding:3px;border-radius:50%}
 .rec-sub{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:1px}
 .rec-count{font-family:var(--mono);font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 

@@ -10,7 +10,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   mergeRawParticipants, deriveAttendee, presenceSeconds, sessionsFromEvents,
-  closeOpenEvents, closeOpenParticipants, lastActivityMs
+  closeOpenEvents, closeOpenParticipants, lastActivityMs,
+  meetingState, isLive, meetingDurationSeconds
 } from '../src/lib/attendance.js';
 
 const at = (hhmm) => `2026-08-14T${hhmm}:00.000Z`;
@@ -132,4 +133,52 @@ test('the watermark is what a quiet call is known by', () => {
 
   assert.equal(lastActivityMs(meeting), Date.parse(at('10:00')), 'without one, the last join is all there is');
   assert.equal(lastActivityMs({ ...meeting, liveAt: at('10:45') }), Date.parse(at('10:45')));
+});
+
+/* ---- what the panel is allowed to call a meeting ----
+ * These are about a record nobody closed, which looks exactly like a call in progress from the
+ * inside: everyone is still standing in it. Only the last sign of life tells the two apart, so
+ * the state is read against the clock rather than against presence.
+ */
+
+const NOW = Date.now();
+const minsAgo = (mins) => new Date(NOW - mins * 60000).toISOString();
+const joinedAgo = (mins) => deriveAttendee({ events: [{ time: minsAgo(mins), type: 'Join' }] });
+
+test('a call that reported in a moment ago is live', () => {
+  const meeting = { date: minsAgo(30), liveAt: minsAgo(0.5), attendance: { Anna: joinedAgo(30) } };
+
+  assert.equal(meetingState(meeting), 'live');
+});
+
+test('a call nothing has reported into for minutes is unfinished, not live', () => {
+  const meeting = { date: minsAgo(90), liveAt: minsAgo(45), attendance: { Anna: joinedAgo(90) } };
+
+  assert.equal(meetingState(meeting), 'unfinished', 'the browser went away with it — nobody can say it is running');
+  assert.equal(isLive(meeting), false);
+});
+
+test('a call nothing ended stops growing at its last sign of life', () => {
+  const meeting = { date: minsAgo(90), liveAt: minsAgo(45), attendance: { Anna: joinedAgo(90) } };
+
+  assert.equal(meetingDurationSeconds(meeting), 45 * 60, 'not the hour and a half the wall clock has run');
+});
+
+test('a record that carries an end is settled, whoever it left standing in the call', () => {
+  const meeting = { date: minsAgo(90), endedAt: minsAgo(30), liveAt: minsAgo(30), attendance: { Anna: joinedAgo(90) } };
+
+  assert.equal(meetingState(meeting), 'ended');
+});
+
+test('the moment between the last person leaving and the end arriving is not called unfinished', () => {
+  const anna = deriveAttendee({ events: [{ time: minsAgo(60), type: 'Join' }, { time: minsAgo(1), type: 'Leave' }] });
+  const meeting = { date: minsAgo(60), liveAt: minsAgo(0.2), attendance: { Anna: anna } };
+
+  assert.equal(meetingState(meeting), 'ended', 'the page is still reporting; the end is on its way');
+});
+
+test('a record imported with everyone still in the call is unfinished', () => {
+  const meeting = { date: minsAgo(3 * 24 * 60), attendance: { Anna: joinedAgo(3 * 24 * 60) } };
+
+  assert.equal(meetingState(meeting), 'unfinished', 'no end, and no sign of life since the day it was recorded');
 });

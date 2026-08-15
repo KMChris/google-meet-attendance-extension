@@ -44,6 +44,55 @@
   "inCall": {
     "message": "W rozmowie"
   },
+  "liveNow": {
+    "message": "Na żywo"
+  },
+  "liveNowHint": {
+    "message": "To spotkanie właśnie trwa — jego liczby zmieniają się razem z nim."
+  },
+  "liveNowOne": {
+    "message": "Trwa spotkanie",
+    "description": "Title of the masthead marker when exactly one meeting is live."
+  },
+  "liveNowMany": {
+    "message": "Trwających spotkań: $COUNT$",
+    "description": "Title of the masthead marker when several meetings are live.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "unfinished": {
+    "message": "Niezakończone"
+  },
+  "unfinishedHint": {
+    "message": "Nic nie zakończyło tego spotkania — przeglądarka się zamknęła albo śledzenie urwało się w trakcie. Zapis kończy się na ostatnim śladzie aktywności ($TIME$), a każdy, kto wciąż figuruje w rozmowie, nadal w niej stoi.",
+    "description": "Explains the marker on a meeting that was never closed.",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "10:15"
+      }
+    }
+  },
+  "endNow": {
+    "message": "Zamknij zapis"
+  },
+  "confirmEndNow": {
+    "message": "Zakończyć to spotkanie o $TIME$, na ostatnim śladzie aktywności? Każdy, kto wciąż figuruje w rozmowie, zostanie oznaczony jako wychodzący w tym momencie.",
+    "description": "Asked before closing a meeting nothing got to end.",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "10:15"
+      }
+    }
+  },
+  "endedNowToast": {
+    "message": "Zakończone na ostatnim śladzie aktywności"
+  },
   "navMeetings": {
     "message": "Spotkania"
   },

@@ -166,6 +166,26 @@ a{color:var(--accent);text-decoration:none}
 .status--absent{background:var(--absent-2);color:var(--ink-3)} .status--absent::before{background:var(--absent)}
 .status--info{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line)} .status--info::before{display:none}
 
+/* ---------------------- live / unfinished markers -------------------- */
+/* A record of a call that has already happened is a still thing. One that is happening now is
+   the only thing on the page still moving, so it is marked by the only motion in the interface:
+   a dot that goes on ringing for as long as the call does. Reduced motion drops the ring and
+   leaves the dot, which is why the state is never the animation alone.
+   `.warn` is the other end of the same family: a record nothing ended, marked in the late-amber
+   the palette keeps for "not what it should be" rather than in the green of a live call. */
+.live-tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-weight:500;
+  font-size:11px;letter-spacing:.04em;padding:3px 9px;border-radius:999px;text-transform:uppercase;
+  white-space:nowrap;background:var(--present-2);color:var(--present);
+  border:1px solid color-mix(in srgb,var(--present) 32%,transparent)}
+.live-tag .pip{position:relative;width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.live-tag .pip::after{content:"";position:absolute;inset:0;border-radius:50%;background:currentColor;
+  animation:live-ring 1.9s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes live-ring{from{opacity:.5;transform:scale(1)}to{opacity:0;transform:scale(2.8)}}
+.live-tag .clock{font-variant-numeric:tabular-nums}
+.live-tag.warn{background:var(--late-2);color:var(--late);
+  border-color:color-mix(in srgb,var(--late) 32%,transparent)}
+.live-tag.warn .pip::after{animation:none}
+
 /* ------------------------------ fields ------------------------------ */
 .field{width:100%;background:var(--panel);color:var(--ink);border:1.5px solid var(--line-2);
   border-radius:var(--radius-sm);padding:10px 12px;transition:border-color .15s}

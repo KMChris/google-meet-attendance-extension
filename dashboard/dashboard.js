@@ -200,6 +200,7 @@ async function load() {
   renderReadout();
   syncSettingsUI();
   route(true);   // whatever is on screen is re-read from the fresh data
+  liveSettled();
 }
 
 function renderReadout() {
@@ -212,6 +213,174 @@ function renderReadout() {
   const att = shareN ? Math.round(shareSum / shareN) : 0;
   $('#readout').innerHTML =
     `${t('readoutMeetings').toUpperCase()} <b>${history.length}</b> · ${t('readoutPeople').toUpperCase()} <b>${people.size}</b> · ${t('readoutPresent').toUpperCase()} <b>${att}%</b>`;
+}
+
+/* ====================== WHAT IS HAPPENING RIGHT NOW ======================
+ * Every row on the list is a record of something that already happened — except when it is not.
+ * Two states have to read differently from the rest, and neither can be told apart by presence
+ * alone, because a record nobody closed has everyone still standing inside it:
+ *
+ *   live       — the call is running. It rewrites itself every few seconds and its figures grow
+ *                with the clock, so the page has to keep up or it is showing yesterday's numbers.
+ *   unfinished — nothing ended the record: the browser closed on it, the extension went away
+ *                mid-call, or it came in from a CSV exported during a call. Nothing about it is
+ *                moving, and calling it live would be a lie the panel went on telling for hours.
+ *
+ * Both are watched from two directions, because both can change without the other noticing: the
+ * store says when something was written, and the clock says when something aged (a call that goes
+ * quiet stops being live three minutes later, and nothing is written anywhere when it does).
+ */
+const LIVE_TICK_MS = 1000;
+const LIVE_SETTLE_MS = 1200;  // a live call writes every few seconds; one repaint covers a burst
+const LIVE_BEAT = 10;         // and its derived figures are redrawn on this many ticks
+
+let liveTarget = null;   // the meeting the masthead marker leads to (null: the list)
+let livePainted = '';    // the state the page was last drawn with
+let liveRefresh = null;  // the debounce in flight
+let liveBusy = false;    // a repaint the page was too busy for, waiting for it to be idle
+let liveBeats = 0;
+
+/** Only a record without an end can be live or unfinished — the rest are settled. */
+function openMeetings() { return history.filter(m => !m.endedAt); }
+
+/** What the markers are drawn from, as a string, so a repaint follows a change and nothing else. */
+function liveDigest() {
+  return openMeetings().map(m => `${m.id}:${A.meetingState(m)}`).join('|');
+}
+
+/** Where a record nothing ended stops being known — and where a repair would close it. */
+function lastSignIso(m) {
+  const at = A.lastActivityMs(m) || Date.parse(m && m.date) || 0;
+  return at ? new Date(at).toISOString() : null;
+}
+/** Day and hour together: a bare time would not say which day was the last anything was heard. */
+function whenShort(iso) {
+  if (!iso) return '—';
+  return `${i18n.formatDate(iso, { day: 'numeric', month: 'short' })}, ${i18n.formatTime(iso)}`;
+}
+
+/** Point a clock at the moment it counts from, or take it out of the ticker's hands. */
+function setSince(el, since) {
+  if (!el) return;
+  if (Number.isFinite(since) && since > 0) el.dataset.since = String(since);
+  else { delete el.dataset.since; el.textContent = ''; }
+}
+
+/** Every running clock on the page, wherever it is, off the one timer. */
+function tickClocks(now = Date.now()) {
+  $$('[data-since]').forEach(el => {
+    el.textContent = fmtHMS(Math.max(0, (now - Number(el.dataset.since)) / 1000));
+  });
+}
+
+/**
+ * The marker a record wears while it is not (yet) one: still running, or never ended. The clock
+ * inside it is left to the ticker — the markup only says where it counts from.
+ */
+function stateTag(m, state = A.meetingState(m)) {
+  if (state === 'live') {
+    const since = A.meetingStartMs(m);
+    const clock = Number.isFinite(since) ? `<span class="clock" data-since="${since}"></span>` : '';
+    return `<span class="live-tag" title="${esc(t('liveNowHint'))}"><span class="pip"></span><span class="lb">${esc(t('liveNow'))}</span>${clock}</span>`;
+  }
+  if (state === 'unfinished') {
+    const why = t('unfinishedHint', { time: whenShort(lastSignIso(m)) });
+    return `<span class="live-tag warn" title="${esc(why)}"><span class="pip"></span><span class="lb">${esc(t('unfinished'))}</span></span>`;
+  }
+  return '';
+}
+
+/**
+ * The marker beside the name of the app: whatever view is open, a call in progress is on screen,
+ * and it leads to the call it is about. Several at once name none of them — the list does that.
+ */
+function renderLiveMarker() {
+  const live = history.filter(m => A.isLive(m));
+  const box = $('#live-now'), clock = $('#live-now-clock');
+  box.hidden = !live.length;
+  liveTarget = live.length === 1 ? live[0].id : null;
+  if (!live.length) { setSince(clock, NaN); return; }
+
+  const many = live.length > 1;
+  $('#live-now-label').textContent = many ? `${t('liveNow')} · ${live.length}` : t('liveNow');
+  box.title = many ? t('liveNowMany', { count: live.length }) : `${live[0].meetingTitle} — ${t('liveNowOne')}`;
+  setSince(clock, many ? NaN : A.meetingStartMs(live[0]));
+  tickClocks();
+}
+$('#live-now').addEventListener('click', () => go(liveTarget ? 'meeting=' + encodeURIComponent(liveTarget) : 'meetings'));
+
+/**
+ * A repaint under the user's hands is worse than a number a few seconds old: it rebuilds the rows
+ * a selection is spread across, and closes the modal, menu or rename it lands on. So it waits for
+ * the page to be idle, and the wait is remembered rather than dropped.
+ */
+function canRepaint() {
+  // `selection.scope` is set by every mount, so what says a batch is being picked is what is in
+  // it — the rows are only in the user's hands once something has actually been picked
+  return !$('.modal:not([hidden])') && !$('.menu:not([hidden])')
+    && !$('.title-line.editing') && !selection.keys.size;
+}
+
+/** Redraw whatever shows the two states. Only the two views that carry them are rebuilt. */
+function repaintLive() {
+  renderLiveMarker();   // one element, never in anyone's way
+  if (!canRepaint()) { liveBusy = true; return; }
+  liveBusy = false;
+  livePainted = liveDigest();
+
+  const view = parseRoute(currentHash()).view;
+  if (view === 'meetings') renderMeetings($('#meeting-search').value.trim());
+  else if (view === 'detail') { const m = currentMeeting(); if (m) renderDetail(m); }
+  else tickClocks();
+}
+
+/** The page has just drawn itself from fresh data — nothing to catch up on. */
+function liveSettled() {
+  renderLiveMarker();
+  livePainted = liveDigest();
+  liveBusy = false;
+}
+
+function onLiveTick() {
+  tickClocks();
+  liveBeats++;
+  const digest = liveDigest();
+  // a live call's derived figures (its length, everyone's share of it) move with the clock and
+  // not with anything written down, so they are redrawn on a beat of their own
+  const beat = digest.includes(':live') && liveBeats % LIVE_BEAT === 0;
+  if (digest !== livePainted || liveBusy || beat) repaintLive();
+}
+
+/**
+ * The store is the other half: the tracker writes into it from the Meet tab, so what a call is
+ * doing arrives here as a change rather than as anything this page asked for. The burst a busy
+ * call writes is settled into one repaint.
+ */
+async function refreshFromStore() {
+  try {
+    const h = await store.getHistory();
+    history = h.map(A.normalizeMeeting).sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+    renderReadout();
+    livePainted = '';   // the records changed, not just the clock: draw them again
+    repaintLive();
+  } catch (err) {
+    console.warn('[GM Attendance] could not follow the store:', err);
+  }
+}
+
+function watchLive() {
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes || !(store.STORAGE_KEYS.HISTORY in changes)) return;
+      if (liveRefresh) return;
+      liveRefresh = setTimeout(() => { liveRefresh = null; refreshFromStore(); }, LIVE_SETTLE_MS);
+    });
+  } catch { /* no storage events outside the extension — the clock alone still keeps up */ }
+  setInterval(onLiveTick, LIVE_TICK_MS);
+  // A hidden page is throttled to about one beat a minute, so what is on screen can be a minute
+  // behind the moment it is looked at again: it is read afresh on the way back rather than left
+  // to whenever the next beat lands.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshFromStore(); });
 }
 
 /* ========================= BATCH SELECTION =========================
@@ -439,7 +608,12 @@ function renderMeetings(filter = '') {
     const groupCell = g
       ? `<button class="group-pill go" data-group="${esc(g.id)}" title="${esc(t('openGroup'))}: ${esc(g.name)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span><span class="gname">${esc(g.name)}</span></button>`
       : '';
-    const live = A.isInProgress(m) ? `<span class="status status--present" style="margin-left:6px">${t('inCall')}</span>` : '';
+    // a call still running, and a record nothing ever ended, are not records like the rest: each
+    // is marked beside the title and washes its row. In the trash neither matters — whatever is
+    // in there is on its way out, not something to go back to a call about.
+    const state = inTrash ? 'ended' : A.meetingState(m);
+    const tag = stateTag(m, state);
+    const mark = state === 'live' ? ' is-live' : state === 'unfinished' ? ' is-unfinished' : '';
     const badge = `<div class="date-badge"><span class="day">${d.getDate()}</span><span class="mon">${esc(i18n.monthShort(d))}</span></div>`;
     // in the trash the series it was in is beside the point; what is left of its stay is not
     const middle = inTrash
@@ -455,20 +629,22 @@ function renderMeetings(filter = '') {
       : `<button class="row-ic" data-act="export" data-id="${esc(m.id)}" title="${esc(t('exportCsv'))}" aria-label="${esc(t('exportCsv'))}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg></button>`;
     // a finished meeting reads as its full span; one still running only names its start,
-    // the "in call" chip beside the title says the rest
+    // the marker beside the title carries how long it has been going
     const endIso = A.meetingEndIso(m);
-    const hours = !endIso || A.isInProgress(m)
+    const hours = !endIso || state === 'live'
       ? i18n.formatTime(startIso)
       : `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}`;
-    return `<div class="row meetings-grid" data-id="${esc(m.id)}">
+    return `<div class="row meetings-grid${mark}" data-id="${esc(m.id)}">
       <div class="col-date">${pickHandle(m.id, badge)}</div>
-      <div class="col-title"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}${live}</div><div class="m-sub">${hours}</div></div>
+      <div class="col-title"><div class="m-head"><div class="m-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}</div>${tag}</div><div class="m-sub">${hours}</div></div>
       <div class="col-group">${middle}</div>
       <div class="col-people num">${people}</div>
       <div class="col-avg num">${fmtDur(avg)}</div>
       <div class="col-actions" style="text-align:right">${action}</div>
     </div>`;
   }).join('');
+
+  tickClocks();   // a marker just drawn shows its clock now, not on the next beat
 
   $$('#meetings-body .row').forEach(row => row.addEventListener('click', () => {
     if (selectionClick(row.dataset.id)) return;
@@ -578,15 +754,61 @@ function renderDetail(m) {
 
   renderGroupBadge(m);
 
-  // the hours badge reads them out and edits them; pinned hours are marked, not spelled out
+  // the hours badge reads them out and edits them; pinned hours are marked, not spelled out.
+  // A call still running has no end to name — an hour printed there would read as the one it
+  // finished at, so the span is left open and the marker beside it says how long it has been going.
+  const state = A.meetingState(m);
   const hours = $('#btn-hours'), pinned = A.hasSchedule(m);
-  $('#hours-value').textContent = `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}`;
+  $('#hours-value').textContent = state === 'live'
+    ? `${i18n.formatTime(startIso)}–…`
+    : `${i18n.formatTime(startIso)}–${i18n.formatTime(endIso)}`;
   hours.classList.toggle('pinned', pinned);
   hours.title = pinned ? t('hoursPinnedTitle') : t('hoursAutoTitle');
+  renderDetailState(m, state);
 
   renderTimeline(m);
   renderAttendance(m, $('#participant-search').value.trim());
 }
+
+/**
+ * What the record itself is, said above the numbers it explains: a call still running, whose
+ * figures are still moving, or one nothing ended, whose figures stopped where its last sign of
+ * life is and read as if everyone were still in the room. The second comes with the way out.
+ */
+function renderDetailState(m, state = A.meetingState(m)) {
+  const tag = $('#detail-live'), endBtn = $('#btn-end-now');
+  const clock = $('.clock', tag), label = $('.lb', tag);
+
+  tag.hidden = state === 'ended';
+  endBtn.hidden = state !== 'unfinished';
+  tag.classList.toggle('warn', state === 'unfinished');
+  if (state === 'ended') { setSince(clock, NaN); return; }
+
+  if (state === 'live') {
+    label.textContent = t('liveNow');
+    tag.title = t('liveNowHint');
+    setSince(clock, A.meetingStartMs(m));
+    tickClocks();
+    return;
+  }
+  label.textContent = t('unfinished');
+  tag.title = endBtn.title = t('unfinishedHint', { time: whenShort(lastSignIso(m)) });
+  setSince(clock, NaN);
+}
+
+/**
+ * Close a record nothing got to end, where anything was last known to be reporting into it — the
+ * same repair the worker runs whenever it wakes and finds a call whose link is gone from the
+ * browser. By hand for the one case it cannot judge: the Meet tab is still open, so from out
+ * there the call may well still be running.
+ */
+$('#btn-end-now').addEventListener('click', async () => {
+  const m = currentMeeting(); if (!m) return;
+  if (!confirm(t('confirmEndNow', { time: whenShort(lastSignIso(m)) }))) return;
+  const closed = await store.endInterruptedMeetings([m.id]);
+  await load();
+  if (closed.length) toast(t('endedNowToast'));
+});
 
 /**
  * The hover readout for one presence block: whose lane it is, the hours it covers and how long
@@ -2011,6 +2233,7 @@ i18n.onLocaleChange(() => {
     exportCSV
   });
   await load();
+  watchLive();
   await refreshSheets();
   syncOnOpen();
 })();

@@ -60,9 +60,15 @@ function renderRecent(history) {
     const startIso = A.meetingStartIso(m);
     const d = new Date(startIso);
     const n = Object.keys(m.attendance).length;
+    // the same two states the dashboard marks, in the room a popup row has for them: a dot that
+    // rings while the call does, amber and still where nothing ever ended the record. It sits
+    // beside the title rather than inside it, which is where the ellipsis would have eaten it.
+    const state = A.meetingState(m);
+    const tag = state === 'ended' ? '' :
+      `<span class="live-tag${state === 'unfinished' ? ' warn' : ''}" title="${esc(t(state === 'live' ? 'liveNow' : 'unfinished'))}"><span class="pip"></span></span>`;
     return `<div class="rec-item" data-id="${esc(m.id)}">
       <div class="rec-date"><span class="d">${d.getDate()}</span><span class="m">${esc(i18n.monthShort(d))}</span></div>
-      <div class="rec-body"><div class="rec-title">${esc(m.meetingTitle)}${A.isInProgress(m) ? ' ·' : ''}</div><div class="rec-sub">${i18n.formatTime(startIso)}</div></div>
+      <div class="rec-body"><div class="rec-head"><div class="rec-title">${esc(m.meetingTitle)}</div>${tag}</div><div class="rec-sub">${i18n.formatTime(startIso)}</div></div>
       <div class="rec-count">${n}</div></div>`;
   }).join('');
   list.querySelectorAll('.rec-item').forEach(it => it.addEventListener('click', () => openDashboard('#meeting=' + encodeURIComponent(it.dataset.id))));

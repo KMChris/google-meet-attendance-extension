@@ -10,6 +10,7 @@ every time they left and rejoined.
 - **Real-time Participant Detection**: Track participant join/leave events using MutationObserver and polling
 - **Event-based Tracking**: Records each join and leave as a separate event with timestamp; presence, sessions, durations and shares are all derived from those raw events
 - **Full Dashboard** (Meetings · Series · People · Analytics · Settings): search, rename, native canvas charts, and the presence timeline — opens as the extension's options page. Every view has its own URL, so the browser's back button works and any view can be linked to
+- **A call in progress reads as one**: it is marked in the list, on its own page and beside the name of the app, with the time it has been running, and the panel follows it rather than freezing at the moment it was opened. A record nothing ever ended is marked apart from it, in amber, with the last moment anything was heard from the call — and can be closed at exactly that moment
 - **Analytics**: filter by date range, series and meeting, then read the slice as headline numbers with period-over-period deltas, charts (activity over time, length vs. presence, a weekday × hour heatmap, attendance distribution, top meetings and people, series comparison) and derived read-outs. Every chart flips to the table behind it and exports to CSV
 - **Series**: Bundle recurring sessions (e.g. a weekend training) into a series. Recurring links are auto-detected; each series has an aggregate **attendance matrix** (people × sessions, with each person's share of every session), per-series roster, and its own report. Click a person to see their exact joins and leaves in each session
 - **Attendance is binary**: whoever was in the call is present. How much of it they were there for is reported as time and share — against the meeting's hours, which are read from the calendar event when Meet shows it and can always be corrected by hand
@@ -177,7 +178,7 @@ link never overwrite each other, and can be recognised as a series.
   meetingCode: "abc-defg-hij",       // the Meet link code (series key)
   date: "2026-02-15T09:00:00Z",      // meeting start
   endedAt: "2026-02-15T10:00:00Z",
-  liveAt: "2026-02-15T09:59:00Z",    // last sign of life — where a recovery ends an abandoned call
+  liveAt: "2026-02-15T09:59:00Z",    // last sign of life — what says a call is live, and where a recovery ends an abandoned one
   meetingTitle: "Weekly Standup",    // editable in the dashboard
   url: "https://meet.google.com/abc-defg-hij",
   groupId: "grp-…",                  // optional — links to meetingGroups
@@ -257,6 +258,12 @@ it out mid-call, so tracking is built to be picked back up rather than to be kep
 - Whenever the service worker wakes it ends the meetings nothing got to end, and puts a tracker
   back into every Meet tab that hasn't got one. A call still on screen is resumed into the same
   record; one whose link is gone from the browser is closed at its last sign of life.
+- The same watermark is what the panel reads a record by, because presence cannot tell a live call
+  from an abandoned one — both have everyone still standing inside them. Reported in within the
+  last few minutes: live, and its figures are still moving. Longer than that: unfinished, its hours
+  stopped where the reports stopped, and the panel says so instead of claiming it is running. A
+  record left open because its Meet tab is still up — the one case the worker cannot judge — can be
+  closed by hand from its page, at the last moment anything was heard from it.
 - A call already running when the extension arrives is picked up on the spot, with no record of
   it ever having begun.
 

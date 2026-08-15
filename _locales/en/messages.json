@@ -44,6 +44,55 @@
   "inCall": {
     "message": "In call"
   },
+  "liveNow": {
+    "message": "Live"
+  },
+  "liveNowHint": {
+    "message": "This call is running right now — its figures move with it."
+  },
+  "liveNowOne": {
+    "message": "A call is running",
+    "description": "Title of the masthead marker when exactly one meeting is live."
+  },
+  "liveNowMany": {
+    "message": "Calls running: $COUNT$",
+    "description": "Title of the masthead marker when several meetings are live.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "unfinished": {
+    "message": "Unfinished"
+  },
+  "unfinishedHint": {
+    "message": "Nothing ended this meeting — the browser closed, or tracking stopped mid-call. It stops at its last sign of life, $TIME$, and everyone still shown in the call is still standing in it.",
+    "description": "Explains the marker on a meeting that was never closed.",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "10:15"
+      }
+    }
+  },
+  "endNow": {
+    "message": "End it there"
+  },
+  "confirmEndNow": {
+    "message": "End this meeting at $TIME$, its last sign of life? Anyone still shown in the call is marked as having left then.",
+    "description": "Asked before closing a meeting nothing got to end.",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "10:15"
+      }
+    }
+  },
+  "endedNowToast": {
+    "message": "Ended at its last sign of life"
+  },
   "navMeetings": {
     "message": "Meetings"
   },

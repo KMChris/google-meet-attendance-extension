@@ -5,6 +5,22 @@ All notable changes to this project. This project adheres to [Semantic Versionin
 ## [Unreleased]
 
 ### Added
+- **A call in progress is marked as one, wherever the panel shows it.** Until now a meeting still
+  running sat in the list looking exactly like the dozen finished ones above it, and only the popup
+  hinted otherwise — so the panel quietly invited you to read numbers that were still moving as if
+  they were final. A live call now wears a marker with the time it has been running, its row is
+  washed in the present-green and its date badge is lit, and a marker beside the name of the app
+  says a call is on from every view and leads to it. Its detail page leaves the hours open
+  (`09:00–…`) rather than printing the current time as the hour it finished at.
+- **The panel keeps up with a call instead of freezing at the moment it was opened.** It follows
+  what the tracker writes and redraws when a call is joined, left or ended, and the clocks tick
+  where they stand. A repaint waits for the page to be idle: a batch being picked, an open modal,
+  menu or rename is never pulled out from under you, and lands as soon as it is let go.
+- **A record nothing ended says so, and offers the way out.** It is marked in amber as unfinished,
+  the marker names the last moment anything was heard from the call, and one badge closes the
+  record at exactly that moment — the same repair the worker runs on its own for a call whose link
+  is gone from the browser, offered by hand for the one case it cannot judge, where the Meet tab is
+  still open and the call may as well still be running.
 - **A call in progress survives the extension going away.** Reloading, updating or switching the
   extension off cuts the tracker in the page off from the rest of the extension: it keeps running,
   but nothing it reports arrives anywhere, and Chrome puts a script into tabs that load afterwards,
@@ -36,6 +52,12 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   than being restored behind the deletion.
 
 ### Fixed
+- **A record nothing ended no longer passes for a call in progress.** Presence cannot tell the two
+  apart — a record nobody closed has everyone still standing inside it — so a call the browser was
+  killed on read as running, and its length grew with the wall clock, until it was four hours stale.
+  The last sign of life decides now: the page reports in once a minute, and three minutes without
+  one is a call nothing is watching any more. Its hours stop where they stopped, its length stops
+  growing, and the panel says nobody can vouch for it rather than claiming it is live.
 - **A meeting nothing got to end no longer runs on for hours.** The browser closed on it, the tab
   went while the worker was asleep, the extension was switched off: the record was left open with
   everyone still inside it, reading as in progress and growing with the clock until it was four
