@@ -67,8 +67,11 @@ function getMany(keys) {
 /**
  * Chrome refuses a write by saying so afterwards and doing nothing, which is how a store that has
  * filled up loses a meeting without anybody noticing: the call goes on being recorded into a
- * register that no longer takes it. Nothing here can put that right — the cap on stored meetings
- * is what keeps it from happening — but a record that vanished should not have to be guessed at.
+ * register that no longer takes it. Two things keep it from happening, and neither is here: the
+ * cap on stored meetings, and the `unlimitedStorage` permission, without which a register of two
+ * hundred meetings can come within a few megabytes of what an extension is allowed. What is left
+ * (a disk with nothing on it to spare) is nothing this can put right, but a record that vanished
+ * should not have to be guessed at.
  */
 function setMany(obj) {
   return new Promise((resolve) => chrome.storage.local.set(obj, () => {
