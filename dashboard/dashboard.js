@@ -279,7 +279,7 @@ function tickClocks(now = Date.now()) {
  */
 function stateTag(m, state = A.meetingState(m)) {
   if (state === 'live') {
-    const since = A.meetingStartMs(m);
+    const since = A.measuredStartMs(m);   // the hour it was scheduled for may not have come yet
     const clock = Number.isFinite(since) ? `<span class="clock" data-since="${since}"></span>` : '';
     return `<span class="live-tag" title="${esc(t('liveNowHint'))}"><span class="pip"></span><span class="lb">${esc(t('liveNow'))}</span>${clock}</span>`;
   }
@@ -304,7 +304,7 @@ function renderLiveMarker() {
   const many = live.length > 1;
   $('#live-now-label').textContent = many ? `${t('liveNow')} · ${live.length}` : t('liveNow');
   box.title = many ? t('liveNowMany', { count: live.length }) : `${live[0].meetingTitle} — ${t('liveNowOne')}`;
-  setSince(clock, many ? NaN : A.meetingStartMs(live[0]));
+  setSince(clock, many ? NaN : A.measuredStartMs(live[0]));
   tickClocks();
 }
 $('#live-now').addEventListener('click', () => go(liveTarget ? 'meeting=' + encodeURIComponent(liveTarget) : 'meetings'));
@@ -787,7 +787,7 @@ function renderDetailState(m, state = A.meetingState(m)) {
   if (state === 'live') {
     label.textContent = t('liveNow');
     tag.title = t('liveNowHint');
-    setSince(clock, A.meetingStartMs(m));
+    setSince(clock, A.measuredStartMs(m));
     tickClocks();
     return;
   }

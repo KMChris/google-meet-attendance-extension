@@ -278,8 +278,28 @@ export function meetingEndMs(meeting) {
   return lastActivityMs(meeting);
 }
 
+/**
+ * The start a meeting is measured from, which is not always the start it is filed under.
+ *
+ * Official hours can sit ahead of what is happening: people gather before the hour, and a schedule
+ * read off the wrong event can miss the call altogether. Measured from a start it has not reached,
+ * a call in progress has no length and nobody has attended any of it — the clock stands at nothing
+ * while the meeting is plainly on, and every share of it reads as zero. So where the official start
+ * is not behind the end, the figures are taken from what tracking saw instead. The hours themselves
+ * are left exactly as they are: they say what the meeting is, and printing them is not the same as
+ * measuring with them.
+ */
+export function measuredStartMs(meeting) {
+  const start = meetingStartMs(meeting);
+  const endMs = meetingEndMs(meeting);
+  if (!Number.isFinite(start) || !Number.isFinite(endMs) || start < endMs) return start;
+  const observed = observedBounds(meeting).startMs;
+  return Number.isFinite(observed) && observed < endMs ? observed : start;
+}
+
+/** The window a meeting's figures are drawn and counted over. */
 export function meetingBounds(meeting) {
-  return { startMs: meetingStartMs(meeting), endMs: meetingEndMs(meeting) };
+  return { startMs: measuredStartMs(meeting), endMs: meetingEndMs(meeting) };
 }
 
 /** Are the meeting's hours pinned (calendar event or hand-set) rather than derived? */

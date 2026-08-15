@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import {
   mergeRawParticipants, deriveAttendee, presenceSeconds, sessionsFromEvents,
   closeOpenEvents, closeOpenParticipants, lastActivityMs, hasEventsAfter,
-  meetingState, isLive, meetingDurationSeconds
+  meetingState, isLive, meetingDurationSeconds, measuredStartMs, meetingStartMs,
+  sharePct, makeSessionId, sessionStartMs
 } from '../src/lib/attendance.js';
 
 const at = (hhmm) => `2026-08-14T${hhmm}:00.000Z`;
@@ -206,4 +207,53 @@ test('a record imported with everyone still in the call is unfinished', () => {
   const meeting = { date: minsAgo(3 * 24 * 60), attendance: { Anna: joinedAgo(3 * 24 * 60) } };
 
   assert.equal(meetingState(meeting), 'unfinished', 'no end, and no sign of life since the day it was recorded');
+});
+
+/* ---- hours that have not arrived yet ----
+ * A meeting keeps the hours it was scheduled for, and joining early must not stretch them. But
+ * people do gather before the hour, and until it comes those hours are ahead of the clock: measured
+ * from them, a call with five people in it has been going for no time and nobody has attended any
+ * of it.
+ */
+
+const inMins = (mins) => new Date(NOW + mins * 60000).toISOString();
+
+test('a call joined before its hour is measured from when it was joined', () => {
+  const meeting = {
+    date: minsAgo(10), liveAt: minsAgo(0.2), scheduledStart: inMins(5), scheduledEnd: inMins(65),
+    attendance: { Anna: joinedAgo(10) }
+  };
+
+  assert.equal(isLive(meeting), true);
+  assert.equal(meetingStartMs(meeting), Date.parse(inMins(5)), 'the hours themselves are untouched');
+  assert.equal(measuredStartMs(meeting), Date.parse(minsAgo(10)), 'the clock counts from the gathering');
+  assert.ok(meetingDurationSeconds(meeting) >= 10 * 60 - 1, 'not nothing, which is what it read before');
+  assert.ok(sharePct(meeting.attendance.Anna, meeting) > 90, 'and the share of it is not nothing either');
+});
+
+test('once the hour has come, the meeting is measured from it', () => {
+  const meeting = {
+    date: minsAgo(70), liveAt: minsAgo(0.2), scheduledStart: minsAgo(60), scheduledEnd: inMins(5),
+    attendance: { Anna: joinedAgo(70) }
+  };
+
+  assert.equal(measuredStartMs(meeting), Date.parse(minsAgo(60)), 'the ten minutes of gathering are not the meeting');
+  assert.ok(Math.abs(meetingDurationSeconds(meeting) - 60 * 60) <= 1);
+});
+
+test('a start pinned after the meeting ended does not leave it with no length', () => {
+  const meeting = {
+    date: minsAgo(180), endedAt: minsAgo(120), scheduledStart: minsAgo(60),
+    attendance: { Anna: deriveAttendee({ events: [
+      { time: minsAgo(180), type: 'Join' }, { time: minsAgo(120), type: 'Leave' }
+    ] }) }
+  };
+
+  assert.equal(meetingDurationSeconds(meeting), 60 * 60, 'the hour it was actually seen to run');
+});
+
+test('a session id says when it began, and an id from anywhere else does not', () => {
+  assert.equal(sessionStartMs(makeSessionId('abc-defg-hij', 1786824000000)), 1786824000000);
+  assert.ok(Number.isNaN(sessionStartMs('imported-from-somewhere')));
+  assert.ok(Number.isNaN(sessionStartMs(null)));
 });

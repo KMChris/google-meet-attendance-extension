@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSpreadsheetRef, spreadsheetUrl, headerRepair } from '../src/lib/sheets-api.js';
+import { parseSpreadsheetRef, spreadsheetUrl, headerRepair, meetingRow } from '../src/lib/sheets-api.js';
 
 const ID = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
 
@@ -68,4 +68,30 @@ test('rows somebody else put there get a row above them, not overwritten', () =>
   assert.equal(headerRepair(['Spotkanie', 'Osoba'], HEAD), 'insert');
   assert.equal(headerRepair(['mtg-1', 'Anna Kowalska'], HEAD), 'insert');
   assert.equal(headerRepair(['Meeting ID', 'Name', 'Email'], HEAD), 'insert', 'half a header is not the header');
+});
+
+/* ---- the row a person reads ---- */
+
+test('the readable row is the meeting the dashboard shows, hours and all', () => {
+  const [, , start, end, minutes] = meetingRow({
+    id: 'abc-defg-hij-1', meetingTitle: 'Standup', url: '',
+    date: '2026-08-14T09:50:00.000Z', endedAt: '2026-08-14T10:58:00.000Z',
+    scheduledStart: '2026-08-14T10:00:00.000Z', scheduledEnd: '2026-08-14T11:00:00.000Z',
+    attendance: {}
+  });
+
+  assert.equal(start, '2026-08-14T10:00:00.000Z', 'joining ten minutes early is not the meeting starting early');
+  assert.equal(end, '2026-08-14T11:00:00.000Z');
+  assert.equal(minutes, '60', 'the hour it was scheduled for, as everywhere else in the app');
+});
+
+test('a meeting with no hours of its own is the span it was tracked over', () => {
+  const [, , start, end, minutes] = meetingRow({
+    id: 'abc-defg-hij-2', meetingTitle: 'Ad hoc', url: '',
+    date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T09:30:00.000Z', attendance: {}
+  });
+
+  assert.equal(start, '2026-08-14T09:00:00.000Z');
+  assert.equal(end, '2026-08-14T09:30:00.000Z');
+  assert.equal(minutes, '30');
 });

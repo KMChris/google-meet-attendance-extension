@@ -146,6 +146,17 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   came home on the next pass and were dropped again by the next write, so a full register fetched
   the same old meetings over and over. A register at its limit now asks for nothing older than the
   oldest meeting it is keeping; raising the setting lifts that floor and brings them back.
+- **A call joined before the hour it was scheduled for no longer reads as not happening.** The
+  meeting keeps the hours of its calendar event, so that joining early cannot stretch it — but
+  until the hour comes those hours are ahead of the clock, and everything measured from them said
+  the same thing: a clock at `00:00:00`, a length of nothing, and everyone in the call credited
+  with none of it. Ten minutes early is now ten minutes of a meeting that is plainly on, and the
+  hour takes over the moment it arrives. Its timeline is drawn over the same window, where before
+  the blocks had nowhere to go, and hours pinned by hand behind the end of a meeting no longer
+  leave it with no length either.
+- **The spreadsheet's Meetings tab says what the dashboard says.** Its start, end and duration were
+  the moments tracking happened to begin and stop, so a meeting with hours of its own read minutes
+  longer up there than it did here.
 
 ## [1.3.3] 2026-08-14
 

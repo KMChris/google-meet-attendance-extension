@@ -8,6 +8,8 @@
  * row that is empty — rows somebody else put there are pushed down, never overwritten.
  */
 
+import { meetingStartIso, meetingEndIso, meetingDurationSeconds } from './attendance.js';
+
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 /**
@@ -282,13 +284,18 @@ async function getRanges(spreadsheetId, ranges) {
 
 /* ------------------------- what a meeting looks like in the sheet ------------------------- */
 
-function meetingRow(meeting) {
+/**
+ * The readable row: the meeting's hours as the app reads them, not the moments tracking happened
+ * to start and stop. A meeting with hours of its own (from its calendar event, or set by hand) is
+ * that long here too — joining ten minutes early made the row say ten minutes more than the
+ * dashboard did, of a meeting nobody would recognise by those numbers.
+ */
+export function meetingRow(meeting) {
   const names = Object.keys(meeting.attendance || {});
-  const duration = meeting.date && meeting.endedAt
-    ? Math.round((new Date(meeting.endedAt) - new Date(meeting.date)) / 60000).toString()
-    : '';
-  return [meeting.id, meeting.meetingTitle || '', meeting.date || '', meeting.endedAt || '',
-    duration, names.length, meeting.url || ''];
+  const seconds = meetingDurationSeconds(meeting);
+  return [meeting.id, meeting.meetingTitle || '',
+    meetingStartIso(meeting) || '', meetingEndIso(meeting) || '',
+    seconds ? Math.round(seconds / 60).toString() : '', names.length, meeting.url || ''];
 }
 
 /** One row per raw Join/Leave event — a summary row only when a record carries no events. */
