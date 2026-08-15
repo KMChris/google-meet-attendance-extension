@@ -21,6 +21,10 @@ node --test "tests/**/*.test.mjs"
 Anything that can be exercised without `chrome.*` belongs there: `attendance.js` and
 `importers.js` are pure by design, which is what makes the derivation testable at all.
 
+`storage.test.mjs` is the exception, and stands on a fake `chrome.storage.local` of its own: what
+it covers is two writers on one key at the same moment, which is a thing about `chrome.storage`
+rather than about our code, and cannot be shown any other way.
+
 ## Project layout
 
 See [README → Project Structure](README.md#project-structure). In short:

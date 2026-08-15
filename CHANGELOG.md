@@ -114,6 +114,15 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   heartbeat, a scan, a recovery pass, and the end of a call all racing. They queue now, one at a
   time, with the spreadsheet left outside the queue where a request that never answers cannot hold
   up a call being tracked behind it.
+- **An edit made during a call is no longer taken back by the call.** The queue above only holds
+  within the worker, and the dashboard writes to the same register from a page of its own: a rename
+  or a merge made while a meeting was being recorded could be written over by the tracker's next
+  write, seconds later and for good. Every write now carries a revision, a change worked out from a
+  register that has since moved is worked out again on what is there now, and a write that turns
+  out to have gone over a change nobody here had seen puts that change back with its own on top.
+- **Lowering "meetings to keep" no longer writes back the register as the page found it.** The trim
+  was made from the copy the dashboard was holding, which could be an hour old and knew nothing of
+  the call recorded into it since; it reads the store now.
 
 ## [1.3.3] 2026-08-14
 

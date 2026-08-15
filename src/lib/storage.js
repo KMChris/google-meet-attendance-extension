@@ -3,6 +3,7 @@
  *
  * Stores:
  *   attendanceHistory : Meeting[]  (newest-first)
+ *   attendanceHistoryRev : string  (changes on every write to the history — see mutateHistory)
  *   trashedMeetings   : Meeting[]  (deleted, each with deletedAt; purged after the retention window)
  *   meetingGroups     : Group[]    ({ id, name, color, roster[], createdAt })
  *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings,
@@ -23,6 +24,7 @@ import {
 
 export const STORAGE_KEYS = {
   HISTORY: 'attendanceHistory',
+  HISTORY_REV: 'attendanceHistoryRev',
   TRASH: 'trashedMeetings',
   GROUPS: 'meetingGroups',
   LEGACY_MEETINGS: 'meetings',
@@ -74,7 +76,101 @@ export async function getHistory() {
 }
 
 export async function saveHistory(history) {
-  await set(STORAGE_KEYS.HISTORY, history);
+  await setMany({ [STORAGE_KEYS.HISTORY]: history, [STORAGE_KEYS.HISTORY_REV]: uid('rev') });
+  return history;
+}
+
+/** How many times a change is worked out again before it is written over what is there. */
+const MUTATE_ATTEMPTS = 6;
+/** How far a repair will chase a change that keeps being written over. */
+const REPAIR_DEPTH = 3;
+
+/**
+ * Every change to the register goes through here.
+ *
+ * The dashboard, the report page and the worker all write to one key, and Chrome gives none of
+ * them a way to hold it still while a change is worked out: two reading the same array and writing
+ * it back a moment apart lose whichever wrote first, and with it a rename or a merge that nothing
+ * will ever report again. There is no way to write a key only if it has not moved, so this is done
+ * in two parts, and the second is what makes it sound:
+ *
+ *   before writing — the revision is read again, and a change worked out from a register that has
+ *     since moved is worked out again on what is there now. Cheap, and it catches the slow cases:
+ *     anything that read the store, went away to settings or the trash, and came back.
+ *   after writing — Chrome says what each write replaced. A write that turns out to have gone over
+ *     a revision this context never saw puts that revision back and applies its own change on top,
+ *     so the store passes through a moment holding one of the two and settles holding both.
+ *
+ * Two writers at once is what that settles, which is the case there is: the worker recording a
+ * call, and a page the user is editing it from. A third landing in the same instant can still cost
+ * one of the three its change — one, as it would have cost before, and never the register itself.
+ *
+ * `change` is handed the stored history to edit in place or to replace, and returns
+ * `{ history?, save?, value }`; `value` is what the caller gets back, and `save: false` says it
+ * found nothing to do. It is run again for every one of the above, so it must decide everything
+ * from the history it is given and keep nothing between runs.
+ */
+async function mutateHistory(change, resume = null, depth = 0) {
+  let base = resume;   // the array to work from, and the revision it stands for
+  for (let attempt = 1; ; attempt++) {
+    if (!base) {
+      const stored = await getMany([STORAGE_KEYS.HISTORY, STORAGE_KEYS.HISTORY_REV]);
+      base = {
+        history: Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [],
+        rev: stored[STORAGE_KEYS.HISTORY_REV]
+      };
+    }
+
+    const { history = base.history, save = true, value } = (await change(base.history)) || {};
+    if (!save) return value;
+
+    const rev = await get(STORAGE_KEYS.HISTORY_REV);
+    if (rev !== base.rev && attempt < MUTATE_ATTEMPTS) { base = null; continue; }
+
+    await writeHistory(history, base.rev, change, depth);
+    return value;
+  }
+}
+
+/**
+ * What each write of ours replaced, kept by the revision the write carried so that only our own
+ * writes are answered for. Notifications this context cannot have (no `storage.onChanged` to
+ * listen to) leave entries nothing consumes, so the oldest are dropped: without the report there
+ * is nothing to repair, which is how this behaved before there was one.
+ */
+const inFlight = new Map();
+const IN_FLIGHT_MAX = 50;
+let watching = false;
+
+function watchWrites() {
+  if (watching) return;
+  watching = true;
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      const rev = area === 'local' ? changes[STORAGE_KEYS.HISTORY_REV] : null;
+      if (!rev || !inFlight.has(rev.newValue)) return;
+      const ours = inFlight.get(rev.newValue);
+      inFlight.delete(rev.newValue);
+
+      const went = (changes[STORAGE_KEYS.HISTORY] || {}).oldValue;
+      if (rev.oldValue === ours.expected || !Array.isArray(went) || ours.depth >= REPAIR_DEPTH) return;
+      mutateHistory(ours.change, { history: went, rev: rev.newValue }, ours.depth + 1)
+        .catch(err => console.warn('[GM Attendance] could not put a change back:', err));
+    });
+  } catch (err) {
+    watching = false;   // nothing to listen to here; the write below still lands
+  }
+}
+
+/** Write, and leave word to check what the write went over. */
+async function writeHistory(history, expected, change, depth) {
+  watchWrites();
+  const token = uid('rev');
+  if (watching) {
+    inFlight.set(token, { expected, change, depth });
+    if (inFlight.size > IN_FLIGHT_MAX) inFlight.delete(inFlight.keys().next().value);
+  }
+  await setMany({ [STORAGE_KEYS.HISTORY]: history, [STORAGE_KEYS.HISTORY_REV]: token });
   return history;
 }
 
@@ -93,37 +189,53 @@ export async function getMeetingById(id) {
  */
 export async function upsertMeeting(record) {
   const settings = await getSettings();
-  let history = await getHistory();
 
-  const idx = history.findIndex(m => m.id === record.id);
+  const { merged, fresh } = await mutateHistory(history => {
+    const idx = history.findIndex(m => m.id === record.id);
 
-  const nameMap = record.nameMap || (idx >= 0 && history[idx].nameMap) || null;
-  const toStore = (nameMap && Object.keys(nameMap).length) ? { ...record, nameMap } : record;
+    const nameMap = record.nameMap || (idx >= 0 && history[idx].nameMap) || null;
+    const toStore = (nameMap && Object.keys(nameMap).length) ? { ...record, nameMap } : record;
 
-  const merged = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
-  // A name given by hand stays given. The tracker holds the title it scraped when the call
-  // opened and writes it again every few seconds, which would otherwise take a rename back.
-  if (idx >= 0 && history[idx].titleEdited) merged.meetingTitle = history[idx].meetingTitle;
-  // An end is only undone by a write that carries something later than it — the call coming back
-  // after a reload, which is a rejoin somebody records. A scan still in flight when the meeting
-  // finished reports nothing newer than the end, and reopening the record on it would leave a
-  // finished call reading as one nobody ever ended.
-  if (idx >= 0 && history[idx].endedAt && !merged.endedAt && !hasEventsAfter(record, history[idx].endedAt)) {
-    merged.endedAt = history[idx].endedAt;
-  }
-  if (idx >= 0) history[idx] = merged; else history.push(merged);
+    const next = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
+    // A name given by hand stays given. The tracker holds the title it scraped when the call
+    // opened and writes it again every few seconds, which would otherwise take a rename back.
+    if (idx >= 0 && history[idx].titleEdited) next.meetingTitle = history[idx].meetingTitle;
+    // An end is only undone by a write that carries something later than it — the call coming back
+    // after a reload, which is a rejoin somebody records. A scan still in flight when the meeting
+    // finished reports nothing newer than the end, and reopening the record on it would leave a
+    // finished call reading as one nobody ever ended.
+    if (idx >= 0 && history[idx].endedAt && !next.endedAt && !hasEventsAfter(record, history[idx].endedAt)) {
+      next.endedAt = history[idx].endedAt;
+    }
+    if (idx >= 0) history[idx] = next; else history.push(next);
 
-  history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+    history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
 
-  // maxStoredMeetings === 0 means unlimited — keep every meeting.
-  const cap = settings.maxStoredMeetings === 0 ? 0 : (settings.maxStoredMeetings || 200);
-  if (cap > 0 && history.length > cap) history = history.slice(0, cap);
+    return { history: capped(history, settings), value: { merged: next, fresh: idx < 0 } };
+  });
 
-  await saveHistory(history);
   // a call thrown away and then rejoined is alive again, so it leaves the trash behind. Only
   // worth a look when the record is new here — during a call this runs every few seconds.
-  if (idx < 0) await purgeMeetings([record.id]);
+  if (fresh) await purgeMeetings([record.id]);
   return normalizeMeeting(merged);
+}
+
+/** The newest `maxStoredMeetings` of them (0 = unlimited — keep every meeting). */
+function capped(history, settings) {
+  const cap = settings.maxStoredMeetings === 0 ? 0 : (settings.maxStoredMeetings || 200);
+  return cap > 0 && history.length > cap ? history.slice(0, cap) : history;
+}
+
+/**
+ * Hold the register to the cap after the setting is lowered, without writing back a copy the page
+ * has been holding while a call was recorded into it.
+ */
+export async function trimHistoryToCap() {
+  const settings = await getSettings();
+  return mutateHistory(history => {
+    const next = capped(history, settings);
+    return { history: next, save: next.length !== history.length, value: history.length - next.length };
+  });
 }
 
 /**
@@ -133,27 +245,54 @@ export async function upsertMeeting(record) {
 export async function setMeetingTitle(id, title) {
   const name = String(title || '').trim();
   if (!name) return null;
-  const history = await getHistory();
-  const meeting = history.find(m => m.id === id);
-  if (!meeting) return null;
-  meeting.meetingTitle = name;
-  meeting.titleEdited = true;
-  await saveHistory(history);
-  return meeting;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === id);
+    if (meeting) { meeting.meetingTitle = name; meeting.titleEdited = true; }
+    return { save: !!meeting, value: meeting || null };
+  });
+}
+
+/**
+ * A record nothing was ever recorded in: a link that was opened and a call that was never joined
+ * — the green room left standing, a Meet address in a tab nobody went back to. It is not a
+ * meeting that happened, and it is the one record with nothing to lose: no participant, no event,
+ * no hour anybody spent anywhere. Whatever the user gave it by hand makes it theirs, and that is
+ * a record like any other.
+ */
+function isEmptyRecord(m) {
+  return !!m && !Object.keys(m.attendance || {}).length &&
+    !m.titleEdited && !m.groupId && !m.archived;
+}
+
+/**
+ * Drop the records among these that nothing was ever recorded in. Called where a meeting would
+ * otherwise be ended, because an empty record ended is an empty row in the register for good — and
+ * from there in the spreadsheet too, which only ever adds. Returns the ids that went.
+ */
+export async function discardEmptyMeetings(ids) {
+  const wanted = new Set(ids || []);
+  if (!wanted.size) return [];
+  return mutateHistory(history => {
+    const gone = new Set(history.filter(m => wanted.has(m.id) && isEmptyRecord(m)).map(m => m.id));
+    return {
+      history: gone.size ? history.filter(m => !gone.has(m.id)) : history,
+      save: gone.size > 0, value: [...gone]
+    };
+  });
 }
 
 /** Set aside (or bring back) meetings: a flag on the record, so nothing else about it changes. */
 export async function setMeetingsArchived(ids, archived) {
   const wanted = new Set(ids);
-  const history = await getHistory();
-  let changed = 0;
-  history.forEach(m => {
-    if (!wanted.has(m.id) || !!m.archived === !!archived) return;
-    if (archived) m.archived = true; else delete m.archived;
-    changed++;
+  return mutateHistory(history => {
+    let changed = 0;
+    history.forEach(m => {
+      if (!wanted.has(m.id) || !!m.archived === !!archived) return;
+      if (archived) m.archived = true; else delete m.archived;
+      changed++;
+    });
+    return { save: changed > 0, value: changed };
   });
-  if (changed) await saveHistory(history);
-  return changed;
 }
 
 /* ============================ trash ============================ */
@@ -173,10 +312,11 @@ export async function saveTrash(list) {
 }
 
 export async function deleteMeetingById(id) {
-  const history = await getHistory();
-  const record = history.find(m => m.id === id);
+  const record = await mutateHistory(history => {
+    const found = history.find(m => m.id === id) || null;
+    return { history: found ? history.filter(m => m.id !== id) : history, save: !!found, value: found };
+  });
   if (!record) return false;
-  await saveHistory(history.filter(m => m.id !== id));
   const trash = await getTrash();
   await saveTrash([{ ...record, deletedAt: new Date().toISOString() }, ...trash.filter(m => m.id !== id)]);
   return true;
@@ -189,12 +329,12 @@ export async function restoreMeetings(ids) {
   const coming = trash.filter(m => wanted.has(m.id));
   if (!coming.length) return 0;
   await saveTrash(trash.filter(m => !wanted.has(m.id)));
-  const history = await getHistory();
   const restored = coming.map(({ deletedAt, ...rec }) => rec);
-  const next = restored.concat(history.filter(m => !wanted.has(m.id)))
-    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  await saveHistory(next);
-  return restored.length;
+  return mutateHistory(history => ({
+    history: restored.concat(history.filter(m => !wanted.has(m.id)))
+      .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
+    value: restored.length
+  }));
 }
 
 /** Out of the trash for good. */
@@ -249,22 +389,25 @@ export async function clearHistory() {
  * Returns how many were added.
  */
 export async function mergeMeetings(records) {
-  const [history, trash] = await Promise.all([getHistory(), getTrash()]);
-  const seen = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
+  const trash = await getTrash();
+  return mutateHistory(history => {
+    const seen = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
 
-  const fresh = [];
-  (records || []).forEach(rec => {
-    if (!rec || !rec.id || seen.has(rec.id)) return;
-    seen.add(rec.id);
-    fresh.push(adoptMergeAnnotations(rec));
+    const fresh = [];
+    (records || []).forEach(rec => {
+      if (!rec || !rec.id || seen.has(rec.id)) return;
+      seen.add(rec.id);
+      fresh.push(adoptMergeAnnotations(rec));
+    });
+    if (!fresh.length) return { save: false, value: 0 };
+
+    return {
+      history: history.concat(fresh)
+        .map(m => normalizeMeeting(m, { mergeAliases: false }))
+        .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
+      value: fresh.length
+    };
   });
-  if (!fresh.length) return 0;
-
-  const merged = history.concat(fresh)
-    .map(m => normalizeMeeting(m, { mergeAliases: false }))
-    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  await saveHistory(merged);
-  return fresh.length;
 }
 
 /** Series from elsewhere, under the same rule: only the ones this store does not have. */
@@ -322,12 +465,12 @@ export async function findResumableSession(code) {
  * the window the meeting was observed over past the end it already has.
  */
 export async function touchMeetingLive(id, at = new Date().toISOString()) {
-  const history = await getHistory();
-  const meeting = history.find(m => m.id === id);
-  if (!meeting || meeting.endedAt || meeting.liveAt === at) return null;
-  meeting.liveAt = at;
-  await saveHistory(history);
-  return meeting;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === id);
+    if (!meeting || meeting.endedAt || meeting.liveAt === at) return { save: false, value: null };
+    meeting.liveAt = at;
+    return { value: meeting };
+  });
 }
 
 /**
@@ -342,24 +485,24 @@ export async function endInterruptedMeetings(ids) {
   const wanted = new Set(ids || []);
   if (!wanted.size) return [];
 
-  const history = await getHistory();
-  const closed = [];
-  history.forEach(meeting => {
-    if (!wanted.has(meeting.id) || meeting.endedAt) return;
-    const at = new Date(lastActivityMs(meeting) || Date.parse(meeting.date) || Date.now()).toISOString();
-    const attendance = meeting.attendance || {};
-    for (const name in attendance) {
-      const a = attendance[name] || {};
-      if (!Array.isArray(a.events) || !a.events.length) continue; // nothing to close it from
-      attendance[name] = deriveAttendee({
-        email: a.email, mergedFrom: a.mergedFrom, events: closeOpenEvents(a.events, at)
-      });
-    }
-    meeting.endedAt = at;
-    closed.push(meeting.id);
+  return mutateHistory(history => {
+    const closed = [];
+    history.forEach(meeting => {
+      if (!wanted.has(meeting.id) || meeting.endedAt) return;
+      const at = new Date(lastActivityMs(meeting) || Date.parse(meeting.date) || Date.now()).toISOString();
+      const attendance = meeting.attendance || {};
+      for (const name in attendance) {
+        const a = attendance[name] || {};
+        if (!Array.isArray(a.events) || !a.events.length) continue; // nothing to close it from
+        attendance[name] = deriveAttendee({
+          email: a.email, mergedFrom: a.mergedFrom, events: closeOpenEvents(a.events, at)
+        });
+      }
+      meeting.endedAt = at;
+      closed.push(meeting.id);
+    });
+    return { save: closed.length > 0, value: closed };
   });
-  if (closed.length) await saveHistory(history);
-  return closed;
 }
 
 /* ============================ participants ============================ */
@@ -378,22 +521,22 @@ export async function renameParticipant(meetingId, fromName, toName) {
   const to = String(toName || '').trim();
   if (!from || !to || from === to) return null;
 
-  const history = await getHistory();
-  const meeting = history.find(m => m.id === meetingId);
-  if (!meeting) return null;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === meetingId);
+    if (!meeting) return { save: false, value: null };
 
-  const key = normName(from);
-  const merged = Object.keys(meeting.attendance || {})
-    .some(n => normName(n) !== key && normName(n) === normName(to));
+    const key = normName(from);
+    const merged = Object.keys(meeting.attendance || {})
+      .some(n => normName(n) !== key && normName(n) === normName(to));
 
-  // Flatten chains at write time: aliases that pointed at the old name follow it.
-  const nameMap = { ...(meeting.nameMap || {}) };
-  for (const k in nameMap) if (normName(nameMap[k]) === key) nameMap[k] = to;
-  nameMap[key] = to;
+    // Flatten chains at write time: aliases that pointed at the old name follow it.
+    const nameMap = { ...(meeting.nameMap || {}) };
+    for (const k in nameMap) if (normName(nameMap[k]) === key) nameMap[k] = to;
+    nameMap[key] = to;
 
-  meeting.nameMap = nameMap;
-  await saveHistory(history);
-  return { meeting, merged };
+    meeting.nameMap = nameMap;
+    return { value: { meeting, merged } };
+  });
 }
 
 /**
@@ -403,23 +546,23 @@ export async function renameParticipant(meetingId, fromName, toName) {
  * added, and dropping it would undo an unrelated edit. Returns { meeting, restored } or null.
  */
 export async function unmergeParticipant(meetingId, displayName) {
-  const history = await getHistory();
-  const meeting = history.find(m => m.id === meetingId);
-  if (!meeting || !meeting.nameMap) return null;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === meetingId);
+    if (!meeting || !meeting.nameMap) return { save: false, value: null };
 
-  const target = normName(displayName);
-  const kept = {};
-  const restored = [];
-  for (const key in meeting.nameMap) {
-    const landsHere = normName(resolveMappedName(key, meeting.nameMap)) === target;
-    if (landsHere && key !== target) restored.push(key);
-    else kept[key] = meeting.nameMap[key];
-  }
-  if (!restored.length) return null;
+    const target = normName(displayName);
+    const kept = {};
+    const restored = [];
+    for (const key in meeting.nameMap) {
+      const landsHere = normName(resolveMappedName(key, meeting.nameMap)) === target;
+      if (landsHere && key !== target) restored.push(key);
+      else kept[key] = meeting.nameMap[key];
+    }
+    if (!restored.length) return { save: false, value: null };
 
-  if (Object.keys(kept).length) meeting.nameMap = kept; else delete meeting.nameMap;
-  await saveHistory(history);
-  return { meeting, restored };
+    if (Object.keys(kept).length) meeting.nameMap = kept; else delete meeting.nameMap;
+    return { value: { meeting, restored } };
+  });
 }
 
 /* ============================ meeting hours ============================ */
@@ -437,12 +580,12 @@ function writeSchedule(meeting, start, end) {
 
 /** Set the hours by hand. Pass null for a side to drop it back to automatic. */
 export async function setMeetingSchedule(meetingId, { start = null, end = null } = {}) {
-  const history = await getHistory();
-  const meeting = history.find(m => m.id === meetingId);
-  if (!meeting) return null;
-  writeSchedule(meeting, start, end);
-  await saveHistory(history);
-  return meeting;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === meetingId);
+    if (!meeting) return { save: false, value: null };
+    writeSchedule(meeting, start, end);
+    return { value: meeting };
+  });
 }
 
 /**
@@ -450,14 +593,13 @@ export async function setMeetingSchedule(meetingId, { start = null, end = null }
  * on the record (typically the user's own edit) always wins.
  */
 export async function applyDetectedSchedule(meetingId, { start = null, end = null } = {}) {
-  const history = await getHistory();
-  const meeting = history.find(m => m.id === meetingId);
-  if (!meeting) return null;
-  if (meeting.scheduledStart || meeting.scheduledEnd) return null;
   if (!start && !end) return null;
-  writeSchedule(meeting, start, end);
-  await saveHistory(history);
-  return meeting;
+  return mutateHistory(history => {
+    const meeting = history.find(m => m.id === meetingId);
+    if (!meeting || meeting.scheduledStart || meeting.scheduledEnd) return { save: false, value: null };
+    writeSchedule(meeting, start, end);
+    return { value: meeting };
+  });
 }
 
 /* ============================ groups CRUD ============================ */
@@ -502,29 +644,29 @@ export async function updateGroup(id, patch) {
 /** Delete a group and unassign its meetings (meetings themselves are kept). */
 export async function deleteGroup(id) {
   await saveGroups((await getGroups()).filter(g => g.id !== id));
-  const history = await getHistory();
-  let changed = false;
-  history.forEach(m => { if (m.groupId === id) { delete m.groupId; changed = true; } });
-  if (changed) await saveHistory(history);
+  await mutateHistory(history => {
+    let changed = 0;
+    history.forEach(m => { if (m.groupId === id) { delete m.groupId; changed++; } });
+    return { save: changed > 0, value: changed };
+  });
   return true;
 }
 
 export async function assignMeetingToGroup(meetingId, groupId) {
-  const history = await getHistory();
-  const m = history.find(x => x.id === meetingId);
-  if (!m) return false;
-  if (groupId) m.groupId = groupId; else delete m.groupId;
-  await saveHistory(history);
-  return true;
+  return mutateHistory(history => {
+    const m = history.find(x => x.id === meetingId);
+    if (m) { if (groupId) m.groupId = groupId; else delete m.groupId; }
+    return { save: !!m, value: !!m };
+  });
 }
 
 /** Assign many meetings at once (used by "group this series"). */
 export async function assignMeetingsToGroup(meetingIds, groupId) {
   const ids = new Set(meetingIds || []);
-  const history = await getHistory();
-  history.forEach(m => { if (ids.has(m.id)) { if (groupId) m.groupId = groupId; else delete m.groupId; } });
-  await saveHistory(history);
-  return true;
+  return mutateHistory(history => {
+    history.forEach(m => { if (ids.has(m.id)) { if (groupId) m.groupId = groupId; else delete m.groupId; } });
+    return { value: true };
+  });
 }
 
 /* ============================ settings / roster ============================ */
@@ -622,31 +764,33 @@ function unbakeMerges(meeting) {
  */
 export async function migrateIfNeeded() {
   const stored = await getMany([
-    STORAGE_KEYS.SCHEMA_VERSION, STORAGE_KEYS.LEGACY_MEETINGS,
-    STORAGE_KEYS.HISTORY, STORAGE_KEYS.GROUPS
+    STORAGE_KEYS.SCHEMA_VERSION, STORAGE_KEYS.LEGACY_MEETINGS, STORAGE_KEYS.GROUPS
   ]);
 
   if ((stored[STORAGE_KEYS.SCHEMA_VERSION] || 0) >= SCHEMA_VERSION) return { migrated: 0 };
 
-  let history = Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [];
-  let migrated = 0;
-
-  const legacy = stored[STORAGE_KEYS.LEGACY_MEETINGS];
-  if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
-    const ids = new Set(history.map(m => m.id));
-    for (const key in legacy) {
-      const rec = buildMeetingRecord(legacy[key]);
-      if (!ids.has(rec.id)) { history.push(rec); ids.add(rec.id); migrated++; }
+  // Through the same guarded write as everything else: an update fires this off while the worker
+  // is already putting interrupted meetings to bed, and a rewrite of the whole register is the
+  // one write that could not afford to lose the other.
+  const migrated = await mutateHistory(history => {
+    let count = 0;
+    const legacy = stored[STORAGE_KEYS.LEGACY_MEETINGS];
+    if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+      const ids = new Set(history.map(m => m.id));
+      for (const key in legacy) {
+        const rec = buildMeetingRecord(legacy[key]);
+        if (!ids.has(rec.id)) { history.push(rec); ids.add(rec.id); count++; }
+      }
     }
-  }
-
-  history = history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
-    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+    return {
+      history: history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
+        .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
+      value: count
+    };
+  });
 
   const groups = Array.isArray(stored[STORAGE_KEYS.GROUPS]) ? stored[STORAGE_KEYS.GROUPS] : [];
-
   await setMany({
-    [STORAGE_KEYS.HISTORY]: history,
     [STORAGE_KEYS.GROUPS]: groups,
     [STORAGE_KEYS.SCHEMA_VERSION]: SCHEMA_VERSION
   });

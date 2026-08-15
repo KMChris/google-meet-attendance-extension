@@ -1874,7 +1874,10 @@ $$('#theme-seg button').forEach(b => b.addEventListener('click', async () => { s
 $('#set-max').addEventListener('change', async () => {
   const cap = parseInt($('#set-max').value, 10) || 0; // 0 = unlimited
   settings = await store.updateSettings({ maxStoredMeetings: cap });
-  if (cap > 0 && history.length > cap) { const trimmed = history.slice(0, cap); await store.saveHistory(trimmed); await load(); }
+  // a lower cap can put records past it at once, so the register is held to it here. The trim
+  // reads the store rather than the copy this page has been holding, which a call being tracked
+  // has moved on from.
+  if (await store.trimHistoryToCap()) await load();
   toast(t('savedToast'));
 });
 
