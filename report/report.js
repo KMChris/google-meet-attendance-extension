@@ -4,7 +4,12 @@ import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 
 const { t } = i18n;
-const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+// Quotes included, as on the dashboard: names and titles go into attributes as well as into text,
+// and this page is built from the same records an import can bring in.
+const esc = s => {
+  const d = document.createElement('div'); d.textContent = s == null ? '' : s;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
 const initials = name => { const p = String(name || '').trim().split(/\s+/); return ((p.length >= 2 ? p[0][0] + p[p.length - 1][0] : (name || '').slice(0, 2)) || '?').toUpperCase(); };
 function fmtDur(secs) { secs = Math.floor(secs || 0); if (secs <= 0) return '0m'; const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60), s = secs % 60; if (h) return `${h}h ${String(m).padStart(2, '0')}m`; if (m) return `${m}m`; return `${s}s`; }
 function fmtHMS(secs) { secs = Math.floor(secs || 0); const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60), s = secs % 60; return [h, m, s].map(v => String(v).padStart(2, '0')).join(':'); }

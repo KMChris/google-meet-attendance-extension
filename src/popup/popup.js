@@ -5,7 +5,12 @@ import * as i18n from '../lib/i18n.js';
 
 const { t } = i18n;
 const $ = s => document.querySelector(s);
-const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+// Quotes included, as on the dashboard: a meeting's id and its title both land inside an HTML
+// attribute below, and a record that came in from a file is free to carry one.
+const esc = s => {
+  const d = document.createElement('div'); d.textContent = s == null ? '' : s;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
 
 // the stored theme lands after the first paint, so the same transition guard the dashboard needs
 // applies here: without it every .btn keeps the background of the theme being left
