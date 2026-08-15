@@ -181,17 +181,28 @@
   }
 
   /**
-   * Meet saying the call at this address is already over.
+   * Meet saying the call at this address is already over: the flag it sets, and the way back to
+   * the home screen it offers instead of the call.
    *
    * Leaving a call keeps its code in the address bar, so the URL alone cannot tell a call in
    * progress from the screen you land on when you leave one. It matters because this script is
    * also put into tabs that were open long before it arrived (see the worker's ensureTrackers):
    * without asking, a tab still showing "you left the meeting" would open a record for a call
    * that finished hours ago, and then close it again at the wrong hour.
+   *
+   * One list, read by everything that asks the question — the watchdog before it starts a call,
+   * and the end detection before it closes one. Two lists would take turns: a marker only the
+   * second knew about would stop the call, and the first would start it again three seconds
+   * later, for as long as the page was left open.
    */
+  const ENDED_MARKERS = [
+    '[data-call-ended="true"]',
+    '[data-mdc-dialog-action="returnToHomePage"]',
+    'button[jsname="EszDse"]'          // "Return to home screen"
+  ];
+
   function callHasEnded() {
-    return !!(document.querySelector('[data-call-ended="true"]') ||
-              document.querySelector('[data-mdc-dialog-action="returnToHomePage"]'));
+    return ENDED_MARKERS.some(sel => !!document.querySelector(sel));
   }
 
   /**
@@ -669,24 +680,15 @@
       return true;
     }
 
-    // Method 2: Check for explicit "call ended" attribute
-    if (document.querySelector('[data-call-ended="true"]')) {
-      console.log('[Attendance] Meeting end detected: call-ended flag');
+    // Method 2: Meet says so itself — the call-ended flag, or the way back to the home screen
+    // it offers in place of the call. Both only appear once YOU have left, not when others do.
+    if (callHasEnded()) {
+      console.log('[Attendance] Meeting end detected: Meet says the call is over');
       stopTracking();
       return true;
     }
 
-    // Method 3: Check for "Return to home screen" button (appears after leaving)
-    // This button only appears when YOU left, not when others leave
-    const returnHomeButton = document.querySelector('[data-mdc-dialog-action="returnToHomePage"]') ||
-                             document.querySelector('button[jsname="EszDse"]');
-    if (returnHomeButton) {
-      console.log('[Attendance] Meeting end detected: return to home button');
-      stopTracking();
-      return true;
-    }
-
-    // Method 4: Check if video/audio controls are gone (meeting UI disappeared)
+    // Method 3: Check if video/audio controls are gone (meeting UI disappeared)
     const hasMeetingId = getMeetingId();
 
     if (hasMeetingId && !meetingControls() && isTracking) {
