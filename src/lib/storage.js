@@ -17,7 +17,8 @@
 
 import {
   buildMeetingRecord, normalizeMeeting, resolveMappedName, splitConcatenatedEvents,
-  annotateMerges, adoptMergeAnnotations, lastActivityMs, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
+  annotateMerges, adoptMergeAnnotations, lastActivityMs, closeOpenEvents, deriveAttendee,
+  RESUME_WINDOW_MS, REJOIN_WINDOW_MS
 } from './attendance.js';
 
 export const STORAGE_KEYS = {
@@ -277,6 +278,56 @@ export async function findResumableSession(code) {
     if (now - t < window && t > bestT) { best = m; bestT = t; }
   }
   return best;
+}
+
+/* ============================ interrupted tracking ============================ */
+/**
+ * Nothing gets a chance to run when the browser is killed, the extension is switched off or an
+ * update swaps it out mid-call, so a record can be left open with everyone still inside it. Two
+ * things put that right: a watermark written while tracking runs, and a pass that ends whatever
+ * the watermark says has been abandoned.
+ */
+
+/** Note that the page was still reporting at `at`. Costs one field on the record. */
+export async function touchMeetingLive(id, at = new Date().toISOString()) {
+  const history = await getHistory();
+  const meeting = history.find(m => m.id === id);
+  if (!meeting || meeting.liveAt === at) return null;
+  meeting.liveAt = at;
+  await saveHistory(history);
+  return meeting;
+}
+
+/**
+ * End meetings nothing got to end. Every session still open is closed at the last moment tracking
+ * was known to be running, and the record is marked ended — otherwise it reads as in progress and
+ * its hours grow with the clock until it is four hours stale. Returns the ids that changed.
+ *
+ * Which meetings those are is the caller's judgement: it is the one that can see whether a call is
+ * still on screen somewhere.
+ */
+export async function endInterruptedMeetings(ids) {
+  const wanted = new Set(ids || []);
+  if (!wanted.size) return [];
+
+  const history = await getHistory();
+  const closed = [];
+  history.forEach(meeting => {
+    if (!wanted.has(meeting.id) || meeting.endedAt) return;
+    const at = new Date(lastActivityMs(meeting) || Date.parse(meeting.date) || Date.now()).toISOString();
+    const attendance = meeting.attendance || {};
+    for (const name in attendance) {
+      const a = attendance[name] || {};
+      if (!Array.isArray(a.events) || !a.events.length) continue; // nothing to close it from
+      attendance[name] = deriveAttendee({
+        email: a.email, mergedFrom: a.mergedFrom, events: closeOpenEvents(a.events, at)
+      });
+    }
+    meeting.endedAt = at;
+    closed.push(meeting.id);
+  });
+  if (closed.length) await saveHistory(history);
+  return closed;
 }
 
 /* ============================ participants ============================ */

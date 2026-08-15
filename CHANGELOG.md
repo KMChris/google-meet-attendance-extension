@@ -2,6 +2,39 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **A call in progress survives the extension going away.** Reloading, updating or switching the
+  extension off cuts the tracker in the page off from the rest of the extension: it keeps running,
+  but nothing it reports arrives anywhere, and Chrome puts a script into tabs that load afterwards,
+  not into the ones already open. So the worker now puts a tracker back into every Meet tab that
+  hasn't got one, whenever it wakes, and the call is resumed into the record it was already
+  keeping. A tab that answers is left alone, because replacing a working tracker would open the
+  participant panel in the user's face for nothing.
+- **A call already running when the extension arrives is picked up on the spot**, with no record
+  of it ever having begun. Installing mid-meeting, or turning tracking back on mid-meeting, no
+  longer means waiting for the next call to see anything.
+- **The page says it is still on the call once a minute.** Nothing else did: a call where nobody
+  comes or goes records no events for an hour, so a meeting the browser was killed on could only
+  be ended where somebody last arrived — an hour of it thrown away. It is ended at the last
+  minute it was known to be running instead.
+
+### Fixed
+- **A meeting nothing got to end no longer runs on for hours.** The browser closed on it, the tab
+  went while the worker was asleep, the extension was switched off: the record was left open with
+  everyone still inside it, reading as in progress and growing with the clock until it was four
+  hours stale. Whenever the worker wakes it now ends whatever has been abandoned, and at browser
+  start it ends everything left open, since no call survives the browser going away. Records left
+  open by earlier versions are put right the same way.
+- **One page load can no longer open two records for one call.** The first participants and the
+  start of the meeting are reported at the same moment, and reading the store to decide which
+  session they belong to took long enough for both to arrive first and each open a record of its
+  own, stamped a millisecond apart.
+- **A tracker cut off from the extension stands down** instead of scanning the call every five
+  seconds for the rest of the day and throwing on every send. Sending from a page whose extension
+  has gone throws rather than rejecting, which the `.catch()` on it never held.
+
 ## [1.3.3] 2026-08-14
 
 ### Added

@@ -1,21 +1,84 @@
 /**
  * Google Meet Attendance Tracker - Content Script
  * Detects participants in Google Meet and tracks their join/leave times
+ *
+ * Two copies of this can meet in one page. Reloading, updating or switching the extension off
+ * leaves the copy that is here running but cut off — chrome.runtime is gone and every send throws
+ * — and the worker injects a fresh copy into tabs that are already open, because that is the only
+ * way a call in progress gets picked back up. So the first thing a copy does is stand the previous
+ * one down, and every copy watches for the moment it is the one that has been cut off.
  */
 
 (function() {
   'use strict';
+
+  // Whoever arrives last is the one that still has a working connection: shut the other down
+  // before taking over. Quietly — the call is still running, and the record stays open for us.
+  if (typeof window.__gmAttendanceStop === 'function') window.__gmAttendanceStop();
 
   // State
   let currentMeetingId = null;
   let participants = {};
   let observer = null;
   let pollingInterval = null;
+  let watchdogInterval = null;
+  let heartbeatInterval = null;
   let isTracking = false;
   let scheduledWindow = null;   // { start, end } ISO, scraped from the calendar event
   let scheduleAttempts = 0;
   let stoppedMeetingId = null;  // the call already finished at this URL — don't start it again
   let panelAttempts = 0;
+
+  /**
+   * How often to tell the worker this page is still on the call. Nothing else says so: a call
+   * where nobody comes or goes records no events for an hour, and a meeting the browser was
+   * closed on can only be ended where it was last known to be running. A minute apart leaves
+   * the worker free to sleep in between.
+   */
+  const HEARTBEAT_MS = 60000;
+
+  /**
+   * Is the extension still behind us? A reload, an update or a switch-off leaves this script in
+   * the page with nothing at the other end: chrome.runtime.id goes away, and sending throws
+   * rather than rejecting, so a bare .catch() would not hold it.
+   */
+  function isExtensionAlive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** Send to the worker, or notice there is nobody left to send to and stand down. */
+  function send(message) {
+    if (!isExtensionAlive()) { teardown(); return Promise.resolve(null); }
+    try {
+      return chrome.runtime.sendMessage(message).catch(() => null);
+    } catch (e) {
+      teardown();
+      return Promise.resolve(null);
+    }
+  }
+
+  /**
+   * Stop working without reporting an end. The call is still running; it is this script that is
+   * going away, so the meeting is left open for whichever copy takes over to resume.
+   */
+  function teardown() {
+    isTracking = false;
+    if (observer) { observer.disconnect(); observer = null; }
+    clearInterval(pollingInterval); pollingInterval = null;
+    clearInterval(watchdogInterval); watchdogInterval = null;
+    clearInterval(heartbeatInterval); heartbeatInterval = null;
+    clearTimeout(window._attendanceDebounce);
+    // Listeners too, or a copy that has stood down still answers the popup asking who is here.
+    try {
+      chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+      chrome.storage.onChanged.removeListener(watchAutoTrack);
+    } catch (e) { /* the extension is already gone; the listeners went with it */ }
+    if (window.__gmAttendanceStop === teardown) delete window.__gmAttendanceStop;
+  }
 
   // Mirrors the stored setting; null until it has been read, so nothing starts on a guess.
   let autoTrack = null;
@@ -23,9 +86,10 @@
     autoTrack = !(res && res.autoTrack === false);
     if (!autoTrack) console.log('[Attendance] Auto-track disabled — not tracking');
   });
-  chrome.storage.onChanged.addListener((changes, area) => {
+  function watchAutoTrack(changes, area) {
     if (area === 'local' && changes.autoTrack) autoTrack = changes.autoTrack.newValue !== false;
-  });
+  }
+  chrome.storage.onChanged.addListener(watchAutoTrack);
 
   // Multiple selectors for participant detection (Google Meet DOM changes frequently)
   const PARTICIPANT_SELECTORS = [
@@ -211,15 +275,13 @@
     if (!scheduledWindow) { setTimeout(pollScheduledWindow, 2000); return; }
 
     console.log('[Attendance] Scheduled hours detected:', scheduledWindow.start, '→', scheduledWindow.end);
-    chrome.runtime.sendMessage({
+    send({
       type: 'MEETING_SCHEDULE',
       meetingId: currentMeetingId,
       url: window.location.href,
       meetingTitle: getMeetingTitle(),
       scheduledStart: scheduledWindow.start,
       scheduledEnd: scheduledWindow.end
-    }).catch(err => {
-      console.warn('[Attendance] Failed to report scheduled hours:', err);
     });
   }
 
@@ -379,15 +441,25 @@
    * Send message to background service worker
    */
   function notifyBackground(action, data) {
-    chrome.runtime.sendMessage({
+    send({
       type: 'ATTENDANCE_UPDATE',
       action: action,
       meetingId: currentMeetingId,
       data: data,
       participants: participants,
       timestamp: new Date().toISOString()
-    }).catch(err => {
-      console.warn('[Attendance] Failed to notify background:', err);
+    });
+  }
+
+  /** Tell the worker the page is still on the call, so a recovery knows how far it got. */
+  function sendHeartbeat() {
+    if (!isTracking) return;
+    send({
+      type: 'MEETING_HEARTBEAT',
+      meetingId: currentMeetingId,
+      url: window.location.href,
+      meetingTitle: getMeetingTitle(),
+      at: new Date().toISOString()
     });
   }
 
@@ -456,14 +528,12 @@
     pollingInterval = setInterval(scanParticipants, 5000);
 
     // Notify background that tracking started
-    chrome.runtime.sendMessage({
+    send({
       type: 'MEETING_STARTED',
       meetingId: currentMeetingId,
       startTime: new Date().toISOString(),
       url: window.location.href,
       meetingTitle: getMeetingTitle()
-    }).catch(err => {
-      console.warn('[Attendance] Failed to notify meeting start:', err);
     });
 
     // Read the event's scheduled hours while they may still be on screen
@@ -497,13 +567,11 @@
     }
 
     // Notify background that meeting ended
-    chrome.runtime.sendMessage({
+    send({
       type: 'MEETING_ENDED',
       meetingId: currentMeetingId,
       endTime: endTime,
       participants: participants
-    }).catch(err => {
-      console.warn('[Attendance] Failed to notify meeting end:', err);
     });
 
     stoppedMeetingId = currentMeetingId;
@@ -512,9 +580,12 @@
   }
 
   /**
-   * Handle messages from popup or background
+   * Handle messages from popup or background. Answering at all is also how the worker tells a
+   * tab that still has a working tracker from one whose tracker it has to put back.
    */
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+
+  function handleRuntimeMessage(message, sender, sendResponse) {
     switch (message.type) {
       case 'GET_STATUS':
         sendResponse({
@@ -542,7 +613,7 @@
         sendResponse({ success: true });
         return true;
     }
-  });
+  }
 
   /**
    * Detect when user leaves the meeting
@@ -602,6 +673,7 @@
    */
   function init() {
     console.log('[Attendance] Content script loaded');
+    window.__gmAttendanceStop = teardown;
 
     // Wait for page to be ready
     if (document.readyState === 'loading') {
@@ -614,12 +686,16 @@
 
     // One watchdog for both ends of the meeting: it closes the call we are in, and picks up
     // the next one. Landing back on the home screen clears the finished call, so re-entering
-    // the same link later starts a fresh session rather than being mistaken for it.
-    setInterval(() => {
+    // the same link later starts a fresh session rather than being mistaken for it. It is also
+    // where a copy that has been cut off from the extension finds out and stops.
+    watchdogInterval = setInterval(() => {
+      if (!isExtensionAlive()) { teardown(); return; }
       if (isTracking) { detectMeetingEnd(); return; }
       if (!getMeetingId()) stoppedMeetingId = null;
       else startTracking();
     }, 3000);
+
+    heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_MS);
 
     // Handle page unload
     window.addEventListener('beforeunload', () => {

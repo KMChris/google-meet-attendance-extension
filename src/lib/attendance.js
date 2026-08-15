@@ -143,14 +143,19 @@ export function anyPresent(meeting) {
   return Object.values((meeting && meeting.attendance) || {}).some(p => p && p.present);
 }
 
-/** Latest observable timestamp across events / derived fields / endedAt. */
+/**
+ * Latest observable timestamp across events / derived fields / endedAt, and `liveAt` — the
+ * watermark tracking leaves behind while it runs. A quiet call records nothing between its
+ * joins, so without the watermark the last thing known about a meeting the browser took with
+ * it would be somebody arriving an hour before it stopped.
+ */
 export function lastActivityMs(meeting) {
   let latest = 0;
   Object.values((meeting && meeting.attendance) || {}).forEach(p => {
     (p.events || []).forEach(e => { const t = ms(e.time); if (t > latest) latest = t; });
     ['firstSeen', 'lastLeft', 'joinedAt'].forEach(k => { const t = ms(p[k]); if (t > latest) latest = t; });
   });
-  if (meeting && meeting.endedAt) { const t = ms(meeting.endedAt); if (t > latest) latest = t; }
+  ['liveAt', 'endedAt'].forEach(k => { const t = ms(meeting && meeting[k]); if (t > latest) latest = t; });
   return latest;
 }
 
@@ -615,6 +620,34 @@ function earliestEventMs(participants) {
     usableEvents(p && p.events).forEach(e => { const t = ms(e.time); if (t < earliest) earliest = t; });
   });
   return earliest;
+}
+
+/**
+ * Write the Leave that never arrived.
+ *
+ * A page that stops reporting without saying so — the browser was closed on it, the extension was
+ * switched off — leaves its people standing inside the call, and every later read keeps counting
+ * them. Recovery closes the stream itself, at `iso`: the last moment tracking was known to be
+ * running, which is the last moment anything is known about the call at all.
+ *
+ * Never earlier than the stream's own last event, so a watermark that lags behind what was
+ * recorded can't close a session before the join that opened it.
+ */
+export function closeOpenEvents(events, iso) {
+  const evs = usableEvents(events);
+  if (!endsOpen(evs)) return evs;
+  const at = Math.max(ms(iso) || 0, lastEventMs(evs));
+  return evs.concat({ time: new Date(at).toISOString(), type: 'Leave' });
+}
+
+/** The same over a whole map of raw participants: nobody is left inside the call. */
+export function closeOpenParticipants(participants, iso) {
+  const out = {};
+  for (const name in (participants || {})) {
+    const p = participants[name] || {};
+    out[name] = { ...p, events: closeOpenEvents(p.events, iso), isPresent: false };
+  }
+  return out;
 }
 
 /**

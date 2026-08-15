@@ -8,7 +8,8 @@
   "minimum_chrome_version": "91",
   "permissions": [
     "storage",
-    "identity"
+    "identity",
+    "scripting"
   ],
   "host_permissions": [
     "https://meet.google.com/*"

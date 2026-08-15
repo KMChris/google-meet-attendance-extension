@@ -168,6 +168,7 @@ link never overwrite each other, and can be recognised as a series.
   meetingCode: "abc-defg-hij",       // the Meet link code (series key)
   date: "2026-02-15T09:00:00Z",      // meeting start
   endedAt: "2026-02-15T10:00:00Z",
+  liveAt: "2026-02-15T09:59:00Z",    // last sign of life — where a recovery ends an abandoned call
   meetingTitle: "Weekly Standup",    // editable in the dashboard
   url: "https://meet.google.com/abc-defg-hij",
   groupId: "grp-…",                  // optional — links to meetingGroups
@@ -232,13 +233,30 @@ This extension uses the following permissions:
 
 - `storage`: Local storage for attendance data
 - `identity`: Google OAuth2 authentication (for Sheets integration)
+- `scripting`: Put the tracker back into a Google Meet tab that is already open — after an update, a reload or the extension being switched back on, and when the extension is installed while a call is already running
 - `host_permissions (meet.google.com)`: Run content scripts on Google Meet pages and talk to that tab
+
+## Interrupted tracking
+
+Nothing gets to run when the browser is killed, the extension is switched off, or an update swaps
+it out mid-call, so tracking is built to be picked back up rather than to be kept alive:
+
+- Attendance is written to `chrome.storage.local` as it happens, so what is on disk is never
+  more than one event behind.
+- The page reports in once a minute even when nobody comes or goes (`liveAt`). It is what a call
+  that was interrupted is ended at, and without it a quiet hour would be lost.
+- Whenever the service worker wakes it ends the meetings nothing got to end, and puts a tracker
+  back into every Meet tab that hasn't got one. A call still on screen is resumed into the same
+  record; one whose link is gone from the browser is closed at its last sign of life.
+- A call already running when the extension arrives is picked up on the spot, with no record of
+  it ever having begun.
 
 ## Known Limitations
 
 - Participant detection may temporarily fail if Google Meet updates its DOM structure
 - Email addresses are only visible for same-organization users or under certain conditions
 - When a browser tab is closed, remaining participants are marked as left at that moment
+- A call the browser was killed on is closed at the last minute it was known to be running, so up to a minute of it can be lost
 - The participant panel is briefly opened automatically on tracking start; this is required for Google Meet to initialize the participant DOM elements
 
 ## Privacy

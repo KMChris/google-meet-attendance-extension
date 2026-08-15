@@ -38,6 +38,7 @@ Off until the user turns it on. If the user connects a Google account and enable
 | `storage` | Store attendance records and settings locally on the user's device |
 | `host_permissions (meet.google.com)` | Run the content script on Google Meet pages and communicate with that tab to detect participants |
 | `identity` | Google OAuth2 authentication for optional Sheets sync to the user's own spreadsheet |
+| `scripting` | Put the content script back into a Google Meet tab that is already open, so a call in progress keeps being tracked after the extension is updated, reloaded or switched back on. It is only ever used on Google Meet pages |
 
 ## Contact
 
