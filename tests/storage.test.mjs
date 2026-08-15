@@ -172,6 +172,51 @@ test('nothing to drop is nothing written', async () => {
   assert.equal(data.attendanceHistoryRev, before, 'the register was left exactly as it was');
 });
 
+/* ---------------------------- the trash ---------------------------- */
+
+test('a deletion is written out of the register and into the trash', async () => {
+  const data = useStorage({
+    attendanceHistory: [meeting('m-1', { attendance: { Anna: person('2026-08-14T09:00:00.000Z') } })]
+  });
+
+  assert.equal(await store.deleteMeetingById('m-1'), true);
+  await idle();
+
+  assert.deepEqual(data.attendanceHistory, []);
+  assert.deepEqual(data.trashedMeetings.map(m => m.id), ['m-1']);
+  assert.ok(data.trashedMeetings[0].deletedAt, 'stamped with the moment it was thrown away');
+});
+
+/**
+ * Both writers meant a record to go, and the one that wrote second found nothing of its own left
+ * to do on what the first had written. Returning at that point left the store holding the write it
+ * had already made, which had gone over the first one: the trash came back after being emptied.
+ */
+test('emptying the trash is not undone by a purge worked out beside it', async () => {
+  const data = useStorage({
+    trashedMeetings: [
+      { ...meeting('m-a'), deletedAt: '2026-08-15T09:00:00.000Z' },
+      { ...meeting('m-b'), deletedAt: '2026-08-15T09:00:00.000Z' }
+    ]
+  });
+
+  await Promise.all([store.emptyTrash(), store.purgeMeetings(['m-a'])]);
+  await idle();
+
+  assert.deepEqual(data.trashedMeetings, [], 'the trash is empty, as both of them meant it to be');
+});
+
+test('a meeting comes back out of the trash whole', async () => {
+  const data = useStorage({
+    trashedMeetings: [{ ...meeting('m-1', { attendance: { Anna: person('2026-08-14T09:00:00.000Z') } }), deletedAt: '2026-08-15T09:00:00.000Z' }]
+  });
+
+  assert.equal(await store.restoreMeetings(['m-1']), 1);
+  assert.deepEqual(data.trashedMeetings, []);
+  assert.deepEqual(Object.keys(data.attendanceHistory[0].attendance), ['Anna']);
+  assert.equal(data.attendanceHistory[0].deletedAt, undefined, 'and without the mark of having been thrown away');
+});
+
 /* ---------------------------- the cap ---------------------------- */
 
 test('lowering the cap trims the store, not the copy a page was holding', async () => {

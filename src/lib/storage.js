@@ -3,8 +3,9 @@
  *
  * Stores:
  *   attendanceHistory : Meeting[]  (newest-first)
- *   attendanceHistoryRev : string  (changes on every write to the history — see mutateHistory)
+ *   attendanceHistoryRev : string  (changes on every write to the history — see mutate)
  *   trashedMeetings   : Meeting[]  (deleted, each with deletedAt; purged after the retention window)
+ *   trashedMeetingsRev : string    (the same stamp on the trash, and for the same reason)
  *   meetingGroups     : Group[]    ({ id, name, color, roster[], createdAt })
  *   settings          : { autoSync, syncInterval, spreadsheetId, maxStoredMeetings,
  *                         trashRetentionDays, theme }
@@ -27,6 +28,7 @@ export const STORAGE_KEYS = {
   HISTORY: 'attendanceHistory',
   HISTORY_REV: 'attendanceHistoryRev',
   TRASH: 'trashedMeetings',
+  TRASH_REV: 'trashedMeetingsRev',
   GROUPS: 'meetingGroups',
   LEGACY_MEETINGS: 'meetings',
   SETTINGS: 'settings',
@@ -98,7 +100,16 @@ const MUTATE_ATTEMPTS = 6;
 const REPAIR_DEPTH = 3;
 
 /**
- * Every change to the register goes through here.
+ * The two lists more than one context writes to, each with the stamp that says which version of
+ * it a write was worked out from. The trash is one of them because a meeting only ever moves
+ * between the two: a deletion that loses its race writes the record out of the register and never
+ * into the trash, which is the one way this store can drop a meeting for good.
+ */
+const HISTORY = { list: STORAGE_KEYS.HISTORY, rev: STORAGE_KEYS.HISTORY_REV };
+const TRASH = { list: STORAGE_KEYS.TRASH, rev: STORAGE_KEYS.TRASH_REV };
+
+/**
+ * Every change to either list goes through here.
  *
  * The dashboard, the report page and the worker all write to one key, and Chrome gives none of
  * them a way to hold it still while a change is worked out: two reading the same array and writing
@@ -106,7 +117,7 @@ const REPAIR_DEPTH = 3;
  * will ever report again. There is no way to write a key only if it has not moved, so this is done
  * in two parts, and the second is what makes it sound:
  *
- *   before writing — the revision is read again, and a change worked out from a register that has
+ *   before writing — the revision is read again, and a change worked out from a list that has
  *     since moved is worked out again on what is there now. Cheap, and it catches the slow cases:
  *     anything that read the store, went away to settings or the trash, and came back.
  *   after writing — Chrome says what each write replaced. A write that turns out to have gone over
@@ -115,34 +126,42 @@ const REPAIR_DEPTH = 3;
  *
  * Two writers at once is what that settles, which is the case there is: the worker recording a
  * call, and a page the user is editing it from. A third landing in the same instant can still cost
- * one of the three its change — one, as it would have cost before, and never the register itself.
+ * one of the three its change — one, as it would have cost before, and never the list itself.
  *
- * `change` is handed the stored history to edit in place or to replace, and returns
- * `{ history?, save?, value }`; `value` is what the caller gets back, and `save: false` says it
+ * `change` is handed the stored array to edit in place or to replace, and returns
+ * `{ list?, save?, value }`; `value` is what the caller gets back, and `save: false` says it
  * found nothing to do. It is run again for every one of the above, so it must decide everything
- * from the history it is given and keep nothing between runs.
+ * from the array it is given and keep nothing between runs.
  */
-async function mutateHistory(change, resume = null, depth = 0) {
+async function mutate(reg, change, resume = null, depth = 0) {
   let base = resume;   // the array to work from, and the revision it stands for
+  let restoring = resume != null;   // this run is putting back what a write of ours went over
   for (let attempt = 1; ; attempt++) {
     if (!base) {
-      const stored = await getMany([STORAGE_KEYS.HISTORY, STORAGE_KEYS.HISTORY_REV]);
+      restoring = false;            // read afresh: there is nothing of ours left to put back
+      const stored = await getMany([reg.list, reg.rev]);
       base = {
-        history: Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [],
-        rev: stored[STORAGE_KEYS.HISTORY_REV]
+        list: Array.isArray(stored[reg.list]) ? stored[reg.list] : [],
+        rev: stored[reg.rev]
       };
     }
 
-    const { history = base.history, save = true, value } = (await change(base.history)) || {};
-    if (!save) return value;
+    const { list = base.list, save = true, value } = (await change(base.list)) || {};
+    // A repair that finds nothing of its own left to do still has to write: what stands in the
+    // store is our own write, and it went over the list being handed back here. Returning at this
+    // point would leave the other context's change buried under a change that no longer needs it.
+    if (!save && !restoring) return value;
 
-    const rev = await get(STORAGE_KEYS.HISTORY_REV);
+    const rev = await get(reg.rev);
     if (rev !== base.rev && attempt < MUTATE_ATTEMPTS) { base = null; continue; }
 
-    await writeHistory(history, base.rev, change, depth);
+    await writeList(reg, list, base.rev, change, depth);
     return value;
   }
 }
+
+const mutateHistory = (change, resume, depth) => mutate(HISTORY, change, resume, depth);
+const mutateTrash = (change) => mutate(TRASH, change);
 
 /**
  * What each write of ours replaced, kept by the revision the write carried so that only our own
@@ -159,15 +178,18 @@ function watchWrites() {
   watching = true;
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
-      const rev = area === 'local' ? changes[STORAGE_KEYS.HISTORY_REV] : null;
-      if (!rev || !inFlight.has(rev.newValue)) return;
-      const ours = inFlight.get(rev.newValue);
-      inFlight.delete(rev.newValue);
+      if (area !== 'local') return;
+      for (const reg of [HISTORY, TRASH]) {
+        const rev = changes[reg.rev];
+        if (!rev || !inFlight.has(rev.newValue)) continue;
+        const ours = inFlight.get(rev.newValue);
+        inFlight.delete(rev.newValue);
 
-      const went = (changes[STORAGE_KEYS.HISTORY] || {}).oldValue;
-      if (rev.oldValue === ours.expected || !Array.isArray(went) || ours.depth >= REPAIR_DEPTH) return;
-      mutateHistory(ours.change, { history: went, rev: rev.newValue }, ours.depth + 1)
-        .catch(err => console.warn('[GM Attendance] could not put a change back:', err));
+        const went = (changes[reg.list] || {}).oldValue;
+        if (rev.oldValue === ours.expected || !Array.isArray(went) || ours.depth >= REPAIR_DEPTH) continue;
+        mutate(reg, ours.change, { list: went, rev: rev.newValue }, ours.depth + 1)
+          .catch(err => console.warn('[GM Attendance] could not put a change back:', err));
+      }
     });
   } catch (err) {
     watching = false;   // nothing to listen to here; the write below still lands
@@ -175,15 +197,15 @@ function watchWrites() {
 }
 
 /** Write, and leave word to check what the write went over. */
-async function writeHistory(history, expected, change, depth) {
+async function writeList(reg, list, expected, change, depth) {
   watchWrites();
   const token = uid('rev');
   if (watching) {
     inFlight.set(token, { expected, change, depth });
     if (inFlight.size > IN_FLIGHT_MAX) inFlight.delete(inFlight.keys().next().value);
   }
-  await setMany({ [STORAGE_KEYS.HISTORY]: history, [STORAGE_KEYS.HISTORY_REV]: token });
-  return history;
+  await setMany({ [reg.list]: list, [reg.rev]: token });
+  return list;
 }
 
 export async function getMeetingById(id) {
@@ -223,7 +245,7 @@ export async function upsertMeeting(record) {
 
     history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
 
-    return { history: capped(history, settings), value: { merged: next, fresh: idx < 0 } };
+    return { list: capped(history, settings), value: { merged: next, fresh: idx < 0 } };
   });
 
   // a call thrown away and then rejoined is alive again, so it leaves the trash behind. Only
@@ -246,7 +268,7 @@ export async function trimHistoryToCap() {
   const settings = await getSettings();
   return mutateHistory(history => {
     const next = capped(history, settings);
-    return { history: next, save: next.length !== history.length, value: history.length - next.length };
+    return { list: next, save: next.length !== history.length, value: history.length - next.length };
   });
 }
 
@@ -287,7 +309,7 @@ export async function discardEmptyMeetings(ids) {
   return mutateHistory(history => {
     const gone = new Set(history.filter(m => wanted.has(m.id) && isEmptyRecord(m)).map(m => m.id));
     return {
-      history: gone.size ? history.filter(m => !gone.has(m.id)) : history,
+      list: gone.size ? history.filter(m => !gone.has(m.id)) : history,
       save: gone.size > 0, value: [...gone]
     };
   });
@@ -318,32 +340,37 @@ export async function getTrash() {
   const t = await get(STORAGE_KEYS.TRASH);
   return Array.isArray(t) ? t : [];
 }
-export async function saveTrash(list) {
-  await set(STORAGE_KEYS.TRASH, list);
-  return list;
-}
 
+/**
+ * A deletion is two writes, and the second is the one that must not be lost: the record leaves the
+ * register first and only then arrives in the trash, so a write that goes over somebody else's
+ * (the worker sweeping what has expired, a second page emptying it) would drop the meeting out of
+ * both. Both halves go through the guarded write, which is why the trash carries a revision too.
+ */
 export async function deleteMeetingById(id) {
   const record = await mutateHistory(history => {
     const found = history.find(m => m.id === id) || null;
-    return { history: found ? history.filter(m => m.id !== id) : history, save: !!found, value: found };
+    return { list: found ? history.filter(m => m.id !== id) : history, save: !!found, value: found };
   });
   if (!record) return false;
-  const trash = await getTrash();
-  await saveTrash([{ ...record, deletedAt: new Date().toISOString() }, ...trash.filter(m => m.id !== id)]);
+  await mutateTrash(trash => ({
+    list: [{ ...record, deletedAt: new Date().toISOString() }, ...trash.filter(m => m.id !== id)],
+    value: true
+  }));
   return true;
 }
 
 /** Back into the history, newest-first as the list expects it. */
 export async function restoreMeetings(ids) {
   const wanted = new Set(ids);
-  const trash = await getTrash();
-  const coming = trash.filter(m => wanted.has(m.id));
+  const coming = await mutateTrash(trash => {
+    const found = trash.filter(m => wanted.has(m.id));
+    return { list: trash.filter(m => !wanted.has(m.id)), save: found.length > 0, value: found };
+  });
   if (!coming.length) return 0;
-  await saveTrash(trash.filter(m => !wanted.has(m.id)));
   const restored = coming.map(({ deletedAt, ...rec }) => rec);
   return mutateHistory(history => ({
-    history: restored.concat(history.filter(m => !wanted.has(m.id)))
+    list: restored.concat(history.filter(m => !wanted.has(m.id)))
       .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
     value: restored.length
   }));
@@ -352,17 +379,14 @@ export async function restoreMeetings(ids) {
 /** Out of the trash for good. */
 export async function purgeMeetings(ids) {
   const wanted = new Set(ids);
-  const trash = await getTrash();
-  const kept = trash.filter(m => !wanted.has(m.id));
-  if (kept.length === trash.length) return 0;
-  await saveTrash(kept);
-  return trash.length - kept.length;
+  return mutateTrash(trash => {
+    const kept = trash.filter(m => !wanted.has(m.id));
+    return { list: kept, save: kept.length !== trash.length, value: trash.length - kept.length };
+  });
 }
 
 export async function emptyTrash() {
-  const n = (await getTrash()).length;
-  if (n) await saveTrash([]);
-  return n;
+  return mutateTrash(trash => ({ list: [], save: trash.length > 0, value: trash.length }));
 }
 
 /**
@@ -370,17 +394,14 @@ export async function emptyTrash() {
  * the worker wakes, which is often enough for a window measured in days.
  */
 export async function purgeExpiredTrash(now = Date.now()) {
-  const trash = await getTrash();
-  if (!trash.length) return 0;
-  const { trashRetentionDays } = await getSettings();
-  const days = Number(trashRetentionDays);
+  const days = Number((await getSettings()).trashRetentionDays);
   if (!(days > 0)) return 0;
   const cutoff = now - days * 86400000;
-  // an unreadable timestamp is treated as "just deleted" rather than silently dropped
-  const kept = trash.filter(m => (Date.parse(m.deletedAt) || now) > cutoff);
-  if (kept.length === trash.length) return 0;
-  await saveTrash(kept);
-  return trash.length - kept.length;
+  return mutateTrash(trash => {
+    // an unreadable timestamp is treated as "just deleted" rather than silently dropped
+    const kept = trash.filter(m => (Date.parse(m.deletedAt) || now) > cutoff);
+    return { list: kept, save: kept.length !== trash.length, value: trash.length - kept.length };
+  });
 }
 
 export async function clearHistory() {
@@ -414,7 +435,7 @@ export async function mergeMeetings(records) {
     if (!fresh.length) return { save: false, value: 0 };
 
     return {
-      history: history.concat(fresh)
+      list: history.concat(fresh)
         .map(m => normalizeMeeting(m, { mergeAliases: false }))
         .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
       value: fresh.length
@@ -801,7 +822,7 @@ export async function migrateIfNeeded() {
       }
     }
     return {
-      history: history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
+      list: history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
         .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
       value: count
     };
