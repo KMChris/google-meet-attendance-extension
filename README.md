@@ -169,7 +169,12 @@ technical report) plus fields derived from those events.
 
 Because a recurring Google Meet link reuses the same code, each session gets a **unique `id`**
 (`<code>-<startMs>`) with the code kept separately in `meetingCode` — so weekly sessions on one
-link never overwrite each other, and can be recognised as a series.
+link never overwrite each other, and can be recognised as a series. The stamp in the id is also
+what dates a meeting the spreadsheet lists, without reading the record back out of it.
+
+Every write to `attendanceHistory` also stamps `attendanceHistoryRev`. The dashboard, the report
+page and the worker all change that one array, so a write that finds the revision moved under it
+works its change out again on what is there now (`storage.js` → `mutateHistory`).
 
 ```javascript
 // chrome.storage.local.attendanceHistory = [ … ]
