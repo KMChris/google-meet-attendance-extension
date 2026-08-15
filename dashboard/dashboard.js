@@ -1256,7 +1256,8 @@ function seriesName(titles, code) {
 }
 function renderSeriesSuggestions() {
   const box = $('#series-suggestions'); box.innerHTML = '';
-  const bycode = A.seriesByCode(history);
+  // a meeting you have set aside is not one to propose filing into a new series
+  const bycode = A.seriesByCode(current());
   bycode.forEach((ms, code) => {
     const ungrouped = ms.filter(m => !m.groupId).sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
     if (ungrouped.length < 2) return; // only suggest real, still-ungrouped series

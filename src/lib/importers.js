@@ -142,7 +142,7 @@ function fromRollCall(raw) {
  * names it was written from.
  */
 const FORMULA = /^'*[=+\-@]/;
-export const csvGuard = (s) => (FORMULA.test(s) ? `'${s}` : s);
+const csvGuard = (s) => (FORMULA.test(s) ? `'${s}` : s);
 const csvUnguard = (s) => (/^'+[=+\-@]/.test(s) ? s.slice(1) : s);
 
 /** One row of CSV text, quoted as RFC 4180 wants it. The inverse of parseCSV, cell for cell. */

@@ -134,7 +134,10 @@ const TRASH = { list: STORAGE_KEYS.TRASH, rev: STORAGE_KEYS.TRASH_REV };
  * `change` is handed the stored array to edit in place or to replace, and returns
  * `{ list?, save?, value }`; `value` is what the caller gets back, and `save: false` says it
  * found nothing to do. It is run again for every one of the above, so it must decide everything
- * from the array it is given and keep nothing between runs.
+ * from the array it is given and keep nothing between runs. `save: false` also has to mean it
+ * left the array alone: a repair that says so is answered by writing back the array it was handed,
+ * which is the other context's, and an edit made on the way to saying "nothing to do" would ride
+ * along with it.
  */
 async function mutate(reg, change, resume = null, depth = 0) {
   let base = resume;   // the array to work from, and the revision it stands for
