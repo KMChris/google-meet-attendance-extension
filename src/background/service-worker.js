@@ -26,7 +26,14 @@ const BADGE_COLOR = '#1e7a4e'; // present-green, matches the status palette
 const CONTENT_SCRIPT = 'src/content/content-script.js';
 const MEET_URL = 'https://meet.google.com/*';
 
-/** tabId -> raw meeting { id, meetingCode, startTime, url, meetingTitle, groupId?, participants } */
+/**
+ * tabId -> raw meeting { id, meetingCode, startTime, url, meetingTitle, groupId?, participants }.
+ *
+ * `inCall` is set once a page has reported somebody of its own: a Meet link can be open in more
+ * than one tab, and that is what tells a tab in the meeting from a tab sitting in the green room
+ * of the same link. A resumed record hands a tab everyone it already holds, so the participants
+ * alone say nothing about where the page is.
+ */
 const activeMeetings = new Map();
 /** tabId -> the resolve in flight, so two messages from one page load can't open two records. */
 const resolving = new Map();
@@ -166,6 +173,8 @@ async function handleAttendanceUpdate(message, tabId) {
   // The page reports what *this* load of the content script has seen, which starts over on
   // every reload — fold it into what the tab reported before rather than replacing it.
   raw.participants = attendance.mergeRawParticipants(raw.participants, message.participants);
+  // and it has seen the call itself, not merely resumed a record about it
+  if (Object.keys(message.participants || {}).length) raw.inCall = true;
   if (tabId != null) activeMeetings.set(tabId, raw);
 
   // upsertMeeting re-applies any user renames/merges (nameMap) — count the mapped result.
@@ -175,8 +184,27 @@ async function handleAttendanceUpdate(message, tabId) {
   return { success: true, id: raw.id };
 }
 
+/** Is another tab in this same call right now? */
+function stillInCall(id) {
+  for (const raw of activeMeetings.values()) if (raw.id === id && raw.inCall) return true;
+  return false;
+}
+
 async function handleMeetingEnded(message, tabId) {
   const raw = await resolveRawMeeting(message, tabId);
+  if (tabId != null) activeMeetings.delete(tabId);   // before the question below, or it answers itself
+
+  // A page can leave a call that is still going on: the same link open in a second tab is a second
+  // page on the same meeting, and one of them closing says nothing about the other. Ending the
+  // record here would cut the meeting short at this moment and mark everyone still in it as gone,
+  // and it would stay that way until the last page leaves — long enough for the spreadsheet, which
+  // is written once, to be handed half a meeting. The tab that is still in the call keeps
+  // reporting, and its own end is the one that ends the record.
+  if (stillInCall(raw.id)) {
+    updateBadge(tabId, '', '');
+    return { success: true, id: raw.id, stillInCall: true };
+  }
+
   if (message.participants) raw.participants = attendance.mergeRawParticipants(raw.participants, message.participants);
 
   const endTime = message.endTime || new Date().toISOString();
@@ -195,7 +223,6 @@ async function handleMeetingEnded(message, tabId) {
     (await storage.discardEmptyMeetings([record.id])).length > 0;
   const saved = empty ? record : await storage.upsertMeeting(record);
 
-  if (tabId != null) activeMeetings.delete(tabId);
   updateBadge(tabId, '', '');
   return { success: true, id: saved.id, discarded: empty };
 }
