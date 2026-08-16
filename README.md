@@ -16,7 +16,7 @@ every time they left and rejoined.
 - **Attendance is binary**: whoever was in the call is present. How much of it they were there for is reported as time and share — against the meeting's hours, which are read from the calendar event when Meet shows it and can always be corrected by hand
 - **Editable participants**: fix a scraped display name, or merge two Meet identities into one person — and split them apart again later
 - **Batch actions**: click a meeting's date badge or a person's avatar to select it, then act on the whole selection — add meetings to a series, export or delete them, merge participants, or add people to a roster
-- **Exports**: per-meeting CSV, series CSV (matrix *and* per-session detail), combined CSV, JSON backup, clipboard, and detailed **technical PDF reports** — for a single meeting or a whole series — with every join/leave event, print-ready
+- **Exports**: per-meeting CSV, series CSV (matrix *and* per-session detail), combined CSV, JSON backup, clipboard, and detailed **technical PDF reports** for a single meeting or a whole series. A large series stays scrollable on screen and is split into readable session chunks on paper
 - **Imports**: a JSON backup, a CSV this extension wrote, or a backup from another attendance extension (RollCall / meet-attendance.com) — always merged, never replacing what is already stored
 - **Dark mode**: Follows the browser's light/dark preference, with a System / Light / Dark override in Settings
 - **Localized**: Full English + Polish interface (auto-detected, switchable in Settings)
@@ -46,8 +46,12 @@ every time they left and rejoined.
 
 1. Join a Google Meet meeting
 2. The extension will automatically start tracking participants
-3. Click the extension icon in the browser toolbar to view the current participant list
-4. Use the **Export CSV** button to export attendance records
+3. Click the extension icon to see tracking status, the live participant count and up to four recent meetings
+4. Open a recent meeting directly, choose **View all**, or use **Open dashboard** for the full register
+5. Export CSV or PDF from a meeting or series in the dashboard. Combined CSV and the lossless JSON backup are available in Settings
+
+Turning automatic tracking off in Settings applies to future meetings. A meeting already being
+recorded continues until it ends, so changing the preference cannot silently cut off its register.
 
 ### Recorded Data
 
@@ -115,11 +119,11 @@ sheet, and nothing the sheet holds removes a record from here:
 - Both buttons say what they left as it was, and what to do about it: **to change or drop what the
   sheet holds, edit it in Google Sheets, or create a new sheet and send everything to that one.**
 
-> ⚠️ Google Sheets sync needs an OAuth client ID **bound to your own extension ID**. The `oauth2.client_id`
-> in `manifest.json` is a placeholder (`YOUR_OAUTH_CLIENT_ID…`) — create your own and paste it in, registering
-> the ID Chrome gives your unpacked copy. See
-> [Google Cloud Console Setup](#google-cloud-console-setup-for-sheets-integration) below. Everything except
-> Sheets sync works without any of this.
+> ⚠️ Google Sheets sync needs an OAuth client ID **bound to the exact extension ID**. A source checkout
+> may contain either a placeholder or a client configured for one particular build. Replace a placeholder
+> with your own client. If a client is already present, confirm in Google Cloud that it is registered for
+> the ID Chrome gives this copy. See [Google Cloud Console Setup](#google-cloud-console-setup-for-sheets-integration)
+> below. Everything except Sheets sync works without OAuth configuration.
 
 ## Project Structure
 
@@ -148,9 +152,13 @@ google-meet-attendance-extension/
     │   └── popup.js
     └── lib/                   # Shared ES-module data + UI layer
         ├── attendance.js      # Pure derivation & aggregation (sessions, status, groups)
+        ├── date-ranges.js     # Local-calendar analytics ranges and day counts
+        ├── dialogs.js         # Native dialog focus and backdrop behavior
         ├── storage.js         # chrome.storage CRUD (history, series, settings) + migration
+        ├── locks.js           # Exclusive Web Lock adapter with FIFO fallback
         ├── importers.js       # Read our own CSV and other extensions' backups
         ├── i18n.js            # Runtime i18n (EN/PL) over the _locales catalogues
+        ├── report-layout.js   # Screen matrix and print-session chunk layout
         ├── sheets-api.js      # Google Sheets API
         ├── sheets-sync.js     # Two-way sync with the spreadsheet, and when it runs
         ├── ui.css             # design system (tokens light/dark, primitives, timeline)
@@ -172,9 +180,10 @@ Because a recurring Google Meet link reuses the same code, each session gets a *
 link never overwrite each other, and can be recognised as a series. The stamp in the id is also
 what dates a meeting the spreadsheet lists, without reading the record back out of it.
 
-Every write to `attendanceHistory` also stamps `attendanceHistoryRev`. The dashboard, the report
-page and the worker all change that one array, so a write that finds the revision moved under it
-works its change out again on what is there now (`storage.js` → `mutateHistory`).
+Every local read-modify-write operation uses the same exclusive Web Lock, with a FIFO fallback for
+test environments. The dashboard, report page and worker therefore cannot overwrite one another's
+changes. Moves between history and trash, group deletion and migrations commit all related keys in
+one storage write.
 
 ```javascript
 // chrome.storage.local.attendanceHistory = [ … ]
@@ -235,8 +244,9 @@ the extension first and copy the ID shown for it on `chrome://extensions`.
 4. Create an OAuth 2.0 Client ID in **APIs & Services > Credentials**:
    - Application type: **Chrome Extension**
    - Application (extension) ID: the ID from `chrome://extensions`
-5. Copy the generated client ID into `manifest.json` under `oauth2.client_id`, replacing the
-   `YOUR_OAUTH_CLIENT_ID…` placeholder, then reload the extension.
+5. Inspect `manifest.json` under `oauth2.client_id`. Replace `YOUR_OAUTH_CLIENT_ID...` if it is
+   still a placeholder. If a client ID is already configured, verify that its Chrome Extension
+   credential names the ID shown for this copy, then reload the extension.
 
 > **Loading the extension from another folder changes its ID**, and a client registered for the old one is
 > then refused with `bad client id`. The Chrome Web Store assigns a permanent ID on publishing — register

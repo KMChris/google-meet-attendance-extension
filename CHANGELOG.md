@@ -52,6 +52,24 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   than being restored behind the deletion.
 
 ### Fixed
+- **Concurrent local edits no longer overwrite one another.** History, trash, groups, settings,
+  rosters and migrations now share one exclusive lock, and multi-key moves commit atomically.
+- **Sheets writes and sync passes are atomic and serialized.** Typed cell batches cannot leave a
+  partial backup, automatic and manual passes cannot race, and ordinary API work never opens an
+  unexpected sign-in prompt. Authentication and backup failures now remain visible as failures.
+- **Meet discovery is scoped and language-aware.** Native and ARIA participant controls work with
+  English, Polish and Korean labels, partial or virtualized lists cannot invent departures, and
+  only trusted event headings can supply scheduled hours.
+- **Large series reports keep every session.** The full matrix scrolls on screen and paper uses
+  five-session chunks with participant, attendance and total columns repeated in each chunk.
+- **Dialogs, navigation and status messages use native accessible semantics.** Keyboard focus,
+  Escape, popup landmarks, control names, live status and light or dark contrast now pass the
+  browser accessibility audit; failed local writes no longer close a dialog and claim success.
+- **Locale changes finish in request order**, so a slower catalogue response cannot restore an
+  older language after a newer choice.
+- **Attendance and date ranges respect both meeting bounds and local calendar days.** Sessions
+  outside corrected hours count as zero, and seven-day analytics presets stay seven days across
+  daylight-saving changes.
 - **A record nothing ended no longer passes for a call in progress.** Presence cannot tell the two
   apart — a record nobody closed has everyone still standing inside it — so a call the browser was
   killed on read as running, and its length grew with the wall clock, until it was four hours stale.

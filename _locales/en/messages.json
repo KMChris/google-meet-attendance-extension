@@ -1534,9 +1534,6 @@
   "popupNoRecent": {
     "message": "No meetings yet"
   },
-  "popupExport": {
-    "message": "Export CSV"
-  },
   "popupViewAll": {
     "message": "View all"
   }
