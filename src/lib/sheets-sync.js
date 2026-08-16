@@ -29,9 +29,11 @@
 import * as storage from './storage.js';
 import * as api from './sheets-api.js';
 import { REJOIN_WINDOW_MS, sessionStartMs } from './attendance.js';
+import { withExclusiveLock } from './locks.js';
 
 export const OPEN_INTERVAL_MS = 5 * 60 * 1000;
 export const BACKGROUND_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const SHEETS_SYNC_LOCK = 'gm-attendance-sheets-sync-v1';
 
 /**
  * What the sheet holds and this store does not: the backup rows worth reading back. A meeting in
@@ -109,8 +111,8 @@ export function outgoing({ index = [], history = [], groups = [], now = Date.now
   };
 }
 
-/** One two-way pass over a spreadsheet. Returns what moved, in each direction. */
-export async function syncNow(spreadsheetId) {
+/** One two-way pass after its caller owns the Sheets lock. */
+async function syncNowUnlocked(spreadsheetId) {
   const [history, trash, groups, settings] = await Promise.all([
     storage.getHistory(), storage.getTrash(), storage.getGroups(), storage.getSettings()
   ]);
@@ -127,8 +129,13 @@ export async function syncNow(spreadsheetId) {
   const out = outgoing({ index, history, groups });
   if (out.meetings.length || out.groups.length) await api.appendRecords(spreadsheetId, out);
 
-  await storage.setSyncState({ lastSyncAt: new Date().toISOString() });
+  await storage.setSyncState({ lastSyncAt: new Date().toISOString(), claimedAt: null });
   return { pulled, pulledGroups, pushed: out.meetings.length, pushedGroups: out.groups.length };
+}
+
+/** One two-way pass over a spreadsheet. Returns what moved, in each direction. */
+export function syncNow(spreadsheetId) {
+  return withExclusiveLock(SHEETS_SYNC_LOCK, () => syncNowUnlocked(spreadsheetId));
 }
 
 /**
@@ -137,7 +144,7 @@ export async function syncNow(spreadsheetId) {
  * cannot be used to bring the sheet back in line with this machine — it can only ever fill it in.
  * The counts say what was left as it was, which is what the page then offers advice about.
  */
-export async function pushEverything(spreadsheetId) {
+async function pushEverythingUnlocked(spreadsheetId) {
   const [history, groups] = await Promise.all([storage.getHistory(), storage.getGroups()]);
   const index = await api.readBackupIndex(spreadsheetId);
 
@@ -150,6 +157,10 @@ export async function pushEverything(spreadsheetId) {
   };
 }
 
+export function pushEverything(spreadsheetId) {
+  return withExclusiveLock(SHEETS_SYNC_LOCK, () => pushEverythingUnlocked(spreadsheetId));
+}
+
 /**
  * "Restore from the sheet": every record the sheet holds, of which only the ones this store has
  * never seen are added. A meeting already here keeps whatever was edited about it, and one in the
@@ -159,7 +170,7 @@ export async function pushEverything(spreadsheetId) {
  * do about the second (the trash) and about the third ("meetings to keep"), and nothing to do
  * about the first.
  */
-export async function pullEverything(spreadsheetId) {
+async function pullEverythingUnlocked(spreadsheetId) {
   const { meetings, groups } = await api.restoreAll(spreadsheetId);
   const [history, trash] = await Promise.all([storage.getHistory(), storage.getTrash()]);
   const here = new Set(history.map(m => m.id));
@@ -180,40 +191,32 @@ export async function pullEverything(spreadsheetId) {
   };
 }
 
-/**
- * How long a pass may hold the claim below before another context takes it as abandoned. Long
- * enough for a slow spreadsheet, short enough that a worker stopped mid-request is not missed.
- */
-const CLAIM_MS = 2 * 60 * 1000;
+export function pullEverything(spreadsheetId) {
+  return withExclusiveLock(SHEETS_SYNC_LOCK, () => pullEverythingUnlocked(spreadsheetId));
+}
 
 /**
  * The scheduled entry point: does nothing unless auto-sync is on, a sheet is linked, the account
  * is still connected, no pass is already running and the last one is older than `maxAgeMs`.
  * Returns null when it stayed out of the way.
  *
- * Only one unattended pass runs at a time, across the worker and every open page alike. What a
- * pass sends is what the sheet was missing when it started, so two overlapping passes would both
- * find the same meetings missing and both send them — and the spreadsheet is only ever added to,
- * so a row sent twice stays there twice. The moment a pass takes it up is written down, and that
- * is a claim rather than a lock: two contexts reading it free in the same instant can still both
- * go, but the window that has to be hit shrinks from a network round trip to a storage write.
+ * Only one pass runs at a time across the worker and every open extension page. Automatic work
+ * stands down instead of waiting when a manual or automatic pass already owns the lock.
  *
  * It never asks for a sign-in. A grant that has lapsed is left to the settings page, where the
  * user can see what is being asked instead of a window appearing on its own.
  */
-export async function autoSync({ maxAgeMs = BACKGROUND_INTERVAL_MS, force = false, now = Date.now() } = {}) {
+async function autoSyncUnlocked({ maxAgeMs = BACKGROUND_INTERVAL_MS, force = false, now = Date.now() } = {}) {
   const settings = await storage.getSettings();
   if (!settings.autoSync || !settings.spreadsheetId) return null;
 
-  const { lastSyncAt, claimedAt } = await storage.getSyncState();
+  const { lastSyncAt } = await storage.getSyncState();
   if (!force && now - (Date.parse(lastSyncAt) || 0) < maxAgeMs) return null;
-  if (now - (Date.parse(claimedAt) || 0) < CLAIM_MS) return null;
   if (!(await api.isAuthenticated())) return null;
 
-  await storage.setSyncState({ claimedAt: new Date(now).toISOString() });
-  try {
-    return await syncNow(settings.spreadsheetId);
-  } finally {
-    await storage.setSyncState({ claimedAt: null });
-  }
+  return syncNowUnlocked(settings.spreadsheetId);
+}
+
+export function autoSync(options = {}) {
+  return withExclusiveLock(SHEETS_SYNC_LOCK, () => autoSyncUnlocked(options), { ifAvailable: true });
 }

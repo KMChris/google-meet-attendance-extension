@@ -86,16 +86,49 @@ function seed(extra = {}) {
 
 const meetingRows = () => appended.filter(sheetId => sheetId === 0).length;
 
-test('a pass that starts while another is running stands down', async () => {
+test('two automatic passes started in the same turn upload once', async () => {
   seed();
 
-  const running = sync.autoSync({ force: true });
-  await new Promise(r => setTimeout(r, 40));      // it is somewhere in its requests by now
-  const second = await sync.autoSync({ force: true });
-  await running;
+  const results = await Promise.all([
+    sync.autoSync({ force: true }),
+    sync.autoSync({ force: true })
+  ]);
 
-  assert.equal(second, null, 'the second pass had nothing to do that the first was not doing');
-  assert.equal(meetingRows(), 1, 'and the meeting went up once');
+  assert.equal(results.filter(Boolean).length, 1, 'one pass owns the work');
+  assert.equal(meetingRows(), 1, 'the meeting went up once');
+});
+
+test('an automatic pass stands down while a manual sync owns the work', async () => {
+  seed();
+
+  const manual = sync.syncNow(SHEET);
+  const automatic = sync.autoSync({ force: true });
+  const [, automaticResult] = await Promise.all([manual, automatic]);
+
+  assert.equal(automaticResult, null);
+  assert.equal(meetingRows(), 1);
+});
+
+test('an automatic pass stands down while a manual push owns the work', async () => {
+  seed();
+
+  const manual = sync.pushEverything(SHEET);
+  const automatic = sync.autoSync({ force: true });
+  const [, automaticResult] = await Promise.all([manual, automatic]);
+
+  assert.equal(automaticResult, null);
+  assert.equal(meetingRows(), 1);
+});
+
+test('an automatic pass stands down while a manual restore owns the work', async () => {
+  seed();
+
+  const manual = sync.pullEverything(SHEET);
+  const automatic = sync.autoSync({ force: true });
+  const [, automaticResult] = await Promise.all([manual, automatic]);
+
+  assert.equal(automaticResult, null);
+  assert.equal(meetingRows(), 0, 'the restore itself does not append a meeting');
 });
 
 test('a pass that comes after the first has finished still runs', async () => {
@@ -110,15 +143,15 @@ test('a pass that comes after the first has finished still runs', async () => {
   assert.equal(meetingRows(), 1, 'and the meeting the sheet had not got goes up');
 });
 
-test('a claim nothing gave up is not honoured for ever', async () => {
+test('a stale claim from an older version does not block a pass', async () => {
   const at = Date.parse('2026-08-14T12:00:00.000Z');
-  seed({ syncState: { claimedAt: new Date(at).toISOString() } });   // a worker stopped mid-request
+  seed({ syncState: { claimedAt: new Date(at).toISOString() } });
 
-  assert.equal(await sync.autoSync({ force: true, now: at + MINUTE }), null, 'a pass may still be running');
-  assert.equal(meetingRows(), 0);
+  const result = await sync.autoSync({ force: true, now: at + MINUTE });
 
-  await sync.autoSync({ force: true, now: at + 3 * MINUTE });
-  assert.equal(meetingRows(), 1, 'past the window, the next pass takes it up');
+  assert.ok(result);
+  assert.equal(meetingRows(), 1);
+  assert.equal(store.syncState.claimedAt, null);
 });
 
 test('nothing runs while the schedule says the last pass is recent', async () => {
