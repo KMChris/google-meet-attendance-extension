@@ -6,12 +6,45 @@ import * as sheetsSync from '../src/lib/sheets-sync.js';
 import { disconnectSheetsAccount } from '../src/lib/sheets-account.js';
 import * as importers from '../src/lib/importers.js';
 import { esc, initials } from '../src/lib/html.js';
+import { installDialog, openDialog } from '../src/lib/dialogs.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
 import { initTips } from './tooltip.js';
 
 const { t } = i18n;
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+const DIALOG_IDS = [
+  'paste-modal',
+  'group-modal',
+  'schedule-modal',
+  'participant-modal',
+  'assign-modal',
+  'pick-meetings-modal'
+];
+DIALOG_IDS.forEach(id => installDialog($('#' + id)));
+
+function closeDialog(id) {
+  const dialog = $('#' + id);
+  if (dialog.open) dialog.close();
+}
+
+function bindLinkRow(row, activate) {
+  const fromNestedControl = event => {
+    const target = event.target;
+    if (!target || typeof target.closest !== 'function') return false;
+    const control = target.closest('a,button,input,select,textarea,[role="button"],[role="checkbox"],[role="link"]');
+    return !!control && control !== row;
+  };
+  row.addEventListener('click', event => {
+    if (!fromNestedControl(event)) activate();
+  });
+  row.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || fromNestedControl(event)) return;
+    event.preventDefault();
+    activate();
+  });
+}
 
 /* ------------------------------ state ------------------------------ */
 let history = [];         // normalized meetings, newest-first
@@ -28,6 +61,14 @@ let meetingsList = 'active'; // which meetings list is on screen: 'active' | 'ar
 
 const GRP_COLORS = { teal: '--grp-teal', amber: '--grp-amber', violet: '--grp-violet', rose: '--grp-rose', sky: '--grp-sky', lime: '--grp-lime' };
 const GRP_KEYS = Object.keys(GRP_COLORS);
+const GRP_COLOR_LABELS = {
+  teal: 'groupColorTeal',
+  amber: 'groupColorAmber',
+  violet: 'groupColorViolet',
+  rose: 'groupColorRose',
+  sky: 'groupColorSky',
+  lime: 'groupColorLime'
+};
 
 /* ------------------------------ utils ------------------------------ */
 function hash(str) { let h = 0; for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h); return Math.abs(h); }
@@ -49,6 +90,13 @@ function toast(msg) {
   el.textContent = msg; el.classList.add('visible');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('visible'), 2400);
 }
+window.addEventListener('unhandledrejection', event => {
+  const error = event.reason;
+  if (!error || (error.name !== 'StorageReadError' && error.name !== 'StorageWriteError')) return;
+  event.preventDefault();
+  console.error('[GM Attendance] local storage failed:', error.message || error);
+  toast(t('storageFailureToast'));
+});
 function groupById(id) { return groups.find(g => g.id === id) || null; }
 function effectiveRoster(meeting) {
   const g = meeting.groupId ? groupById(meeting.groupId) : null;
@@ -318,7 +366,7 @@ $('#live-now').addEventListener('click', () => go(liveTarget ? 'meeting=' + enco
 function canRepaint() {
   // `selection.scope` is set by every mount, so what says a batch is being picked is what is in
   // it — the rows are only in the user's hands once something has actually been picked
-  return !$('.modal:not([hidden])') && !$('.menu:not([hidden])')
+  return !$('.modal[open]') && !$('.menu:not([hidden])')
     && !$('.title-line.editing') && !selection.keys.size;
 }
 
@@ -1006,20 +1054,19 @@ function openScheduleModal() {
     ? t('scheduleObserved', { range: `${i18n.formatTime(new Date(obs.startMs).toISOString())}–${i18n.formatTime(new Date(obs.endMs).toISOString())}` })
     : '';
 
-  $('#schedule-modal').hidden = false;
-  $('#schedule-start').focus();
+  openDialog($('#schedule-modal'), { initialFocus: $('#schedule-start') });
 }
 
 async function saveSchedule(start, end) {
   const m = currentMeeting(); if (!m) return;
   await store.setMeetingSchedule(m.id, { start, end });
-  $('#schedule-modal').hidden = true;
+  closeDialog('schedule-modal');
   await load();
   toast(start || end ? t('savedToast') : t('scheduleClearedToast'));
 }
 
 $('#btn-hours').addEventListener('click', openScheduleModal);
-$('#schedule-cancel').addEventListener('click', () => { $('#schedule-modal').hidden = true; });
+$('#schedule-cancel').addEventListener('click', () => closeDialog('schedule-modal'));
 $('#schedule-auto').addEventListener('click', () => saveSchedule(null, null));
 $('#schedule-save').addEventListener('click', () => {
   const start = fromLocalInput($('#schedule-start').value);
@@ -1060,7 +1107,7 @@ function openParticipantModal(name) {
   const others = Object.keys(m.attendance).filter(n => n !== name).sort((a, b) => a.localeCompare(b));
   $('#merge-pick').hidden = !others.length;
   $('#merge-list').innerHTML = others.map((n, i) =>
-    `<button class="merge-item" data-i="${i}"><span class="avatar" style="${avatarStyle(n)}">${esc(initials(n))}</span><span class="nm">${esc(n)}</span></button>`).join('');
+    `<button type="button" class="merge-item" data-i="${i}"><span class="avatar" style="${avatarStyle(n)}">${esc(initials(n))}</span><span class="nm">${esc(n)}</span></button>`).join('');
   $$('#merge-list .merge-item').forEach(b => b.addEventListener('click', () => {
     $('#participant-name').value = others[Number(b.dataset.i)];
     refreshParticipantModal();
@@ -1073,18 +1120,19 @@ function openParticipantModal(name) {
     .map(n => `<span class="chip"><span>${esc(n)}</span></span>`).join('');
 
   refreshParticipantModal();
-  $('#participant-modal').hidden = false;
-  const input = $('#participant-name'); input.focus(); input.select();
+  const input = $('#participant-name');
+  openDialog($('#participant-modal'), { initialFocus: input });
+  input.select();
 }
 
 async function commitUnmerge() {
   const m = currentMeeting();
   const name = editingName;
-  $('#participant-modal').hidden = true;
-  editingName = null;
   if (!m || name == null) return;
   const res = await store.unmergeParticipant(m.id, name);
   if (!res) return;
+  editingName = null;
+  closeDialog('participant-modal');
   await load();
   toast(t('unmergedToast', { count: res.restored.length + 1 }));
 }
@@ -1093,11 +1141,12 @@ $('#btn-unmerge').addEventListener('click', commitUnmerge);
 async function commitParticipantEdit() {
   const m = currentMeeting();
   const v = $('#participant-name').value.trim();
-  $('#participant-modal').hidden = true;
-  if (!m || editingName == null || !v || v === editingName) { editingName = null; return; }
-  const res = await store.renameParticipant(m.id, editingName, v);
-  editingName = null;
+  const name = editingName;
+  if (!m || name == null || !v || v === name) return;
+  const res = await store.renameParticipant(m.id, name, v);
   if (!res) return;
+  editingName = null;
+  closeDialog('participant-modal');
   await load();
   toast(res.merged ? t('mergedToast') : t('renamedToast'));
 }
@@ -1106,7 +1155,8 @@ $('#participant-name').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !$('#participant-save').disabled) { e.preventDefault(); commitParticipantEdit(); }
 });
 $('#participant-save').addEventListener('click', commitParticipantEdit);
-$('#participant-cancel').addEventListener('click', () => { $('#participant-modal').hidden = true; editingName = null; });
+$('#participant-cancel').addEventListener('click', () => closeDialog('participant-modal'));
+$('#participant-modal').addEventListener('close', () => { editingName = null; });
 
 // deleting is undoable now: it goes to the trash, and the list is where you land
 $('#btn-delete').addEventListener('click', async () => {
@@ -1222,16 +1272,20 @@ function renderGroups() {
     const agg = A.aggregateGroup(ms, g.roster);
     const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
     const mark = g.archived ? `<span class="gc-archived" title="${esc(t('groupsArchive'))}">${ARCHIVE_ICON}</span>` : '';
-    return `<div class="card group-card" data-id="${esc(g.id)}">
+    return `<a class="card group-card" href="#group=${encodeURIComponent(g.id)}" data-id="${esc(g.id)}">
       <div class="gc-top"><span class="gc-swatch" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>
         <div style="min-width:0"><h3>${esc(g.name)}${mark}</h3><div class="gc-meta">${ms.length === 1 ? t('sessionOne') : t('sessionsN', { count: ms.length })}</div></div></div>
       <div class="gc-stats">
         <div class="gc-stat"><div class="n">${agg.peopleCount}</div><div class="l">${t('colGroupPeople')}</div></div>
         <div class="gc-stat"><div class="n">${avgAtt}%</div><div class="l">${t('colGroupAttendance')}</div></div>
         <div class="gc-stat"><div class="n">${fmtDur(agg.totalDurationSeconds)}</div><div class="l">${t('colTotalTime')}</div></div>
-      </div></div>`;
+      </div></a>`;
   }).join('');
-  $$('#groups-list .group-card').forEach(c => c.addEventListener('click', () => go('group=' + encodeURIComponent(c.dataset.id))));
+  $$('#groups-list .group-card').forEach(card => card.addEventListener('click', event => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    go('group=' + encodeURIComponent(card.dataset.id));
+  }));
 }
 
 // Name a series after the title text shared before a separator (e.g. "Szkolenie — Dzień 1/2" → "Szkolenie").
@@ -1298,7 +1352,7 @@ function renderGroupSessions(ms) {
     const startIso = A.meetingStartIso(m);
     const entries = Object.values(m.attendance);
     const share = entries.length ? Math.round(entries.reduce((s, a) => s + A.sharePct(a, m), 0) / entries.length) : 0;
-    return `<tr data-id="${esc(m.id)}" tabindex="0" title="${esc(t('openMeeting'))}">
+    return `<tr data-id="${esc(m.id)}" role="link" tabindex="0" title="${esc(t('openMeeting'))}">
       <td class="mono">${esc(i18n.formatDate(startIso, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
       <td><div class="s-title" title="${esc(m.meetingTitle)}">${esc(m.meetingTitle)}</div>
         <div class="s-time mono">${i18n.formatTime(startIso)}–${i18n.formatTime(A.meetingEndIso(m))}</div></td>
@@ -1311,8 +1365,7 @@ function renderGroupSessions(ms) {
 
   $$('#group-sessions tbody tr').forEach(tr => {
     const open = () => go('meeting=' + encodeURIComponent(tr.dataset.id));
-    tr.addEventListener('click', open);
-    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    bindLinkRow(tr, open);
   });
 }
 
@@ -1324,7 +1377,7 @@ function renderMatrix(agg) {
     <th class="num">${t('colAttendedShare')}</th><th class="num">${t('colTotalTime')}</th>
   </tr></thead>`;
   const chevron = `<svg class="go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>`;
-  const body = '<tbody>' + agg.people.map(p => `<tr data-name="${esc(p.name)}" tabindex="0" title="${esc(t('personSessionsTitle', { name: p.name }))}">
+  const body = '<tbody>' + agg.people.map(p => `<tr data-name="${esc(p.name)}" role="link" tabindex="0" title="${esc(t('personSessionsTitle', { name: p.name }))}">
     <td><div class="m-name">${pickHandle(p.name, `<span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span>`)}<span class="nm">${esc(p.name)}</span>${chevron}</div></td>
     ${agg.sessions.map(s => {
       const c = p.perSession[s.id];
@@ -1343,8 +1396,7 @@ function renderMatrix(agg) {
       if (tr.classList.contains('expanded')) goBack('group=' + encodeURIComponent(curGroupId));
       else go(`group=${encodeURIComponent(curGroupId)}&person=${encodeURIComponent(tr.dataset.name)}`);
     };
-    tr.addEventListener('click', toggle);
-    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    bindLinkRow(tr, toggle);
   });
 
   const g = groupById(curGroupId);
@@ -1524,8 +1576,7 @@ function openPickMeetings() {
   pickedMeetings.clear();
   $('#pick-meetings-search').value = '';
   renderPickMeetings();
-  $('#pick-meetings-modal').hidden = false;
-  $('#pick-meetings-search').focus();
+  openDialog($('#pick-meetings-modal'), { initialFocus: $('#pick-meetings-search') });
 }
 function renderPickMeetings() {
   const g = groupById(curGroupId); if (!g) return;
@@ -1564,12 +1615,12 @@ $('#pick-meetings-list').addEventListener('change', e => {
   cb.closest('.pick-item').classList.toggle('on', cb.checked);
   syncPickCount();
 });
-$('#pick-meetings-cancel').addEventListener('click', () => $('#pick-meetings-modal').hidden = true);
+$('#pick-meetings-cancel').addEventListener('click', () => closeDialog('pick-meetings-modal'));
 $('#pick-meetings-save').addEventListener('click', async () => {
   const g = groupById(curGroupId), ids = Array.from(pickedMeetings);
   if (!g || !ids.length) return;
   await store.assignMeetingsToGroup(ids, g.id);
-  $('#pick-meetings-modal').hidden = true;
+  closeDialog('pick-meetings-modal');
   pickedMeetings.clear();
   await load();
   toast(t('meetingsAddedToast', { count: ids.length }));
@@ -1605,7 +1656,7 @@ function renderPeople(filter = '') {
   $('#people-body').innerHTML = entries.map(p => {
     const avg = p.shares.length ? Math.round(p.shares.reduce((s, r) => s + r, 0) / p.shares.length) : 0;
     const avatar = `<span class="avatar" style="${avatarStyle(p.name)}">${esc(initials(p.name))}</span>`;
-    return `<div class="row people-grid" data-name="${esc(p.name)}">
+    return `<div class="row people-grid" data-name="${esc(p.name)}" role="link" tabindex="0" title="${esc(t('personSessionsTitle', { name: p.name }))}">
       <div class="col-name"><div class="name-cell">${pickHandle(p.name, avatar)}<span class="nm">${esc(p.name)}</span></div></div>
       <div class="num">${p.count}</div>
       <div class="num mono">${fmtDur(p.total)}</div>
@@ -1613,10 +1664,10 @@ function renderPeople(filter = '') {
       <div class="col-last num mono">${esc(i18n.formatDate(new Date(p.last).toISOString(), { day: 'numeric', month: 'short', year: 'numeric' }))}</div>
     </div>`;
   }).join('');
-  $$('#people-body .row').forEach(r => r.addEventListener('click', () => {
-    if (selectionClick(r.dataset.name)) return;
-    if (r.classList.contains('expanded')) goBack('people');
-    else go('people&person=' + encodeURIComponent(r.dataset.name));
+  $$('#people-body .row').forEach(row => bindLinkRow(row, () => {
+    if (selectionClick(row.dataset.name)) return;
+    if (row.classList.contains('expanded')) goBack('people');
+    else go('people&person=' + encodeURIComponent(row.dataset.name));
   }));
 
   mountSelection({
@@ -1657,7 +1708,7 @@ function expandPerson(name) {
       <span>${p.count === 1 ? t('personMeetingOne') : t('personMeetingsN', { count: p.count })}</span>
       <span>${fmtDur(p.total)} ${t('personTotal')}</span><span>${avg}% ${t('personAvg')}</span></div>
     <table class="rc-table person-meetings"><thead><tr><th>${t('colMeeting')}</th><th>${t('colDate')}</th><th class="num">${t('colPresent')}</th><th>${t('colShare')}</th></tr></thead>
-    <tbody>${meetings.map(mm => `<tr data-id="${esc(mm.id)}" tabindex="0" title="${esc(t('openMeeting'))}">
+    <tbody>${meetings.map(mm => `<tr data-id="${esc(mm.id)}" role="link" tabindex="0" title="${esc(t('openMeeting'))}">
       <td class="nm" title="${esc(mm.title)}">${esc(mm.title)}</td>
       <td class="mono">${esc(i18n.formatDate(mm.date, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
       <td class="num mono">${fmtHMS(mm.secs)}</td>
@@ -1665,8 +1716,7 @@ function expandPerson(name) {
   row.after(panel);
   $$('tbody tr', panel).forEach(tr => {
     const open = () => go('meeting=' + encodeURIComponent(tr.dataset.id));
-    tr.addEventListener('click', open);
-    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    bindLinkRow(tr, open);
   });
 }
 // searching replaces the open person rather than leaving the URL pointing at a hidden panel
@@ -1814,18 +1864,26 @@ function openGroupModal(assignIds) {
   assignContextIds = assignIds || [];
   $('#group-modal-name').value = '';
   groupModalColor = GRP_KEYS[groups.length % GRP_KEYS.length];
-  $('#group-modal-colors').innerHTML = GRP_KEYS.map(k => `<button data-c="${k}" style="background:var(${GRP_COLORS[k]})" class="${k === groupModalColor ? 'on' : ''}"></button>`).join('');
-  $$('#group-modal-colors button').forEach(b => b.addEventListener('click', () => { groupModalColor = b.dataset.c; $$('#group-modal-colors button').forEach(x => x.classList.toggle('on', x === b)); }));
-  $('#group-modal').hidden = false; $('#group-modal-name').focus();
+  $('#group-modal-colors').innerHTML = GRP_KEYS.map(k => `<button type="button" data-c="${k}"
+    style="background:var(${GRP_COLORS[k]})" class="${k === groupModalColor ? 'on' : ''}"
+    aria-label="${esc(t(GRP_COLOR_LABELS[k]))}" aria-pressed="${k === groupModalColor}"></button>`).join('');
+  $$('#group-modal-colors button').forEach(button => button.addEventListener('click', () => {
+    groupModalColor = button.dataset.c;
+    $$('#group-modal-colors button').forEach(choice => {
+      const selected = choice === button;
+      choice.classList.toggle('on', selected);
+      choice.setAttribute('aria-pressed', String(selected));
+    });
+  }));
+  openDialog($('#group-modal'), { initialFocus: $('#group-modal-name') });
 }
-$('#group-modal-cancel').addEventListener('click', () => $('#group-modal').hidden = true);
+$('#group-modal-cancel').addEventListener('click', () => closeDialog('group-modal'));
 $('#group-modal-save').addEventListener('click', async () => {
   const name = $('#group-modal-name').value.trim(); if (!name) return;
   const g = await store.createGroup({ name, color: groupModalColor });
-  const assigned = assignContextIds;
+  const assigned = assignContextIds.slice();
   if (assigned.length) await store.assignMeetingsToGroup(assigned, g.id);
-  $('#group-modal').hidden = true;
-  assignContextIds = [];
+  closeDialog('group-modal');
   selectionReset();
   await load();
   toast(t('groupCreatedToast'));
@@ -1843,24 +1901,27 @@ function openAssignModal(meetings) {
 
   const list = $('#assign-list');
   const offered = assignableGroups(ms.map(m => m.groupId));
-  list.innerHTML = offered.map(g => `<div class="assign-item ${shared === g.id ? 'current' : ''}" data-id="${esc(g.id)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>${esc(g.name)}</div>`).join('')
-    + (ms.some(m => m.groupId) ? `<div class="assign-item" data-id="__none"><span class="gdot" style="background:var(--absent)"></span>${t('removeFromGroup')}</div>` : '');
-  if (!offered.length) list.innerHTML = `<p class="hint">${t('emptyGroupsBody')}</p>`;
+  const canRemove = ms.some(m => m.groupId);
+  list.innerHTML = offered.map(g => `<button type="button" class="assign-item ${shared === g.id ? 'current' : ''}" data-id="${esc(g.id)}"><span class="gdot" style="background:var(${GRP_COLORS[g.color] || '--grp-teal'})"></span>${esc(g.name)}</button>`).join('')
+    + (canRemove ? `<button type="button" class="assign-item" data-id="__none"><span class="gdot" style="background:var(--absent)"></span>${t('removeFromGroup')}</button>` : '');
+  if (!offered.length && !canRemove) list.innerHTML = `<p class="hint">${t('emptyGroupsBody')}</p>`;
   $$('#assign-list .assign-item').forEach(it => it.addEventListener('click', async () => {
     const gid = it.dataset.id === '__none' ? null : it.dataset.id;
     await store.assignMeetingsToGroup(assignContextIds, gid);
-    $('#assign-modal').hidden = true;
-    assignContextIds = [];
+    closeDialog('assign-modal');
     selectionReset();
     await load(); toast(t('assignedToast'));
   }));
-  $('#assign-modal').hidden = false;
+  openDialog($('#assign-modal'), { initialFocus: $('.assign-item', list) || $('#assign-new') });
 }
-$('#assign-cancel').addEventListener('click', () => $('#assign-modal').hidden = true);
-$('#assign-new').addEventListener('click', () => { $('#assign-modal').hidden = true; openGroupModal(assignContextIds); });
-
-function dismissModal(mod) { mod.hidden = true; }
-$$('.modal').forEach(mod => mod.addEventListener('click', e => { if (e.target === mod) dismissModal(mod); }));
+$('#assign-cancel').addEventListener('click', () => closeDialog('assign-modal'));
+$('#assign-new').addEventListener('click', () => {
+  const ids = assignContextIds.slice();
+  closeDialog('assign-modal');
+  openGroupModal(ids);
+});
+$('#assign-modal').addEventListener('close', () => { assignContextIds = []; });
+$('#group-modal').addEventListener('close', () => { assignContextIds = []; });
 
 /* ============================ SETTINGS ============================ */
 function syncSettingsUI() {
@@ -1956,25 +2017,53 @@ $('#lang-menu').addEventListener('keydown', e => {
 // roster (global)
 function renderRosterChips() {
   $('#roster-chips').innerHTML = roster.map((n, i) => `<span class="chip">${esc(n)}<span class="x" data-i="${i}">×</span></span>`).join('');
-  $$('#roster-chips .x').forEach(x => x.addEventListener('click', async () => { roster.splice(Number(x.dataset.i), 1); await store.saveRoster(roster); renderRosterChips(); }));
+  $$('#roster-chips .x').forEach(x => x.addEventListener('click', async () => {
+    const next = roster.filter((_, index) => index !== Number(x.dataset.i));
+    await store.saveRoster(next);
+    roster = next;
+    renderRosterChips();
+  }));
 }
 async function addRoster(name) {
   name = (name || '').trim(); if (!name) return;
-  if (!roster.some(n => n.toLowerCase() === name.toLowerCase())) roster.push(name);
-  await store.saveRoster(roster); renderRosterChips();
+  if (roster.some(n => n.toLowerCase() === name.toLowerCase())) return;
+  const next = [...roster, name];
+  await store.saveRoster(next);
+  roster = next;
+  renderRosterChips();
 }
-$('#roster-add').addEventListener('click', () => { addRoster($('#roster-input').value); $('#roster-input').value = ''; });
-$('#roster-input').addEventListener('keydown', e => { if (e.key === 'Enter') { addRoster($('#roster-input').value); $('#roster-input').value = ''; } });
-$('#roster-clear').addEventListener('click', async () => { roster = []; await store.saveRoster([]); renderRosterChips(); toast(t('rosterClearedToast')); });
-$('#roster-paste').addEventListener('click', () => { $('#paste-textarea').value = ''; $('#paste-modal').hidden = false; $('#paste-textarea').focus(); });
-$('#paste-cancel').addEventListener('click', () => $('#paste-modal').hidden = true);
+async function addRosterFromInput() {
+  const input = $('#roster-input');
+  await addRoster(input.value);
+  input.value = '';
+}
+$('#roster-add').addEventListener('click', addRosterFromInput);
+$('#roster-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); addRosterFromInput(); }
+});
+$('#roster-clear').addEventListener('click', async () => {
+  await store.saveRoster([]);
+  roster = [];
+  renderRosterChips();
+  toast(t('rosterClearedToast'));
+});
+$('#roster-paste').addEventListener('click', () => {
+  $('#paste-textarea').value = '';
+  openDialog($('#paste-modal'), { initialFocus: $('#paste-textarea') });
+});
+$('#paste-cancel').addEventListener('click', () => closeDialog('paste-modal'));
 $('#paste-add').addEventListener('click', async () => {
   const names = $('#paste-textarea').value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
-  for (const n of names) await addRoster(n);
-  $('#paste-modal').hidden = true;
+  const next = roster.slice();
+  names.forEach(name => {
+    if (!next.some(item => item.toLowerCase() === name.toLowerCase())) next.push(name);
+  });
+  await store.saveRoster(next);
+  roster = next;
+  renderRosterChips();
+  closeDialog('paste-modal');
   toast(names.length === 1 ? t('addedNamesOne') : t('addedNamesMany', { count: names.length }));
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(dismissModal); });
 
 // import
 function readTextFile(input, handler) {

@@ -687,6 +687,24 @@
   "groupColorLabel": {
     "message": "Kolor"
   },
+  "groupColorTeal": {
+    "message": "Turkusowy"
+  },
+  "groupColorAmber": {
+    "message": "Bursztynowy"
+  },
+  "groupColorViolet": {
+    "message": "Fioletowy"
+  },
+  "groupColorRose": {
+    "message": "Różowy"
+  },
+  "groupColorSky": {
+    "message": "Błękitny"
+  },
+  "groupColorLime": {
+    "message": "Limonkowy"
+  },
   "assignTitle": {
     "message": "Dodaj do cyklu"
   },
@@ -1329,6 +1347,9 @@
   },
   "savedToast": {
     "message": "Zapisano"
+  },
+  "storageFailureToast": {
+    "message": "Nie udało się odczytać ani zapisać danych lokalnych. Spróbuj ponownie."
   },
   "copiedToast": {
     "message": "Skopiowano do schowka"

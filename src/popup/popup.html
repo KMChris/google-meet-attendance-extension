@@ -15,37 +15,39 @@
         <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="var(--line-2)"/>
         <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="var(--late)"/>
       </svg>
-      <span class="name">Attendance<span class="sep">·</span>Tracker</span>
+      <h1 class="name">Attendance<span class="sep">·</span>Tracker</h1>
     </div>
     <span class="status status--info" id="pop-status">—</span>
   </header>
 
-  <div class="live-card" id="live-card">
-    <div class="live-main">
-      <div class="live-count" id="live-count">—</div>
-      <div class="live-label eyebrow" id="live-label" data-i18n="popupInThisCall"></div>
-    </div>
-    <button class="btn ghost" id="btn-export-live" hidden>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
-      <span data-i18n="popupExport"></span>
-    </button>
-  </div>
-
-  <div class="recent">
-    <div class="recent-head"><span class="eyebrow" data-i18n="popupRecent"></span>
-      <button class="link-btn" id="view-all">
-        <span data-i18n="popupViewAll"></span>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  <main class="pop-main">
+    <div class="live-card" id="live-card">
+      <div class="live-main">
+        <div class="live-count" id="live-count">—</div>
+        <div class="live-label eyebrow" id="live-label" data-i18n="popupInThisCall"></div>
+      </div>
+      <button class="btn ghost" id="btn-export-live" hidden>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+        <span data-i18n="popupExport"></span>
       </button>
     </div>
-    <div id="recent-list"></div>
-    <div class="recent-empty eyebrow" id="recent-empty" data-i18n="popupNoRecent" hidden></div>
-  </div>
 
-  <button class="btn block" id="open-dash">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 14.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5"/></svg>
-    <span data-i18n="popupOpenDashboard"></span>
-  </button>
+    <div class="recent">
+      <div class="recent-head"><h2 class="eyebrow" data-i18n="popupRecent"></h2>
+        <button class="link-btn" id="view-all">
+          <span data-i18n="popupViewAll"></span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div id="recent-list"></div>
+      <div class="recent-empty eyebrow" id="recent-empty" data-i18n="popupNoRecent" hidden></div>
+    </div>
+
+    <button class="btn block" id="open-dash">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 14.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5"/></svg>
+      <span data-i18n="popupOpenDashboard"></span>
+    </button>
+  </main>
 
   <script type="module" src="popup.js"></script>
 </body>

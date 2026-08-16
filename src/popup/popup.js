@@ -66,10 +66,10 @@ function renderRecent(history) {
     const state = A.meetingState(m);
     const tag = state === 'ended' ? '' :
       `<span class="live-tag${state === 'unfinished' ? ' warn' : ''}" title="${esc(t(state === 'live' ? 'liveNow' : 'unfinished'))}"><span class="pip"></span></span>`;
-    return `<div class="rec-item" data-id="${esc(m.id)}">
+    return `<button type="button" class="rec-item" data-id="${esc(m.id)}">
       <div class="rec-date"><span class="d">${d.getDate()}</span><span class="m">${esc(i18n.monthShort(d))}</span></div>
       <div class="rec-body"><div class="rec-head"><div class="rec-title">${esc(m.meetingTitle)}</div>${tag}</div><div class="rec-sub">${i18n.formatTime(startIso)}</div></div>
-      <div class="rec-count">${n}</div></div>`;
+      <div class="rec-count">${n}</div></button>`;
   }).join('');
   list.querySelectorAll('.rec-item').forEach(it => it.addEventListener('click', () => openDashboard('#meeting=' + encodeURIComponent(it.dataset.id))));
 }

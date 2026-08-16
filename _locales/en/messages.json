@@ -687,6 +687,24 @@
   "groupColorLabel": {
     "message": "Colour"
   },
+  "groupColorTeal": {
+    "message": "Teal"
+  },
+  "groupColorAmber": {
+    "message": "Amber"
+  },
+  "groupColorViolet": {
+    "message": "Violet"
+  },
+  "groupColorRose": {
+    "message": "Rose"
+  },
+  "groupColorSky": {
+    "message": "Sky blue"
+  },
+  "groupColorLime": {
+    "message": "Lime"
+  },
   "assignTitle": {
     "message": "Add to series"
   },
@@ -1329,6 +1347,9 @@
   },
   "savedToast": {
     "message": "Saved"
+  },
+  "storageFailureToast": {
+    "message": "Could not read or save local data. Try again."
   },
   "copiedToast": {
     "message": "Copied to clipboard"

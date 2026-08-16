@@ -1,5 +1,6 @@
 /* Attendance Tracker — popup (compact live view, built on ui.css) */
 .popup{width:330px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.pop-main{display:flex;flex-direction:column;gap:12px}
 
 .pop-head{display:flex;align-items:center;justify-content:space-between}
 .brand{display:flex;align-items:center;gap:8px}
@@ -20,8 +21,9 @@
 .link-btn svg{flex:none;opacity:.8}
 .recent-empty{padding:10px 2px;color:var(--ink-3)}
 
-.rec-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;
-  cursor:pointer;background:var(--panel);transition:border-color .12s,background .12s}
+.rec-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:1px solid var(--line);
+  border-radius:10px;cursor:pointer;background:var(--panel);color:inherit;font:inherit;text-align:left;
+  transition:border-color .12s,background .12s}
 .rec-item:hover{border-color:var(--line-2);background:var(--panel-2)}
 .rec-item + .rec-item{margin-top:6px}
 .rec-date{display:flex;flex-direction:column;align-items:center;justify-content:center;width:38px;height:38px;flex:none;

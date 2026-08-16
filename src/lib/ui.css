@@ -50,7 +50,7 @@
   --disp:'Space Grotesk',var(--sans);
   --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
 
-  --ink:#1a2320; --ink-2:#55635c; --ink-3:#8b978f;
+  --ink:#1a2320; --ink-2:#4f5d56; --ink-3:#65736b;
   --surface:#f4f6f4; --panel:#fff; --panel-2:#fbfcfb;
   --line:#e4e8e4; --line-2:#cfd6d0;
   --present:#1e7a4e; --present-2:#dcece2;
@@ -72,7 +72,7 @@
 /* dark tokens — shared by browser-preference (system) and the explicit toggle */
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --ink:#e7ede9; --ink-2:#9fb0a7; --ink-3:#6f8078;
+    --ink:#e7ede9; --ink-2:#aebdb5; --ink-3:#8f9f97;
     --surface:#0f1512; --panel:#161d19; --panel-2:#1b231f;
     --line:#26302b; --line-2:#37443d;
     --present:#4cbb84; --present-2:#16271e;
@@ -93,7 +93,7 @@
 :root.theme-swap *,:root.theme-swap *::before,:root.theme-swap *::after{transition:none!important}
 
 :root[data-theme="dark"]{
-  --ink:#e7ede9; --ink-2:#9fb0a7; --ink-3:#6f8078;
+  --ink:#e7ede9; --ink-2:#aebdb5; --ink-3:#8f9f97;
   --surface:#0f1512; --panel:#161d19; --panel-2:#1b231f;
   --line:#26302b; --line-2:#37443d;
   --present:#4cbb84; --present-2:#16271e;
@@ -126,7 +126,7 @@ a{color:var(--accent);text-decoration:none}
 .num{font-variant-numeric:tabular-nums}
 
 :where(button,input,select,textarea){font-family:inherit;font-size:inherit;color:inherit}
-:where(a,button,input,select,textarea):focus-visible{outline:none;box-shadow:var(--focus);border-radius:var(--radius-sm)}
+:where(a,button,input,select,textarea,[role="link"]):focus-visible{outline:none;box-shadow:var(--focus);border-radius:var(--radius-sm)}
 
 /* ------------------------------ buttons ----------------------------- */
 .btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;

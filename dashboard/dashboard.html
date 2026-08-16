@@ -607,11 +607,11 @@
   </main>
 
   <!-- toast + modals -->
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <div class="modal" id="paste-modal" hidden>
+  <dialog class="modal" id="paste-modal" aria-labelledby="paste-modal-title">
     <div class="modal-card card">
-      <h2 data-i18n="rosterPasteTitle"></h2>
+      <h2 id="paste-modal-title" data-i18n="rosterPasteTitle"></h2>
       <p class="hint" data-i18n="rosterPasteHint"></p>
       <textarea class="field" id="paste-textarea" rows="7" data-i18n-placeholder="rosterPastePlaceholder" data-i18n-aria="rosterPasteTitle"></textarea>
       <div class="modal-actions">
@@ -622,9 +622,9 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div class="modal" id="group-modal" hidden>
+  <dialog class="modal" id="group-modal" aria-labelledby="group-modal-title">
     <div class="modal-card card">
       <h2 id="group-modal-title" data-i18n="createGroupTitle"></h2>
       <label class="modal-label" for="group-modal-name" data-i18n="groupNameLabel"></label>
@@ -639,11 +639,11 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div class="modal" id="schedule-modal" hidden>
+  <dialog class="modal" id="schedule-modal" aria-labelledby="schedule-modal-title">
     <div class="modal-card card">
-      <h2 data-i18n="scheduleTitle"></h2>
+      <h2 id="schedule-modal-title" data-i18n="scheduleTitle"></h2>
       <p class="hint" data-i18n="scheduleHint"></p>
       <div class="sched-grid">
         <div>
@@ -668,11 +668,11 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div class="modal" id="participant-modal" hidden>
+  <dialog class="modal" id="participant-modal" aria-labelledby="participant-modal-title">
     <div class="modal-card card">
-      <h2 data-i18n="editParticipantTitle"></h2>
+      <h2 id="participant-modal-title" data-i18n="editParticipantTitle"></h2>
       <p class="hint" data-i18n="editParticipantHint"></p>
       <label class="modal-label" for="participant-name" data-i18n="participantNameLabel"></label>
       <input class="field" id="participant-name" autocomplete="off" spellcheck="false">
@@ -705,11 +705,11 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div class="modal" id="assign-modal" hidden>
+  <dialog class="modal" id="assign-modal" aria-labelledby="assign-modal-title">
     <div class="modal-card card">
-      <h2 data-i18n="assignTitle"></h2>
+      <h2 id="assign-modal-title" data-i18n="assignTitle"></h2>
       <div class="assign-list" id="assign-list"></div>
       <div class="modal-actions">
         <button class="btn subtle" id="assign-cancel" data-i18n="cancel"></button>
@@ -719,12 +719,12 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- the other way round from the meeting's own badge: pick what belongs to this series -->
-  <div class="modal" id="pick-meetings-modal" hidden>
+  <dialog class="modal" id="pick-meetings-modal" aria-labelledby="pick-meetings-modal-title">
     <div class="modal-card card">
-      <h2 data-i18n="pickMeetingsTitle"></h2>
+      <h2 id="pick-meetings-modal-title" data-i18n="pickMeetingsTitle"></h2>
       <p class="hint" data-i18n="pickMeetingsHint"></p>
       <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="field" id="pick-meetings-search" data-i18n-placeholder="searchMeetings" data-i18n-aria="searchMeetings"></div>
       <div class="pick-list" id="pick-meetings-list"></div>
@@ -736,7 +736,7 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
 </div>
 <script type="module" src="dashboard.js"></script>
