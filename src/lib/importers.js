@@ -7,8 +7,10 @@
  * merging into history, normalizing, rendering — is the same path a backup of our own takes, so
  * an importer only has to answer one question: what are the raw joins and leaves?
  *
- * Adding a foreign source means adding an entry to IMPORT_SOURCES with a `convert(raw)` that
- * throws ImportFormatError when the file plainly isn't its format.
+ * Adding a foreign source means adding an entry to IMPORT_SOURCES with a `convert` that throws
+ * ImportFormatError when the file plainly isn't its format. `kind` says what convert is handed:
+ * a 'json' source gets the parsed backup, a 'csv' source gets the raw text and the file's name
+ * (some exports keep the meeting's day only there).
  *
  * Pure: no chrome.* here, same as attendance.js.
  */
@@ -338,10 +340,105 @@ export function fromOwnCSV(text) {
   return { meetings, skipped };
 }
 
+/* ============================ Trackr (newbigtools.com) ============================ */
+
+/**
+ * Trackr writes one CSV per meeting and day: a "Name","Joined at","Left at","Time in call",
+ * "Status" header, then a row per participant holding clock times only. Neither the meeting's
+ * code nor its day appears anywhere inside the file — both live in the file name
+ * ("Meet---abc-defg-hij-2026-08-16.csv") — which is why this converter is handed the name too,
+ * and refuses a file whose name has lost the day: without it the clocks anchor to nothing.
+ *
+ * A row records one join and one leave and nothing in between, so the participant is taken at
+ * the file's word: present for the whole stretch. The leave is pinned at join + "Time in call",
+ * the only figure Trackr keeps to the second; the minute-resolution "Left at" is the fallback,
+ * read as past midnight when it comes out earlier than the join. A row with no leave at all is
+ * someone still in the call when the file was written.
+ */
+const TRACKR_HEADER = new Map([
+  ['name', 'name'], ['joined at', 'joined'], ['left at', 'left'], ['time in call', 'duration']
+]);
+const TRACKR_DAY_RE = /\d{4}-\d{2}-\d{2}/;
+const TRACKR_CODE_RE = /(?<![a-z])[a-z]{3}-[a-z]{4}-[a-z]{3}(?![a-z])/i;
+const TRACKR_DURATION_RE = /^(\d{1,3}):(\d{2}):(\d{2})$/;
+
+function fromTrackr(text, fileName) {
+  const rows = parseCSV(text);
+
+  let cols = null, first = -1;
+  for (let i = 0; i < rows.length && !cols; i++) {
+    const map = {};
+    rows[i].forEach((cell, idx) => {
+      const key = TRACKR_HEADER.get(String(cell).trim().toLowerCase());
+      if (key && map[key] == null) map[key] = idx;
+    });
+    if (map.name != null && map.joined != null) { cols = map; first = i + 1; }
+  }
+  if (!cols) throw new ImportFormatError('no "Name"/"Joined at" header');
+
+  const day = (TRACKR_DAY_RE.exec(String(fileName == null ? '' : fileName)) || [])[0];
+  if (!day) throw new ImportFormatError('no meeting day in the file name');
+  const codeMatch = TRACKR_CODE_RE.exec(String(fileName));
+  const code = codeMatch ? codeMatch[0].toLowerCase() : null;
+
+  const byName = new Map();
+  let skipped = 0;
+
+  for (let i = first; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row.length || row.every(c => !String(c).trim())) continue;
+    const get = key => (cols[key] == null || row[cols[key]] == null ? '' : String(row[cols[key]]).trim());
+
+    const name = get('name');
+    const joined = localMs(day, get('joined'));
+    if (!name || Number.isNaN(joined)) { skipped++; continue; }
+
+    const events = [{ time: new Date(joined).toISOString(), type: 'Join' }];
+    let left = localMs(day, get('left'));
+    if (!Number.isNaN(left)) {
+      const dur = TRACKR_DURATION_RE.exec(get('duration'));
+      if (dur) left = joined + ((Number(dur[1]) * 60 + Number(dur[2])) * 60 + Number(dur[3])) * 1000;
+      else if (left < joined) left = localMs(day, get('left'), 1);
+      events.push({ time: new Date(left).toISOString(), type: 'Leave' });
+    }
+    byName.set(name, (byName.get(name) || []).concat(events));
+  }
+
+  if (!byName.size) throw new ImportFormatError('no participants');
+
+  const attendance = {};
+  for (const name of Array.from(byName.keys()).sort((a, b) => a.localeCompare(b))) {
+    attendance[name] = deriveAttendee({
+      email: null,
+      events: byName.get(name).sort((a, b) => ms(a.time) - ms(b.time))
+    });
+  }
+
+  const names = Object.keys(attendance);
+  const times = names.flatMap(n => attendance[n].events.map(ev => ms(ev.time)));
+  const startMs = Math.min(...times);
+  const endMs = Math.max(...times);
+  const stillIn = names.some(n => attendance[n].present);
+
+  return {
+    meetings: [{
+      id: makeSessionId(code, startMs),
+      meetingCode: isMeetCode(code) ? code : null,
+      date: new Date(startMs).toISOString(),
+      endedAt: stillIn ? null : new Date(endMs).toISOString(),
+      meetingTitle: code || day,
+      url: isMeetCode(code) ? `https://meet.google.com/${code}` : '',
+      attendance
+    }],
+    skipped
+  };
+}
+
 /* ============================ registry ============================ */
 
 export const IMPORT_SOURCES = [
-  { id: 'rollcall', label: 'RollCall — meet-attendance.com', convert: fromRollCall }
+  { id: 'rollcall', label: 'RollCall — meet-attendance.com', kind: 'json', convert: fromRollCall },
+  { id: 'trackr', label: 'Trackr — newbigtools.com', kind: 'csv', convert: fromTrackr }
 ];
 
 export function getImportSource(id) {

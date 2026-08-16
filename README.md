@@ -17,7 +17,7 @@ every time they left and rejoined.
 - **Editable participants**: fix a scraped display name, or merge two Meet identities into one person — and split them apart again later
 - **Batch actions**: click a meeting's date badge or a person's avatar to select it, then act on the whole selection — add meetings to a series, export or delete them, merge participants, or add people to a roster
 - **Exports**: per-meeting CSV, series CSV (matrix *and* per-session detail), combined CSV, JSON backup, clipboard, and detailed **technical PDF reports** for a single meeting or a whole series. A large series stays scrollable on screen and is split into readable session chunks on paper
-- **Imports**: a JSON backup, a CSV this extension wrote, or a backup from another attendance extension (RollCall / meet-attendance.com) — always merged, never replacing what is already stored
+- **Imports**: a JSON backup, a CSV this extension wrote, or an export from another attendance extension (RollCall / meet-attendance.com, Trackr / newbigtools.com) — always merged, never replacing what is already stored
 - **Dark mode**: Follows the browser's light/dark preference, with a System / Light / Dark override in Settings
 - **Localized**: Full English + Polish interface (auto-detected, switchable in Settings)
 - **Local Storage**: Local data storage using the Chrome Storage API
@@ -95,8 +95,11 @@ matched to an existing series or creates one. What CSV cannot carry: times are m
 (so totals can come back up to a minute per session higher), absentees are roster-derived rather
 than data and are skipped, and a merged participant arrives as the one person the file shows.
 
-Settings → **Import from another app** converts a backup written by a different attendance
-extension — currently RollCall (meet-attendance.com) — and merges it in the same way.
+Settings → **Import from another app** converts a file written by a different attendance
+extension and merges it in the same way. Currently: RollCall (meet-attendance.com) JSON backups,
+and Trackr (newbigtools.com) per-meeting CSVs — a Trackr row holds only a join and a leave, so
+the person is read as present for the whole stretch between, and the meeting's day and code are
+taken from the file's own name (`Meet---abc-defg-hij-2026-08-16.csv`), so don't rename it first.
 
 ### Google Sheets Integration (Optional)
 

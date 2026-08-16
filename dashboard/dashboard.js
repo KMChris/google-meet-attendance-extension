@@ -2071,7 +2071,7 @@ function readTextFile(input, handler) {
     const file = e.target.files && e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      Promise.resolve(handler(String(reader.result || '')))
+      Promise.resolve(handler(String(reader.result || ''), file.name))
         .catch(err => { console.error('[GM Attendance] import failed:', (err && err.message) || err); toast(t('importInvalid')); });
     };
     reader.readAsText(file); e.target.value = '';
@@ -2126,12 +2126,17 @@ readTextFile($('#import-file'), async text => {
 });
 
 // import from another attendance extension — the file is converted first, then merged as above
+const chosenImportSource = () => importers.getImportSource($('#import-source').value) || importers.IMPORT_SOURCES[0];
 $('#import-source').innerHTML = importers.IMPORT_SOURCES.map(s => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
-$('#btn-import-app').addEventListener('click', () => $('#import-app-file').click());
-readTextFile($('#import-app-file'), async text => {
-  const source = importers.getImportSource($('#import-source').value) || importers.IMPORT_SOURCES[0];
+$('#btn-import-app').addEventListener('click', () => {
+  const input = $('#import-app-file');
+  input.accept = chosenImportSource().kind === 'csv' ? 'text/csv,.csv' : 'application/json,.json';
+  input.click();
+});
+readTextFile($('#import-app-file'), async (text, fileName) => {
+  const source = chosenImportSource();
   let converted;
-  try { converted = source.convert(JSON.parse(text)); }
+  try { converted = source.kind === 'csv' ? source.convert(text, fileName) : source.convert(JSON.parse(text)); }
   catch { toast(t('importSourceInvalid', { source: source.label })); return; }
 
   const added = await mergeImportedMeetings(converted.meetings);
