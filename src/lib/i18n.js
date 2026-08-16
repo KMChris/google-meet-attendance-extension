@@ -49,9 +49,11 @@ const listeners = new Set();
 
 /** locale code -> parsed messages.json ({ key: { message, placeholders? } }). */
 const catalogues = new Map();
+const catalogueLoads = new Map();
 
 let preference = AUTO; // 'auto' | 'en' | 'pl' — the user's choice ('auto' follows the browser)
 let locale = DEFAULT;  // resolved 'en' | 'pl' currently in use
+let localeQueue = Promise.resolve();
 
 function normalize(code) {
   if (!code) return null;
@@ -71,17 +73,26 @@ export function localeTag() { return locale === 'pl' ? 'pl-PL' : 'en-GB'; }
 async function loadCatalogue(code) {
   const cached = catalogues.get(code);
   if (cached) return cached;
-  try {
-    const res = await fetch(chrome.runtime.getURL(`_locales/${code}/messages.json`));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const messages = await res.json();
-    catalogues.set(code, messages);
-    return messages;
-  } catch (err) {
-    console.warn(`[GM Attendance] could not load _locales/${code}/messages.json:`, err);
-    catalogues.set(code, {});
-    return {};
-  }
+  const pending = catalogueLoads.get(code);
+  if (pending) return pending;
+
+  const load = (async () => {
+    try {
+      const res = await fetch(chrome.runtime.getURL(`_locales/${code}/messages.json`));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const messages = await res.json();
+      catalogues.set(code, messages);
+      return messages;
+    } catch (err) {
+      console.warn(`[GM Attendance] could not load _locales/${code}/messages.json:`, err);
+      catalogues.set(code, {});
+      return {};
+    } finally {
+      catalogueLoads.delete(code);
+    }
+  })();
+  catalogueLoads.set(code, load);
+  return load;
 }
 
 /**
@@ -144,30 +155,55 @@ function readStored() {
   });
 }
 
-/** Load the stored (or browser) locale and apply it. Call once per page, before t(). */
-export async function initI18n() {
-  const stored = await readStored();
-  preference = (stored === 'en' || stored === 'pl') ? stored : AUTO;
-  locale = resolveLocale(preference);
-  await Promise.all([loadCatalogue(locale), loadCatalogue(DEFAULT)]);
+function enqueueLocaleTransition(run) {
+  const result = localeQueue.then(run, run);
+  localeQueue = result.catch(() => {});
+  return result;
+}
+
+function normalizePreference(code) {
+  return (code === 'en' || code === 'pl') ? code : AUTO;
+}
+
+async function persistPreference(requested) {
+  try {
+    if (requested === AUTO) await chrome.storage.sync.remove(STORAGE_KEY);
+    else await chrome.storage.sync.set({ [STORAGE_KEY]: requested });
+  } catch { /* sync unavailable; the in-memory selection still applies */ }
+}
+
+async function applyLocale(requested) {
+  preference = requested;
+  await persistPreference(requested);
+  const next = resolveLocale(requested);
+  await loadCatalogue(next);
+
+  const changed = next !== locale;
+  locale = next;
   applyI18n(document);
-  return locale;
+  if (changed) {
+    listeners.forEach(cb => { try { cb(next); } catch (e) { console.warn(e); } });
+    document.dispatchEvent(new CustomEvent('rollcall:locale', { detail: next }));
+  }
+  return next;
+}
+
+/** Load the stored (or browser) locale and apply it. Call once per page, before t(). */
+export function initI18n() {
+  return enqueueLocaleTransition(async () => {
+    const stored = await readStored();
+    preference = normalizePreference(stored);
+    locale = resolveLocale(preference);
+    await Promise.all([loadCatalogue(locale), loadCatalogue(DEFAULT)]);
+    applyI18n(document);
+    return locale;
+  });
 }
 
 /** Set the language preference ('auto' | 'en' | 'pl'), persist, re-apply, and notify listeners. */
-export async function setLocale(code) {
-  preference = (code === 'en' || code === 'pl') ? code : AUTO;
-  try {
-    if (preference === AUTO) chrome.storage.sync.remove(STORAGE_KEY);
-    else chrome.storage.sync.set({ [STORAGE_KEY]: preference });
-  } catch { /* sync unavailable */ }
-  const next = resolveLocale(preference);
-  if (next === locale) return;
-  await loadCatalogue(next);
-  locale = next;
-  applyI18n(document);
-  listeners.forEach(cb => { try { cb(next); } catch (e) { console.warn(e); } });
-  document.dispatchEvent(new CustomEvent('rollcall:locale', { detail: next }));
+export function setLocale(code) {
+  const requested = normalizePreference(code);
+  return enqueueLocaleTransition(() => applyLocale(requested));
 }
 
 /* ---- locale-aware formatting ---- */
