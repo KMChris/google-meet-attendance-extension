@@ -23,6 +23,7 @@ import {
   annotateMerges, adoptMergeAnnotations, lastActivityMs, hasEventsAfter, closeOpenEvents,
   deriveAttendee, isMeetCode, RESUME_WINDOW_MS, REJOIN_WINDOW_MS
 } from './attendance.js';
+import { withExclusiveLock } from './locks.js';
 
 export const STORAGE_KEYS = {
   HISTORY: 'attendanceHistory',
@@ -51,17 +52,57 @@ export const DEFAULT_SETTINGS = {
 
 /* ============================ generic ============================ */
 
-export function get(key) {
-  return new Promise((resolve) => chrome.storage.local.get([key], (r) => resolve(r[key])));
+const STORAGE_LOCK = 'gm-attendance-storage-v1';
+const withStorageMutation = task => withExclusiveLock(STORAGE_LOCK, task);
+
+function keyList(keys) {
+  return (Array.isArray(keys) ? keys : Object.keys(keys || {})).join(', ');
+}
+
+export class StorageReadError extends Error {
+  constructor(keys, message) {
+    super(`Could not read local storage (${keyList(keys)}): ${message || 'unknown error'}`);
+    this.name = 'StorageReadError';
+  }
+}
+
+export class StorageWriteError extends Error {
+  constructor(keys, message) {
+    super(`Could not write local storage (${keyList(keys)}): ${message || 'unknown error'}`);
+    this.name = 'StorageWriteError';
+  }
+}
+
+function runtimeError() {
+  try {
+    return chrome.runtime && chrome.runtime.lastError;
+  } catch (error) {
+    return error;
+  }
+}
+
+export async function get(key) {
+  const values = await getMany([key]);
+  return values[key];
 }
 export function set(key, value) {
-  return setMany({ [key]: value });
+  return withStorageMutation(() => setMany({ [key]: value }));
 }
 export function remove(key) {
-  return new Promise((resolve) => chrome.storage.local.remove([key], resolve));
+  return withStorageMutation(() => new Promise((resolve, reject) => {
+    chrome.storage.local.remove([key], () => {
+      const error = runtimeError();
+      if (error) reject(new StorageWriteError([key], error.message));
+      else resolve();
+    });
+  }));
 }
 function getMany(keys) {
-  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+  return new Promise((resolve, reject) => chrome.storage.local.get(keys, values => {
+    const error = runtimeError();
+    if (error) reject(new StorageReadError(keys, error.message));
+    else resolve(values || {});
+  }));
 }
 
 /**
@@ -74,10 +115,10 @@ function getMany(keys) {
  * should not have to be guessed at.
  */
 function setMany(obj) {
-  return new Promise((resolve) => chrome.storage.local.set(obj, () => {
-    const err = chrome.runtime && chrome.runtime.lastError;
-    if (err) console.error('[GM Attendance] the store refused a write:', err.message, '·', Object.keys(obj).join(', '));
-    resolve();
+  return new Promise((resolve, reject) => chrome.storage.local.set(obj, () => {
+    const error = runtimeError();
+    if (error) reject(new StorageWriteError(obj, error.message));
+    else resolve();
   }));
 }
 
@@ -93,126 +134,33 @@ export async function getHistory() {
 }
 
 export async function saveHistory(history) {
-  await setMany({ [STORAGE_KEYS.HISTORY]: history, [STORAGE_KEYS.HISTORY_REV]: uid('rev') });
-  return history;
+  return withStorageMutation(async () => {
+    await setMany({ [STORAGE_KEYS.HISTORY]: history, [STORAGE_KEYS.HISTORY_REV]: uid('rev') });
+    return history;
+  });
 }
 
-/** How many times a change is worked out again before it is written over what is there. */
-const MUTATE_ATTEMPTS = 6;
-/** How far a repair will chase a change that keeps being written over. */
-const REPAIR_DEPTH = 3;
-
 /**
- * The two lists more than one context writes to, each with the stamp that says which version of
- * it a write was worked out from. The trash is one of them because a meeting only ever moves
- * between the two: a deletion that loses its race writes the record out of the register and never
- * into the trash, which is the one way this store can drop a meeting for good.
+ * The two lists more than one context writes to, each with a diagnostic revision stamp.
  */
 const HISTORY = { list: STORAGE_KEYS.HISTORY, rev: STORAGE_KEYS.HISTORY_REV };
 const TRASH = { list: STORAGE_KEYS.TRASH, rev: STORAGE_KEYS.TRASH_REV };
 
 /**
- * Every change to either list goes through here.
- *
- * The dashboard, the report page and the worker all write to one key, and Chrome gives none of
- * them a way to hold it still while a change is worked out: two reading the same array and writing
- * it back a moment apart lose whichever wrote first, and with it a rename or a merge that nothing
- * will ever report again. There is no way to write a key only if it has not moved, so this is done
- * in two parts, and the second is what makes it sound:
- *
- *   before writing — the revision is read again, and a change worked out from a list that has
- *     since moved is worked out again on what is there now. Cheap, and it catches the slow cases:
- *     anything that read the store, went away to settings or the trash, and came back.
- *   after writing — Chrome says what each write replaced. A write that turns out to have gone over
- *     a revision this context never saw puts that revision back and applies its own change on top,
- *     so the store passes through a moment holding one of the two and settles holding both.
- *
- * Two writers at once is what that settles, which is the case there is: the worker recording a
- * call, and a page the user is editing it from. A third landing in the same instant can still cost
- * one of the three its change — one, as it would have cost before, and never the list itself.
- *
- * `change` is handed the stored array to edit in place or to replace, and returns
- * `{ list?, save?, value }`; `value` is what the caller gets back, and `save: false` says it
- * found nothing to do. It is run again for every one of the above, so it must decide everything
- * from the array it is given and keep nothing between runs. `save: false` also has to mean it
- * left the array alone: a repair that says so is answered by writing back the array it was handed,
- * which is the other context's, and an edit made on the way to saying "nothing to do" would ride
- * along with it.
+ * Run one list mutation after this extension origin owns the storage lock. `change` receives a
+ * fresh cloned array from Chrome and returns `{ list?, save?, value }`.
  */
-async function mutate(reg, change, resume = null, depth = 0) {
-  let base = resume;   // the array to work from, and the revision it stands for
-  let restoring = resume != null;   // this run is putting back what a write of ours went over
-  for (let attempt = 1; ; attempt++) {
-    if (!base) {
-      restoring = false;            // read afresh: there is nothing of ours left to put back
-      const stored = await getMany([reg.list, reg.rev]);
-      base = {
-        list: Array.isArray(stored[reg.list]) ? stored[reg.list] : [],
-        rev: stored[reg.rev]
-      };
-    }
-
-    const { list = base.list, save = true, value } = (await change(base.list)) || {};
-    // A repair that finds nothing of its own left to do still has to write: what stands in the
-    // store is our own write, and it went over the list being handed back here. Returning at this
-    // point would leave the other context's change buried under a change that no longer needs it.
-    if (!save && !restoring) return value;
-
-    const rev = await get(reg.rev);
-    if (rev !== base.rev && attempt < MUTATE_ATTEMPTS) { base = null; continue; }
-
-    await writeList(reg, list, base.rev, change, depth);
-    return value;
-  }
+async function mutateUnlocked(reg, change) {
+  const stored = await getMany([reg.list, reg.rev]);
+  const current = Array.isArray(stored[reg.list]) ? stored[reg.list] : [];
+  const { list = current, save = true, value } = (await change(current)) || {};
+  if (!save) return value;
+  await setMany({ [reg.list]: list, [reg.rev]: uid('rev') });
+  return value;
 }
 
-const mutateHistory = (change, resume, depth) => mutate(HISTORY, change, resume, depth);
-const mutateTrash = (change) => mutate(TRASH, change);
-
-/**
- * What each write of ours replaced, kept by the revision the write carried so that only our own
- * writes are answered for. Notifications this context cannot have (no `storage.onChanged` to
- * listen to) leave entries nothing consumes, so the oldest are dropped: without the report there
- * is nothing to repair, which is how this behaved before there was one.
- */
-const inFlight = new Map();
-const IN_FLIGHT_MAX = 50;
-let watching = false;
-
-function watchWrites() {
-  if (watching) return;
-  watching = true;
-  try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') return;
-      for (const reg of [HISTORY, TRASH]) {
-        const rev = changes[reg.rev];
-        if (!rev || !inFlight.has(rev.newValue)) continue;
-        const ours = inFlight.get(rev.newValue);
-        inFlight.delete(rev.newValue);
-
-        const went = (changes[reg.list] || {}).oldValue;
-        if (rev.oldValue === ours.expected || !Array.isArray(went) || ours.depth >= REPAIR_DEPTH) continue;
-        mutate(reg, ours.change, { list: went, rev: rev.newValue }, ours.depth + 1)
-          .catch(err => console.warn('[GM Attendance] could not put a change back:', err));
-      }
-    });
-  } catch (err) {
-    watching = false;   // nothing to listen to here; the write below still lands
-  }
-}
-
-/** Write, and leave word to check what the write went over. */
-async function writeList(reg, list, expected, change, depth) {
-  watchWrites();
-  const token = uid('rev');
-  if (watching) {
-    inFlight.set(token, { expected, change, depth });
-    if (inFlight.size > IN_FLIGHT_MAX) inFlight.delete(inFlight.keys().next().value);
-  }
-  await setMany({ [reg.list]: list, [reg.rev]: token });
-  return list;
-}
+const mutateHistory = change => withStorageMutation(() => mutateUnlocked(HISTORY, change));
+const mutateTrash = change => withStorageMutation(() => mutateUnlocked(TRASH, change));
 
 export async function getMeetingById(id) {
   return (await getHistory()).find(m => m.id === id) || null;
@@ -228,42 +176,45 @@ export async function getMeetingById(id) {
  * the merged view back — it is what the badge counts and what Sheets should receive.
  */
 export async function upsertMeeting(record) {
-  const settings = await getSettings();
+  return withStorageMutation(async () => {
+    const settings = await getSettings();
+    const { merged, fresh } = await mutateUnlocked(HISTORY, history => {
+      const idx = history.findIndex(m => m.id === record.id);
 
-  const { merged, fresh } = await mutateHistory(history => {
-    const idx = history.findIndex(m => m.id === record.id);
+      const nameMap = record.nameMap || (idx >= 0 && history[idx].nameMap) || null;
+      const toStore = (nameMap && Object.keys(nameMap).length) ? { ...record, nameMap } : record;
 
-    const nameMap = record.nameMap || (idx >= 0 && history[idx].nameMap) || null;
-    const toStore = (nameMap && Object.keys(nameMap).length) ? { ...record, nameMap } : record;
+      const next = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
+      // A name given by hand stays given. The tracker holds the title it scraped when the call
+      // opened and writes it again every few seconds, which would otherwise take a rename back.
+      if (idx >= 0 && history[idx].titleEdited) next.meetingTitle = history[idx].meetingTitle;
+      // Nor does a placeholder take a name back. A tab that landed on the call before Meet put the
+      // calendar event in its title holds the bare code and writes it on every scan, and a second
+      // tab on the same call holds whatever it was told when it opened.
+      if (idx >= 0 && isPlaceholderName(next, next.meetingTitle) && !isPlaceholderName(next, history[idx].meetingTitle)) {
+        next.meetingTitle = history[idx].meetingTitle;
+      }
+      // An end is only undone by a write that carries something later than it. A scan still in
+      // flight when the meeting finished must not reopen a completed record.
+      if (idx >= 0 && history[idx].endedAt && !next.endedAt && !hasEventsAfter(record, history[idx].endedAt)) {
+        next.endedAt = history[idx].endedAt;
+      }
+      if (idx >= 0) history[idx] = next; else history.push(next);
 
-    const next = idx >= 0 ? { ...history[idx], ...toStore } : toStore;
-    // A name given by hand stays given. The tracker holds the title it scraped when the call
-    // opened and writes it again every few seconds, which would otherwise take a rename back.
-    if (idx >= 0 && history[idx].titleEdited) next.meetingTitle = history[idx].meetingTitle;
-    // Nor does a placeholder take a name back. A tab that landed on the call before Meet put the
-    // calendar event in its title holds the bare code and writes it on every scan, and a second
-    // tab on the same call holds whatever it was told when it opened.
-    if (idx >= 0 && isPlaceholderName(next, next.meetingTitle) && !isPlaceholderName(next, history[idx].meetingTitle)) {
-      next.meetingTitle = history[idx].meetingTitle;
+      history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+      return { list: capped(history, settings), value: { merged: next, fresh: idx < 0 } };
+    });
+
+    // A deleted call that is genuinely rejoined is active again. Keep this inside the same lock
+    // so another trash mutation cannot land between the history write and this cleanup.
+    if (fresh) {
+      await mutateUnlocked(TRASH, trash => {
+        const kept = trash.filter(m => m.id !== record.id);
+        return { list: kept, save: kept.length !== trash.length };
+      });
     }
-    // An end is only undone by a write that carries something later than it — the call coming back
-    // after a reload, which is a rejoin somebody records. A scan still in flight when the meeting
-    // finished reports nothing newer than the end, and reopening the record on it would leave a
-    // finished call reading as one nobody ever ended.
-    if (idx >= 0 && history[idx].endedAt && !next.endedAt && !hasEventsAfter(record, history[idx].endedAt)) {
-      next.endedAt = history[idx].endedAt;
-    }
-    if (idx >= 0) history[idx] = next; else history.push(next);
-
-    history.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-
-    return { list: capped(history, settings), value: { merged: next, fresh: idx < 0 } };
+    return normalizeMeeting(merged);
   });
-
-  // a call thrown away and then rejoined is alive again, so it leaves the trash behind. Only
-  // worth a look when the record is new here — during a call this runs every few seconds.
-  if (fresh) await purgeMeetings([record.id]);
-  return normalizeMeeting(merged);
 }
 
 /** The newest `maxStoredMeetings` of them (0 = unlimited — keep every meeting). */
@@ -277,10 +228,12 @@ function capped(history, settings) {
  * has been holding while a call was recorded into it.
  */
 export async function trimHistoryToCap() {
-  const settings = await getSettings();
-  return mutateHistory(history => {
-    const next = capped(history, settings);
-    return { list: next, save: next.length !== history.length, value: history.length - next.length };
+  return withStorageMutation(async () => {
+    const settings = await getSettings();
+    return mutateUnlocked(HISTORY, history => {
+      const next = capped(history, settings);
+      return { list: next, save: next.length !== history.length, value: history.length - next.length };
+    });
   });
 }
 
@@ -384,39 +337,54 @@ export async function getTrash() {
   return Array.isArray(t) ? t : [];
 }
 
-/**
- * A deletion is two writes, and the second is the one that must not be lost: the record leaves the
- * register first and only then arrives in the trash, so a write that goes over somebody else's
- * (the worker sweeping what has expired, a second page emptying it) would drop the meeting out of
- * both. Both halves go through the guarded write, which is why the trash carries a revision too.
- */
 export async function deleteMeetingById(id) {
-  const record = await mutateHistory(history => {
-    const found = history.find(m => m.id === id) || null;
-    return { list: found ? history.filter(m => m.id !== id) : history, save: !!found, value: found };
+  return withStorageMutation(async () => {
+    const stored = await getMany([
+      STORAGE_KEYS.HISTORY, STORAGE_KEYS.HISTORY_REV,
+      STORAGE_KEYS.TRASH, STORAGE_KEYS.TRASH_REV
+    ]);
+    const history = Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [];
+    const trash = Array.isArray(stored[STORAGE_KEYS.TRASH]) ? stored[STORAGE_KEYS.TRASH] : [];
+    const record = history.find(m => m.id === id) || null;
+    if (!record) return false;
+
+    await setMany({
+      [STORAGE_KEYS.HISTORY]: history.filter(m => m.id !== id),
+      [STORAGE_KEYS.HISTORY_REV]: uid('rev'),
+      [STORAGE_KEYS.TRASH]: [
+        { ...record, deletedAt: new Date().toISOString() },
+        ...trash.filter(m => m.id !== id)
+      ],
+      [STORAGE_KEYS.TRASH_REV]: uid('rev')
+    });
+    return true;
   });
-  if (!record) return false;
-  await mutateTrash(trash => ({
-    list: [{ ...record, deletedAt: new Date().toISOString() }, ...trash.filter(m => m.id !== id)],
-    value: true
-  }));
-  return true;
 }
 
 /** Back into the history, newest-first as the list expects it. */
 export async function restoreMeetings(ids) {
   const wanted = new Set(ids);
-  const coming = await mutateTrash(trash => {
-    const found = trash.filter(m => wanted.has(m.id));
-    return { list: trash.filter(m => !wanted.has(m.id)), save: found.length > 0, value: found };
+  if (!wanted.size) return 0;
+  return withStorageMutation(async () => {
+    const stored = await getMany([
+      STORAGE_KEYS.HISTORY, STORAGE_KEYS.HISTORY_REV,
+      STORAGE_KEYS.TRASH, STORAGE_KEYS.TRASH_REV
+    ]);
+    const history = Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [];
+    const trash = Array.isArray(stored[STORAGE_KEYS.TRASH]) ? stored[STORAGE_KEYS.TRASH] : [];
+    const coming = trash.filter(m => wanted.has(m.id));
+    if (!coming.length) return 0;
+    const restored = coming.map(({ deletedAt, ...record }) => record);
+
+    await setMany({
+      [STORAGE_KEYS.HISTORY]: restored.concat(history.filter(m => !wanted.has(m.id)))
+        .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
+      [STORAGE_KEYS.HISTORY_REV]: uid('rev'),
+      [STORAGE_KEYS.TRASH]: trash.filter(m => !wanted.has(m.id)),
+      [STORAGE_KEYS.TRASH_REV]: uid('rev')
+    });
+    return restored.length;
   });
-  if (!coming.length) return 0;
-  const restored = coming.map(({ deletedAt, ...rec }) => rec);
-  return mutateHistory(history => ({
-    list: restored.concat(history.filter(m => !wanted.has(m.id)))
-      .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
-    value: restored.length
-  }));
 }
 
 /** Out of the trash for good. */
@@ -437,13 +405,15 @@ export async function emptyTrash() {
  * the worker wakes, which is often enough for a window measured in days.
  */
 export async function purgeExpiredTrash(now = Date.now()) {
-  const days = Number((await getSettings()).trashRetentionDays);
-  if (!(days > 0)) return 0;
-  const cutoff = now - days * 86400000;
-  return mutateTrash(trash => {
-    // an unreadable timestamp is treated as "just deleted" rather than silently dropped
-    const kept = trash.filter(m => (Date.parse(m.deletedAt) || now) > cutoff);
-    return { list: kept, save: kept.length !== trash.length, value: trash.length - kept.length };
+  return withStorageMutation(async () => {
+    const days = Number((await getSettings()).trashRetentionDays);
+    if (!(days > 0)) return 0;
+    const cutoff = now - days * 86400000;
+    return mutateUnlocked(TRASH, trash => {
+      // An unreadable timestamp is treated as just deleted rather than silently dropped.
+      const kept = trash.filter(m => (Date.parse(m.deletedAt) || now) > cutoff);
+      return { list: kept, save: kept.length !== trash.length, value: trash.length - kept.length };
+    });
   });
 }
 
@@ -465,44 +435,45 @@ export async function clearHistory() {
  * Returns how many were added.
  */
 export async function mergeMeetings(records) {
-  const [trash, settings] = await Promise.all([getTrash(), getSettings()]);
-  return mutateHistory(history => {
-    const seen = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
+  return withStorageMutation(async () => {
+    const [trash, settings] = await Promise.all([getTrash(), getSettings()]);
+    return mutateUnlocked(HISTORY, history => {
+      const seen = new Set([...history.map(m => m.id), ...trash.map(m => m.id)]);
 
-    const fresh = [];
-    (records || []).forEach(rec => {
-      if (!rec || !rec.id || seen.has(rec.id)) return;
-      seen.add(rec.id);
-      fresh.push(adoptMergeAnnotations(rec));
+      const fresh = [];
+      (records || []).forEach(rec => {
+        if (!rec || !rec.id || seen.has(rec.id)) return;
+        seen.add(rec.id);
+        fresh.push(adoptMergeAnnotations(rec));
+      });
+      if (!fresh.length) return { save: false, value: 0 };
+
+      // Hold the import to the configured cap before reporting how many records were accepted.
+      const next = capped(history.concat(fresh)
+        .map(m => normalizeMeeting(m, { mergeAliases: false }))
+        .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)), settings);
+
+      const kept = new Set(next.map(m => m.id));
+      return { list: next, value: fresh.filter(m => kept.has(m.id)).length };
     });
-    if (!fresh.length) return { save: false, value: 0 };
-
-    // Held to "meetings to keep" here rather than by whatever writes next. A file or a sheet can
-    // carry more than the register keeps, and taking all of them in would report every one and
-    // then lose the oldest to the first call recorded afterwards, without a word. What is left out
-    // is still in the file and still in the sheet, and comes home when the setting is raised.
-    const next = capped(history.concat(fresh)
-      .map(m => normalizeMeeting(m, { mergeAliases: false }))
-      .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)), settings);
-
-    const kept = new Set(next.map(m => m.id));
-    return { list: next, value: fresh.filter(m => kept.has(m.id)).length };
   });
 }
 
 /** Series from elsewhere, under the same rule: only the ones this store does not have. */
 export async function mergeGroups(list) {
-  const groups = await getGroups();
-  const known = new Set(groups.map(g => g.id));
+  return withStorageMutation(async () => {
+    const groups = await getGroups();
+    const known = new Set(groups.map(g => g.id));
 
-  const fresh = [];
-  (list || []).forEach(g => {
-    if (!g || !g.id || known.has(g.id)) return;
-    known.add(g.id);
-    fresh.push(g);
+    const fresh = [];
+    (list || []).forEach(g => {
+      if (!g || !g.id || known.has(g.id)) return;
+      known.add(g.id);
+      fresh.push(g);
+    });
+    if (fresh.length) await setMany({ [STORAGE_KEYS.GROUPS]: groups.concat(fresh) });
+    return fresh.length;
   });
-  if (fresh.length) await saveGroups(groups.concat(fresh));
-  return fresh.length;
 }
 
 /**
@@ -696,45 +667,62 @@ export async function getGroups() {
   return Array.isArray(g) ? g : [];
 }
 export async function saveGroups(groups) {
-  await set(STORAGE_KEYS.GROUPS, groups);
-  return groups;
+  return withStorageMutation(async () => {
+    await setMany({ [STORAGE_KEYS.GROUPS]: groups });
+    return groups;
+  });
 }
 export async function getGroupById(id) {
   return (await getGroups()).find(g => g.id === id) || null;
 }
 
 export async function createGroup({ name, color, roster } = {}) {
-  const groups = await getGroups();
-  const group = {
-    id: uid('grp'),
-    name: (name || '').trim() || 'Series',
-    color: color || GROUP_COLORS[groups.length % GROUP_COLORS.length],
-    roster: Array.isArray(roster) ? roster : [],
-    createdAt: new Date().toISOString()
-  };
-  groups.push(group);
-  await saveGroups(groups);
-  return group;
+  return withStorageMutation(async () => {
+    const groups = await getGroups();
+    const group = {
+      id: uid('grp'),
+      name: (name || '').trim() || 'Series',
+      color: color || GROUP_COLORS[groups.length % GROUP_COLORS.length],
+      roster: Array.isArray(roster) ? roster : [],
+      createdAt: new Date().toISOString()
+    };
+    groups.push(group);
+    await setMany({ [STORAGE_KEYS.GROUPS]: groups });
+    return group;
+  });
 }
 
 export async function updateGroup(id, patch) {
-  const groups = await getGroups();
-  const i = groups.findIndex(g => g.id === id);
-  if (i < 0) return null;
-  groups[i] = { ...groups[i], ...patch };
-  await saveGroups(groups);
-  return groups[i];
+  return withStorageMutation(async () => {
+    const groups = await getGroups();
+    const i = groups.findIndex(g => g.id === id);
+    if (i < 0) return null;
+    groups[i] = { ...groups[i], ...patch };
+    await setMany({ [STORAGE_KEYS.GROUPS]: groups });
+    return groups[i];
+  });
 }
 
 /** Delete a group and unassign its meetings (meetings themselves are kept). */
 export async function deleteGroup(id) {
-  await saveGroups((await getGroups()).filter(g => g.id !== id));
-  await mutateHistory(history => {
+  return withStorageMutation(async () => {
+    const stored = await getMany([
+      STORAGE_KEYS.GROUPS, STORAGE_KEYS.HISTORY, STORAGE_KEYS.HISTORY_REV
+    ]);
+    const groups = Array.isArray(stored[STORAGE_KEYS.GROUPS]) ? stored[STORAGE_KEYS.GROUPS] : [];
+    const history = Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [];
     let changed = 0;
     history.forEach(m => { if (m.groupId === id) { delete m.groupId; changed++; } });
-    return { save: changed > 0, value: changed };
+    const nextGroups = groups.filter(g => g.id !== id);
+    if (changed || nextGroups.length !== groups.length) {
+      await setMany({
+        [STORAGE_KEYS.GROUPS]: nextGroups,
+        [STORAGE_KEYS.HISTORY]: history,
+        [STORAGE_KEYS.HISTORY_REV]: uid('rev')
+      });
+    }
+    return true;
   });
-  return true;
 }
 
 export async function assignMeetingToGroup(meetingId, groupId) {
@@ -761,9 +749,11 @@ export async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(s || {}) };
 }
 export async function updateSettings(patch) {
-  const next = { ...(await getSettings()), ...patch };
-  await set(STORAGE_KEYS.SETTINGS, next);
-  return next;
+  return withStorageMutation(async () => {
+    const next = { ...(await getSettings()), ...patch };
+    await setMany({ [STORAGE_KEYS.SETTINGS]: next });
+    return next;
+  });
 }
 
 /**
@@ -776,9 +766,11 @@ export async function getSyncState() {
   return (s && typeof s === 'object') ? s : {};
 }
 export async function setSyncState(patch) {
-  const next = { ...(await getSyncState()), ...patch };
-  await set(STORAGE_KEYS.SYNC_STATE, next);
-  return next;
+  return withStorageMutation(async () => {
+    const next = { ...(await getSyncState()), ...patch };
+    await setMany({ [STORAGE_KEYS.SYNC_STATE]: next });
+    return next;
+  });
 }
 
 export async function getRoster() {
@@ -798,6 +790,18 @@ export async function getAutoTrack() {
 }
 export async function setAutoTrack(on) {
   await set(STORAGE_KEYS.AUTO_TRACK, !!on);
+}
+
+/** Set the default once without overwriting a preference written by another context. */
+export async function initializeAutoTrack() {
+  return withStorageMutation(async () => {
+    const stored = await getMany([STORAGE_KEYS.AUTO_TRACK]);
+    if (stored[STORAGE_KEYS.AUTO_TRACK] !== undefined) {
+      return stored[STORAGE_KEYS.AUTO_TRACK] !== false;
+    }
+    await setMany({ [STORAGE_KEYS.AUTO_TRACK]: true });
+    return true;
+  });
 }
 
 /* ============================ migration ============================ */
@@ -849,16 +853,15 @@ function unbakeMerges(meeting) {
  * they can be undone. Every read path merges the view anyway.
  */
 export async function migrateIfNeeded() {
-  const stored = await getMany([
-    STORAGE_KEYS.SCHEMA_VERSION, STORAGE_KEYS.LEGACY_MEETINGS, STORAGE_KEYS.GROUPS
-  ]);
+  return withStorageMutation(async () => {
+    const stored = await getMany([
+      STORAGE_KEYS.SCHEMA_VERSION, STORAGE_KEYS.LEGACY_MEETINGS, STORAGE_KEYS.GROUPS,
+      STORAGE_KEYS.HISTORY, STORAGE_KEYS.HISTORY_REV
+    ]);
 
-  if ((stored[STORAGE_KEYS.SCHEMA_VERSION] || 0) >= SCHEMA_VERSION) return { migrated: 0 };
+    if ((stored[STORAGE_KEYS.SCHEMA_VERSION] || 0) >= SCHEMA_VERSION) return { migrated: 0 };
 
-  // Through the same guarded write as everything else: an update fires this off while the worker
-  // is already putting interrupted meetings to bed, and a rewrite of the whole register is the
-  // one write that could not afford to lose the other.
-  const migrated = await mutateHistory(history => {
+    const history = Array.isArray(stored[STORAGE_KEYS.HISTORY]) ? stored[STORAGE_KEYS.HISTORY] : [];
     let count = 0;
     const legacy = stored[STORAGE_KEYS.LEGACY_MEETINGS];
     if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
@@ -868,19 +871,16 @@ export async function migrateIfNeeded() {
         if (!ids.has(rec.id)) { history.push(rec); ids.add(rec.id); count++; }
       }
     }
-    return {
-      list: history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
+    const groups = Array.isArray(stored[STORAGE_KEYS.GROUPS]) ? stored[STORAGE_KEYS.GROUPS] : [];
+    await setMany({
+      [STORAGE_KEYS.HISTORY]: history.map(m => normalizeMeeting(unbakeMerges(m), { mergeAliases: false }))
         .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)),
-      value: count
-    };
+      [STORAGE_KEYS.HISTORY_REV]: uid('rev'),
+      [STORAGE_KEYS.GROUPS]: groups,
+      [STORAGE_KEYS.SCHEMA_VERSION]: SCHEMA_VERSION
+    });
+    return { migrated: count };
   });
-
-  const groups = Array.isArray(stored[STORAGE_KEYS.GROUPS]) ? stored[STORAGE_KEYS.GROUPS] : [];
-  await setMany({
-    [STORAGE_KEYS.GROUPS]: groups,
-    [STORAGE_KEYS.SCHEMA_VERSION]: SCHEMA_VERSION
-  });
-  return { migrated };
 }
 
 /* ============================ export ============================ */

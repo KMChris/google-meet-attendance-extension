@@ -279,12 +279,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   try {
     const { migrated } = await storage.migrateIfNeeded();
     if (migrated) console.log('[GM Attendance] migrated legacy meetings:', migrated);
+    await storage.initializeAutoTrack();
   } catch (err) {
-    console.warn('[GM Attendance] migration failed:', err);
+    console.warn('[GM Attendance] initialization failed:', err);
   }
-  chrome.storage.local.get(['autoTrack'], (res) => {
-    if (res.autoTrack === undefined) chrome.storage.local.set({ autoTrack: true });
-  });
 });
 
 /* ============================ picking the pieces back up ============================ */
