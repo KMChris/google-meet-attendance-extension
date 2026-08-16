@@ -3,6 +3,7 @@ import * as store from '../src/lib/storage.js';
 import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 import { esc, initials } from '../src/lib/html.js';
+import { renderSeriesMatrices } from '../src/lib/report-layout.js';
 
 const { t } = i18n;
 function fmtDur(secs) { secs = Math.floor(secs || 0); if (secs <= 0) return '0m'; const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60), s = secs % 60; if (h) return `${h}h ${String(m).padStart(2, '0')}m`; if (m) return `${m}m`; return `${s}s`; }
@@ -96,18 +97,19 @@ function renderGroup(group, meetings) {
   const avgAtt = agg.people.length ? Math.round(agg.people.reduce((s, p) => s + p.avgShare, 0) / agg.people.length) : 0;
   const first = ms[0], last = ms[ms.length - 1];
 
-  // Each cell carries both readings: the dot keeps a row scannable, the share under it says how
-  // much of that session the person was there for. Last column: presence across the whole
-  // series against the summed meeting hours — a missed session pulls it down, which is what the
-  // per-session average cannot show.
-  const matrix = `<table class="rep-matrix"><thead><tr><th>${t('colParticipant')}</th>
-    ${agg.sessions.map(s => `<th>${esc(i18n.formatDate(s.date, { day: 'numeric', month: 'short' }))}</th>`).join('')}
-    <th>${t('colAttendedShare')}</th><th>${t('colTotalTime')}</th><th>${t('colTotalShare')}</th></tr></thead><tbody>
-    ${agg.people.map(p => `<tr><td style="text-align:left"><b>${esc(p.name)}</b></td>
-      ${agg.sessions.map(s => { const c = p.perSession[s.id]; return `<td><span class="dot ${c.state}"></span><span class="pct ${c.state}">${c.state === 'absent' ? '–' : c.sharePct + '%'}</span></td>`; }).join('')}
-      <td class="mono">${p.attendedCount}/${agg.sessionCount}</td><td class="mono">${fmtHMS(p.totalSeconds)}</td>
-      <td class="mono"><b>${p.totalShare}%</b></td></tr>`).join('')}
-    </tbody></table>`;
+  // The screen keeps the complete matrix and paper repeats the fixed columns beside small
+  // session chunks, so neither view has to discard a session or squeeze it out of sight.
+  const matrices = renderSeriesMatrices(agg, {
+    labels: {
+      matrix: t('matrixTitle'),
+      participant: t('colParticipant'),
+      attended: t('colAttendedShare'),
+      totalTime: t('colTotalTime'),
+      totalShare: t('colTotalShare')
+    },
+    formatSession: session => i18n.formatDate(session.date, { day: 'numeric', month: 'short' }),
+    formatDuration: fmtHMS
+  });
 
   const sessionBlocks = ms.map(m => {
     const people = Object.keys(m.attendance).length;
@@ -130,7 +132,7 @@ function renderGroup(group, meetings) {
     <h1>${esc(group.name)}</h1>
     <div class="rep-meta"><span><b>${agg.sessionCount}</b> ${t('colSessions').toLowerCase()}</span><span>${range}</span><span><b>${agg.peopleCount}</b> ${t('colGroupPeople').toLowerCase()}</span></div>
     ${statGrid([[agg.sessionCount, t('colSessions')], [agg.peopleCount, t('reportPeople')], [avgAtt + '%', t('statAvgAttendance')], [fmtDur(agg.sessionCount ? Math.round(agg.totalDurationSeconds / agg.sessionCount) : 0), t('statAvgLength')], [fmtDur(agg.totalDurationSeconds), t('colTotalTime')]])}
-    <div class="rep-sect"><h2>${t('matrixTitle')}</h2>${matrix}</div>
+    <div class="rep-sect"><h2>${t('matrixTitle')}</h2>${matrices.screen}${matrices.print}</div>
     <div class="rep-sect"><h2>${t('sessionsBreakdown')}</h2>${sessionBlocks}</div>
   </div>${footer()}`;
   document.title = `${group.name} — Attendance Tracker`;

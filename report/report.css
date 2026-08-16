@@ -11,13 +11,13 @@
 
 /* The report itself pins a light palette so PDFs never come out dark. */
 .report-root{
-  --ink:#1a2320; --ink-2:#55635c; --ink-3:#8b978f;
+  --ink:#1a2320; --ink-2:#4f5d56; --ink-3:#65736b;
   --panel:#fff; --panel-2:#f8faf8; --line:#e4e8e4; --line-2:#cfd6d0;
-  --present:#1e7a4e; --present-2:#dcece2; --late:#bd7a15; --late-2:#f4e8cf;
+  --present:#1a7047; --present-2:#dcece2; --late:#bd7a15; --late-2:#f4e8cf;
   --absent:#98a49d; --absent-2:#eef1ee; --red:#bf453b;
   color:var(--ink);
   max-width:820px;margin:26px auto;background:#fff;border:1.5px solid var(--line);
-  border-radius:14px;box-shadow:0 20px 50px -30px rgba(20,30,26,.4);overflow:hidden}
+  border-radius:14px;box-shadow:0 20px 50px -30px rgba(20,30,26,.4)}
 
 .report-root .doc{padding:38px 44px}
 .rep-eyebrow{font-family:var(--mono);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--present)}
@@ -44,7 +44,7 @@
   text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:999px}
 .rep-status::before{content:"";width:5px;height:5px;border-radius:50%}
 .rep-status.present{background:var(--present-2);color:var(--present)} .rep-status.present::before{background:var(--present)}
-.rep-status.absent{background:var(--absent-2);color:var(--ink-3)} .rep-status.absent::before{background:var(--absent)}
+.rep-status.absent{background:var(--absent-2);color:var(--ink-2)} .rep-status.absent::before{background:var(--absent)}
 
 /* event log */
 .evlog{display:flex;flex-direction:column;gap:2px}
@@ -79,6 +79,12 @@
 
 /* matrix */
 .rep-matrix{width:100%;border-collapse:collapse;font-size:12px}
+.report-matrix-scroll{max-width:100%;overflow-x:auto;padding:2px 2px 10px}
+.report-matrix-scroll:focus-visible{outline:2px solid var(--present);outline-offset:2px;border-radius:6px}
+.screen-matrix{width:max-content;min-width:100%}
+.screen-matrix th:first-child,.screen-matrix td:first-child{min-width:150px}
+.screen-matrix th:not(:first-child),.screen-matrix td:not(:first-child){min-width:64px}
+.print-matrices{display:none}
 .rep-matrix th,.rep-matrix td{text-align:center;padding:8px 8px;border-bottom:1px solid var(--line)}
 .rep-matrix th:first-child,.rep-matrix td:first-child{text-align:left}
 .rep-matrix thead th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
@@ -103,13 +109,15 @@
   .report-root{max-width:none;margin:0;border:none;border-radius:0;box-shadow:none}
   .report-root .doc{padding:0}
   .rep-footer{padding:20px 0}
-  /* the matrix carries a column per session plus three totals, each with a share under the dot —
-     on paper that width has to come out of the padding and the share type, or a long name wraps
-     onto two lines in a dense series */
-  .rep-matrix th,.rep-matrix td{padding:7px 4px}
-  .rep-matrix .pct{font-size:8px;margin-top:2px}
+  .report-matrix-scroll{display:none}
+  .print-matrices{display:block}
+  .print-matrix{width:100%;table-layout:fixed;font-size:10px;break-inside:auto}
+  .print-matrix + .print-matrix{margin-top:8mm}
+  .print-matrix th:first-child,.print-matrix td:first-child{width:24%}
+  .print-matrix th,.print-matrix td{padding:6px 3px;overflow-wrap:anywhere}
+  .print-matrix .pct{font-size:8px;margin-top:2px}
   .sess-block{break-inside:avoid}
-  .ev-person,.rep-table tr{break-inside:avoid}
+  .ev-person,.rep-table tr,.print-matrix tr{break-inside:avoid}
   thead{display:table-header-group}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   @page{margin:14mm}
