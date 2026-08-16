@@ -2,7 +2,7 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] 2026-08-16
 
 ### Added
 - **A call in progress is marked as one, wherever the panel shows it.** Until now a meeting still
@@ -59,7 +59,9 @@ All notable changes to this project. This project adheres to [Semantic Versionin
   unexpected sign-in prompt. Authentication and backup failures now remain visible as failures.
 - **Meet discovery is scoped and language-aware.** Native and ARIA participant controls work with
   English, Polish and Korean labels, partial or virtualized lists cannot invent departures, and
-  only trusted event headings can supply scheduled hours.
+  only trusted event headings can supply scheduled hours. The drawer Meet marks with panel id 5 is
+  taken for the participant list only when it holds one: the same id sits on other controls, and
+  the first one found won the scan and then had nobody in it to report.
 - **A failed preference read no longer opts the user into tracking.** Meet waits for a known
   automatic-tracking setting and reports the storage error instead of guessing that it is enabled.
 - **Large series reports keep every session.** The full matrix scrolls on screen and paper uses
