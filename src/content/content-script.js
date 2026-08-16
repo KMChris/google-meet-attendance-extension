@@ -150,13 +150,20 @@
     return !!root.querySelector('[role="list"], [data-participant-list]');
   }
 
+  function panelHasParticipantEvidence(root) {
+    return panelHasParticipantStructure(root) || PARTICIPANT_SELECTORS.some(selector =>
+      root.matches(selector) || !!root.querySelector(selector));
+  }
+
   /** Resolve and retain the drawer that belongs to the People control. */
   function resolveParticipantPanel(button = findParticipantPanelButton()) {
     if (participantPanelRoot && participantPanelRoot.isConnected) return participantPanelRoot;
     participantPanelRoot = null;
 
     const fixed = document.querySelector('[data-panel-id="5"]');
-    if (fixed && fixed.isConnected) return (participantPanelRoot = fixed);
+    if (fixed && fixed.isConnected && panelHasParticipantEvidence(fixed)) {
+      return (participantPanelRoot = fixed);
+    }
 
     const controlledIds = normalizeAccessibleText(button && button.getAttribute('aria-controls')).split(' ').filter(Boolean);
     for (const id of controlledIds) {

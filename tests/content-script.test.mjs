@@ -288,6 +288,26 @@ test('participant scanning stays below the resolved panel root', async () => {
   assert.equal(snapshot.authoritative, true);
 });
 
+test('an unrelated Meet control with panel id 5 does not hide the participant list', async () => {
+  const meetingDetails = el('button', {
+    'aria-label': 'Meeting details',
+    'aria-controls': 'ME4pNd',
+    'data-panel-id': '5'
+  });
+  const peopleButton = el('div', { role: 'button', 'aria-label': 'Osoby' });
+  const participantList = el('div', { role: 'list', 'aria-label': 'Uczestnicy' }).append(
+    el('div', { role: 'listitem', 'aria-label': 'Krzysztof Mizgala' })
+  );
+  const { hooks } = await loadHarness({
+    body: el('body').append(meetingDetails, peopleButton, participantList)
+  });
+
+  assert.equal(hooks.resolveParticipantPanel(peopleButton), participantList);
+  const snapshot = hooks.scanParticipantPanel();
+  assert.deepEqual(Array.from(snapshot.people, person => person.name), ['Krzysztof Mizgala']);
+  assert.equal(snapshot.authoritative, true);
+});
+
 test('aria-controls resolves a participant panel without a fixed panel id', async () => {
   const button = el('div', { role: 'button', 'aria-label': 'Osoby', 'aria-controls': 'people-drawer' });
   const panel = el('section', { id: 'people-drawer', role: 'dialog' }).append(
