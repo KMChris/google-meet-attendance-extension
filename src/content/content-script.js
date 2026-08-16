@@ -28,6 +28,7 @@
   let scheduleAttempts = 0;
   let stoppedMeetingId = null;  // the call already finished at this URL — don't start it again
   let panelAttempts = 0;
+  let participantPanelRoot = null;
 
   /**
    * How often to tell the worker this page is still on the call. Nothing else says so: a call
@@ -91,42 +92,121 @@
   }
   chrome.storage.onChanged.addListener(watchAutoTrack);
 
-  // Multiple selectors for participant detection (Google Meet DOM changes frequently)
+  // Multiple selectors for participant detection inside the resolved People panel.
   const PARTICIPANT_SELECTORS = [
-    'div[role="listitem"][aria-label]',  // Most reliable - participant list item with name in aria-label
-    '.KV1GEc',  // Participant container
+    'div[role="listitem"][aria-label]',
+    '.KV1GEc',
     '[data-self-name]'
   ];
 
-  // Selectors for participant panel (includes Korean locale support)
-  const PANEL_SELECTORS = [
-    '[aria-label*="participant"]',
-    '[aria-label*="참가자"]',
-    '.VfPpkd-Bz112c-LgbsSe',
-    '[data-panel-id="5"]',  // People panel
-    '.TNczGb'  // Panel container
-  ];
+  const PEOPLE_LABELS = new Set([
+    'people', 'participants', 'osoby', 'uczestnicy', '사용자', '참가자'
+  ]);
+
+  function normalizeAccessibleText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  /** Accessible name used by Meet controls and drawers. */
+  function accessibleName(element) {
+    if (!element) return '';
+    const labelledBy = normalizeAccessibleText(element.getAttribute('aria-labelledby'));
+    if (labelledBy) {
+      const label = labelledBy.split(' ')
+        .map(id => document.getElementById(id))
+        .filter(Boolean)
+        .map(node => normalizeAccessibleText(node.textContent))
+        .filter(Boolean)
+        .join(' ');
+      if (label) return normalizeAccessibleText(label);
+    }
+    const ariaLabel = normalizeAccessibleText(element.getAttribute('aria-label'));
+    return ariaLabel || normalizeAccessibleText(element.textContent);
+  }
+
+  function hasPeopleLabel(element) {
+    return PEOPLE_LABELS.has(accessibleName(element).toLocaleLowerCase());
+  }
 
   /**
    * Auto-open participant panel once to initialize DOM elements, then close it
    */
   function findParticipantPanelButton() {
-    // The participant button is a div[role="button"] labeled via aria-labelledby
-    // Find by checking the label text for "사용자" (Korean) or "People" (English)
-    const buttons = document.querySelectorAll('div[role="button"][aria-labelledby]');
+    const buttons = document.querySelectorAll('button, [role="button"]');
     for (const btn of buttons) {
-      const labelId = btn.getAttribute('aria-labelledby');
-      if (labelId) {
-        const labelEl = document.getElementById(labelId);
-        if (labelEl) {
-          const text = labelEl.textContent.trim();
-          if (text === '사용자' || text === 'People' || text === 'Participants') {
-            return btn;
-          }
-        }
+      if (hasPeopleLabel(btn)) return btn;
+    }
+    return null;
+  }
+
+  function panelHasParticipantStructure(root) {
+    if (!root) return false;
+    if (root.matches('[role="list"], [data-participant-list]')) return true;
+    return !!root.querySelector('[role="list"], [data-participant-list]');
+  }
+
+  /** Resolve and retain the drawer that belongs to the People control. */
+  function resolveParticipantPanel(button = findParticipantPanelButton()) {
+    if (participantPanelRoot && participantPanelRoot.isConnected) return participantPanelRoot;
+    participantPanelRoot = null;
+
+    const fixed = document.querySelector('[data-panel-id="5"]');
+    if (fixed && fixed.isConnected) return (participantPanelRoot = fixed);
+
+    const controlledIds = normalizeAccessibleText(button && button.getAttribute('aria-controls')).split(' ').filter(Boolean);
+    for (const id of controlledIds) {
+      const controlled = document.getElementById(id);
+      if (controlled && controlled.isConnected) return (participantPanelRoot = controlled);
+    }
+
+    const candidates = document.querySelectorAll('[role="dialog"], [role="complementary"], [aria-label], [aria-labelledby], .TNczGb');
+    for (const candidate of candidates) {
+      if (candidate !== button && hasPeopleLabel(candidate) && panelHasParticipantStructure(candidate)) {
+        return (participantPanelRoot = candidate);
       }
     }
     return null;
+  }
+
+  function panelMarkedPartial(root, elements) {
+    const markers = ['data-virtualized', 'data-partial', 'data-partial-list', 'data-virtual-scroll'];
+    const marked = node => markers.some(name => {
+      const value = node.getAttribute(name);
+      return value != null && value.toLocaleLowerCase() !== 'false';
+    }) || node.getAttribute('aria-busy') === 'true';
+
+    if (marked(root)) return true;
+    const markedChildren = root.querySelectorAll('[aria-busy="true"], [data-virtualized], [data-partial], [data-partial-list], [data-virtual-scroll]');
+    if (Array.from(markedChildren).some(marked)) return true;
+
+    const renderedItems = root.querySelectorAll('[role="listitem"]').length;
+    const sizedElements = [root, ...root.querySelectorAll('[aria-setsize]'), ...elements];
+    const declaredSizes = sizedElements.map(element => Number(element.getAttribute('aria-setsize')))
+      .filter(size => Number.isInteger(size) && size > 0);
+    return declaredSizes.length > 0 && Math.max(...declaredSizes) > renderedItems;
+  }
+
+  /** Read the resolved panel without treating unrelated page content as participants. */
+  function scanParticipantPanel() {
+    const root = resolveParticipantPanel();
+    if (!root) return { people: [], authoritative: false };
+
+    const elements = [];
+    const seen = new Set();
+    for (const selector of PARTICIPANT_SELECTORS) {
+      try {
+        root.querySelectorAll(selector).forEach(element => {
+          if (!seen.has(element)) { seen.add(element); elements.push(element); }
+        });
+      } catch (e) {
+        console.warn('[Attendance] Participant selector failed:', selector, e);
+      }
+    }
+
+    const people = elements.map(extractParticipantInfo).filter(Boolean);
+    const authoritative = !!root.isConnected && panelHasParticipantStructure(root) &&
+      !panelMarkedPartial(root, elements);
+    return { people, authoritative };
   }
 
   // ~30s of retries. Meet's controls are up long before that, and a page that never shows them
@@ -146,8 +226,9 @@
       const waitForDOM = setInterval(() => {
         attempts++;
         if (!isTracking) { clearInterval(waitForDOM); return; }
-        const found = document.querySelector('div[role="listitem"][aria-label], .KV1GEc');
-        console.log('[Attendance] Waiting for participant DOM... attempt', attempts, 'found:', !!found);
+        const snapshot = scanParticipantPanel();
+        const found = snapshot.people.length > 0 || snapshot.authoritative;
+        console.log('[Attendance] Waiting for participant DOM... attempt', attempts, 'found:', found);
 
         if (found) {
           clearInterval(waitForDOM);
@@ -248,7 +329,7 @@
    * always allows fixing the hours by hand.
    */
   const CLOCK = String.raw`(\d{1,2})[:.](\d{2})\s*(a\.?m\.?|p\.?m\.?)?`;
-  const TIME_RANGE_RE = new RegExp(CLOCK + String.raw`\s*[–—−-]\s*` + CLOCK, 'i');
+  const TIME_RANGE_RE = new RegExp(String.raw`^\s*` + CLOCK + String.raw`\s*[–—−-]\s*` + CLOCK + String.raw`\s*$`, 'i');
 
   function to24h(hour, meridiem) {
     const h = Number(hour);
@@ -270,7 +351,7 @@
 
   /** Parse "10:00 – 11:00" (optionally am/pm) into today's ISO window, or null. */
   function parseTimeRange(text) {
-    const m = TIME_RANGE_RE.exec(text);
+    const m = TIME_RANGE_RE.exec(String(text || ''));
     if (!m) return null;
 
     const startMin = Number(m[2]), endMin = Number(m[5]);
@@ -297,6 +378,44 @@
     return best ? { start: best.start.toISOString(), end: best.end.toISOString() } : null;
   }
 
+  function scheduleNodeRejected(element) {
+    const tag = String(element.tagName || '').toLocaleLowerCase();
+    const role = normalizeAccessibleText(element.getAttribute('role')).toLocaleLowerCase();
+    const live = normalizeAccessibleText(element.getAttribute('aria-live')).toLocaleLowerCase();
+    const editable = normalizeAccessibleText(element.getAttribute('contenteditable')).toLocaleLowerCase();
+    if (['input', 'textarea', 'select', 'option', 'button', 'li'].includes(tag)) return true;
+    if (['button', 'listitem', 'log'].includes(role)) return true;
+    if (live && live !== 'off') return true;
+    if (editable && editable !== 'false') return true;
+    if (element.getAttribute('data-panel-id') === '5') return true;
+    if (element.getAttribute('data-participant-id') != null ||
+        element.getAttribute('data-requested-participant-id') != null ||
+        element.getAttribute('data-chat-message') != null ||
+        element.getAttribute('data-message-id') != null) return true;
+    return element.matches('.TNczGb');
+  }
+
+  function scheduleContext(element) {
+    const tag = String(element.tagName || '').toLocaleLowerCase();
+    if (/^h[1-6]$/.test(tag) || element.getAttribute('role') === 'heading') return true;
+    return ['data-event-id', 'data-event-title', 'data-meeting-title', 'data-schedule', 'data-scheduled-time']
+      .some(name => element.getAttribute(name) != null) || element.matches('.R3Gmyc, .WbD1sf');
+  }
+
+  /** A schedule may come only from an event heading or known event container. */
+  function isTrustedScheduleNode(node) {
+    let element = node && (node.parentElement || node.parentNode);
+    if (!element) return false;
+
+    for (let current = element; current; current = current.parentElement) {
+      if (scheduleNodeRejected(current)) return false;
+    }
+    for (let current = element; current; current = current.parentElement) {
+      if (scheduleContext(current)) return true;
+    }
+    return false;
+  }
+
   /** Look for a short text node that is just a time range (event header, green room). */
   function detectScheduledWindow() {
     if (!document.body) return null;
@@ -304,6 +423,7 @@
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = (node.nodeValue || '').trim();
       if (text.length < 9 || text.length > 48) continue;
+      if (!isTrustedScheduleNode(node)) continue;
       const win = parseTimeRange(text);
       if (win) return win;
     }
@@ -426,30 +546,24 @@
 
     const currentTime = new Date().toISOString();
     const foundParticipants = new Set();
+    const snapshot = scanParticipantPanel();
 
-    // Try each selector
-    for (const selector of PARTICIPANT_SELECTORS) {
-      try {
-        document.querySelectorAll(selector).forEach(element => {
-          const info = extractParticipantInfo(element);
-          if (info && info.name) markPresent(info.name, info.email, currentTime, foundParticipants);
-        });
-      } catch (e) {
-        console.warn('[Attendance] Selector failed:', selector, e);
-      }
-    }
+    snapshot.people.forEach(info => markPresent(info.name, info.email, currentTime, foundParticipants));
 
     // The user themselves, whom the panel does not always list under the name they are shown by.
     // Before the check below rather than after it: they are in the call like anyone else.
     detectSelf(currentTime, foundParticipants);
 
-    // Check for participants who left
-    for (const name in participants) {
-      if (!foundParticipants.has(name) && participants[name].isPresent) {
-        participants[name].events.push({ time: currentTime, type: 'Leave' });
-        participants[name].isPresent = false;
-        console.log('[Attendance] Participant left:', name);
-        notifyBackground('participantLeft', participants[name]);
+    // Only a complete panel snapshot can prove that somebody left. A virtualized, loading or
+    // missing panel can still add visible people, but absence from it carries no information.
+    if (snapshot.authoritative) {
+      for (const name in participants) {
+        if (!foundParticipants.has(name) && participants[name].isPresent) {
+          participants[name].events.push({ time: currentTime, type: 'Leave' });
+          participants[name].isPresent = false;
+          console.log('[Attendance] Participant left:', name);
+          notifyBackground('participantLeft', participants[name]);
+        }
       }
     }
   }
@@ -549,6 +663,7 @@
     scheduledWindow = null;
     scheduleAttempts = 0;
     panelAttempts = 0;
+    participantPanelRoot = null;
 
     // Say what call this is before anything is reported into it. Whichever message reaches the
     // worker first is the one that opens the record, and only this one carries the title and the
@@ -703,6 +818,13 @@
     return false;
   }
 
+  function watchdogTick() {
+    if (!isExtensionAlive()) { teardown(); return; }
+    if (isTracking) { detectMeetingEnd(); return; }
+    if (!getMeetingId() || callIsUp()) stoppedMeetingId = null;
+    startTracking();
+  }
+
   /**
    * Initialize
    */
@@ -728,12 +850,7 @@
     // leave. Two things clear it: landing back on the home screen, so the same link later is a
     // fresh session rather than this one, and the call itself coming back up — which is what
     // "Rejoin" does, in place, with no page load for anything else to notice.
-    watchdogInterval = setInterval(() => {
-      if (!isExtensionAlive()) { teardown(); return; }
-      if (isTracking) { detectMeetingEnd(); return; }
-      if (!getMeetingId() || callIsUp()) stoppedMeetingId = null;
-      startTracking();
-    }, 3000);
+    watchdogInterval = setInterval(watchdogTick, 3000);
 
     heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_MS);
 

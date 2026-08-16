@@ -1040,7 +1040,7 @@
     "message": "Automatyczne śledzenie"
   },
   "settingTrackingHint": {
-    "message": "Rozpocznij rejestr automatycznie po dołączeniu do Google Meet."
+    "message": "Rozpocznij rejestr automatycznie po dołączeniu do Google Meet. Wyłączenie tej opcji nie przerywa bieżącego spotkania i obowiązuje od następnego spotkania."
   },
   "settingTheme": {
     "message": "Wygląd"

@@ -1040,7 +1040,7 @@
     "message": "Automatic tracking"
   },
   "settingTrackingHint": {
-    "message": "Start the register automatically when you join a Google Meet."
+    "message": "Start the register automatically when you join a Google Meet. Turning this off keeps the current meeting running and applies to the next meeting."
   },
   "settingTheme": {
     "message": "Appearance"
