@@ -60,6 +60,8 @@ All notable changes to this project. This project adheres to [Semantic Versionin
 - **Meet discovery is scoped and language-aware.** Native and ARIA participant controls work with
   English, Polish and Korean labels, partial or virtualized lists cannot invent departures, and
   only trusted event headings can supply scheduled hours.
+- **A failed preference read no longer opts the user into tracking.** Meet waits for a known
+  automatic-tracking setting and reports the storage error instead of guessing that it is enabled.
 - **Large series reports keep every session.** The full matrix scrolls on screen and paper uses
   five-session chunks with participant, attendance and total columns repeated in each chunk.
 - **Dialogs, navigation and status messages use native accessible semantics.** Keyboard focus,

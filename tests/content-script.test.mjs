@@ -167,7 +167,7 @@ class FixedDate extends Date {
   static now() { return Date.parse('2026-08-16T10:30:00+02:00'); }
 }
 
-async function loadHarness({ body = el('body'), autoTrack = true } = {}) {
+async function loadHarness({ body = el('body'), autoTrack = true, autoTrackReadError = null } = {}) {
   const original = await readFile(SOURCE_PATH, 'utf8');
   const hook = `  window.__attendanceTest = {
     accessibleName: typeof accessibleName === 'function' ? accessibleName : null,
@@ -195,6 +195,7 @@ async function loadHarness({ body = el('body'), autoTrack = true } = {}) {
 
   const document = new FakeDocument(body);
   const sent = [];
+  const warnings = [];
   const intervalCallbacks = [];
   const runtimeListeners = [];
   const storageListeners = [];
@@ -205,6 +206,7 @@ async function loadHarness({ body = el('body'), autoTrack = true } = {}) {
   const chrome = {
     runtime: {
       id: 'test-extension',
+      lastError: null,
       sendMessage(message) { sent.push(message); return Promise.resolve({}); },
       onMessage: {
         addListener(listener) { runtimeListeners.push(listener); },
@@ -215,7 +217,15 @@ async function loadHarness({ body = el('body'), autoTrack = true } = {}) {
       }
     },
     storage: {
-      local: { get(_keys, callback) { callback({ autoTrack }); } },
+      local: {
+        get(_keys, callback) {
+          chrome.runtime.lastError = autoTrackReadError
+            ? { message: autoTrackReadError }
+            : null;
+          callback(autoTrackReadError ? undefined : { autoTrack });
+          chrome.runtime.lastError = null;
+        }
+      },
       onChanged: {
         addListener(listener) { storageListeners.push(listener); },
         removeListener(listener) {
@@ -236,10 +246,10 @@ async function loadHarness({ body = el('body'), autoTrack = true } = {}) {
     setTimeout: () => 1, clearTimeout: () => {},
     setInterval(callback) { intervalCallbacks.push(callback); return intervalCallbacks.length; },
     clearInterval: () => {},
-    console: { log() {}, warn() {}, error() {} }
+    console: { log() {}, warn(...args) { warnings.push(args.join(' ')); }, error() {} }
   });
   vm.runInContext(source, context, { filename: 'content-script.js' });
-  return { hooks: window.__attendanceTest, document, window, sent, intervalCallbacks };
+  return { hooks: window.__attendanceTest, document, window, sent, warnings, intervalCallbacks };
 }
 
 for (const label of ['People', 'Osoby', '사용자']) {
@@ -386,4 +396,18 @@ test('disabling automatic tracking keeps the current call and blocks the next on
   hooks.watchdogTick();
 
   assert.equal(sent.some(message => message.type === 'MEETING_STARTED'), false);
+});
+
+test('a failed auto-track preference read cannot opt the user into tracking', async () => {
+  const controls = el('button', { 'data-is-muted': 'false' });
+  const { hooks, sent, warnings } = await loadHarness({
+    body: el('body').append(controls),
+    autoTrackReadError: 'storage unavailable'
+  });
+
+  assert.equal(hooks.getState().autoTrack, null);
+  hooks.watchdogTick();
+  assert.equal(sent.some(message => message.type === 'MEETING_STARTED'), false);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /storage unavailable/);
 });

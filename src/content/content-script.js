@@ -84,6 +84,11 @@
   // Mirrors the stored setting; null until it has been read, so nothing starts on a guess.
   let autoTrack = null;
   chrome.storage.local.get(['autoTrack'], (res) => {
+    const readError = chrome.runtime.lastError;
+    if (readError) {
+      console.warn('[Attendance] Could not read auto-track preference:', readError.message || readError);
+      return;
+    }
     autoTrack = !(res && res.autoTrack === false);
     if (!autoTrack) console.log('[Attendance] Auto-track disabled — not tracking');
   });
