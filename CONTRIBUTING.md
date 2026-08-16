@@ -10,6 +10,36 @@ There is **no build step**. Load the folder directly:
 2. **Load unpacked** → select the project root
 3. After editing, hit **Reload** on the extension card (and reopen the dashboard/popup)
 
+## Packaging for the Web Store
+
+```
+npm run package
+```
+
+Writes `dist/<name>-<version>.zip`, named from the manifest, holding the tracked contents of
+`_locales/`, `dashboard/`, `icons/`, `report/` and `src/` — tests, docs and the site pages stay
+out. It is still no build step: the sources ship unchanged. The one edit is to the manifest, whose
+`key` is dropped, because that line pins the extension ID for a local unpacked copy and the store
+assigns its own.
+
+It refuses to write a package rather than write a broken one: a manifest whose `oauth2.client_id`
+is still the placeholder (see below), a file the manifest names but the package would not hold, or
+a `__MSG_` key missing from a catalogue all stop it. A file that is untracked, and would therefore
+go missing from the package, is warned about.
+
+The store listing assets are made by the second tool in `tools/`, `npm run screenshots`, which
+writes to `dist/assets/`. Both are documented in [tools/README.md](tools/README.md). The extension
+itself still has no build step and no dependencies — the root `package.json` exists only for these
+two, and deliberately carries no `version`, so `manifest.json` stays the only place a version is
+written down.
+
+## The manifest is modified locally, on purpose
+
+`manifest.json` shows as modified in every checkout that can actually talk to Google, and should
+stay that way: the committed copy carries a placeholder `client_id` and no `key`, while a working
+copy carries the real OAuth client and the key that pins the extension ID. **Neither local value
+belongs in a commit.** When releasing, stage the version line alone.
+
 ## Tests
 
 `tests/` covers the pure modules with `node:test` — no dependencies, no config:

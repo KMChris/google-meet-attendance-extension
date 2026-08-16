@@ -1,0 +1,17 @@
+{
+  "name": "google-meet-attendance-extension",
+  "private": true,
+  "type": "module",
+  "description": "Developer tooling for the extension. The extension itself has no build step and no dependencies.",
+  "scripts": {
+    "package": "node tools/package-extension.mjs",
+    "screenshots": "node tools/capture.mjs",
+    "serve": "node tools/demo-server.mjs 4177",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:tools": "node --test \"tools/tests/*.test.mjs\"",
+    "test:all": "npm test && npm run test:tools"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.7.0"
+  }
+}

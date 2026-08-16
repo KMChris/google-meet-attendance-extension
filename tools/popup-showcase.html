@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Attendance Tracker · Popup</title>
+  <link rel="stylesheet" href="/src/lib/ui.css">
+  <style>
+    *{box-sizing:border-box}
+    html,body{width:1280px;height:800px;margin:0;overflow:hidden;background:#08110d;color:#edf4ef}
+    body{font-family:var(--sans);background:
+      radial-gradient(circle at 18% 18%,rgba(81,202,154,.14),transparent 36%),
+      radial-gradient(circle at 83% 74%,rgba(141,119,225,.12),transparent 38%),#08110d}
+    .stage{height:100%;display:grid;grid-template-columns:1fr 470px;align-items:center;gap:70px;padding:72px 104px}
+    .copy{align-self:center}
+    .brand{display:flex;align-items:center;gap:14px;font-family:var(--disp);font-size:25px;font-weight:700}
+    .brand .sep{color:var(--present)}
+    h1{font-family:var(--disp);font-size:54px;line-height:1.03;letter-spacing:-.035em;max-width:580px;margin:42px 0 18px}
+    .lead{max-width:520px;color:#9fb3a8;font-size:20px;line-height:1.55;margin:0 0 38px}
+    .features{display:flex;gap:12px;flex-wrap:wrap}
+    .feature{border:1px solid rgba(169,199,182,.22);background:rgba(17,31,24,.72);border-radius:999px;padding:10px 15px;font:500 12px var(--mono);letter-spacing:.04em;color:#c6d7ce}
+    .browser{width:398px;margin-left:auto;border:1px solid rgba(169,199,182,.24);border-radius:22px;background:#101a15;box-shadow:0 32px 80px rgba(0,0,0,.46);overflow:hidden}
+    .chrome{height:46px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid rgba(169,199,182,.16);background:#0b1510}
+    .dot{width:9px;height:9px;border-radius:50%;background:#31483c}.dot:nth-child(2){background:#4d765f}.dot:nth-child(3){background:#52c89a}
+    .chrome span:last-child{margin-left:10px;color:#6f8a7b;font:500 10px var(--mono);letter-spacing:.06em}
+    iframe{display:block;width:358px;height:530px;margin:20px;border:0;background:#08110d}
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="copy">
+      <div class="brand">
+        <svg width="42" height="42" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#111c16" stroke="#355344" stroke-width="1.5"/>
+          <rect x="7" y="8.5" width="16" height="3.4" rx="1.7" fill="#52c89a"/>
+          <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="#355344"/>
+          <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="#d7aa4b"/>
+        </svg>
+        <span>Attendance<span class="sep">·</span>Tracker</span>
+      </div>
+      <h1 data-en="Attendance always at hand">Frekwencja zawsze pod ręką</h1>
+      <p class="lead" data-en="View the current meeting, see how many people are present, and jump straight to recent reports.">Podgląd trwającego spotkania, liczba obecnych osób i szybki dostęp do ostatnich raportów.</p>
+      <div class="features">
+        <span class="feature" data-en="LIVE VIEW">PODGLĄD NA ŻYWO</span>
+        <span class="feature" data-en="RECENT MEETINGS">OSTATNIE SPOTKANIA</span>
+        <span class="feature" data-en="ONE CLICK TO REPORT">1 KLIK DO RAPORTU</span>
+      </div>
+    </section>
+    <section class="browser" aria-label="Podgląd popupu rozszerzenia" data-en-aria-label="Extension popup preview">
+      <div class="chrome"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span data-en="EXTENSION">ROZSZERZENIE</span></div>
+      <iframe title="Attendance Tracker popup" src="/src/popup/popup.html"></iframe>
+    </section>
+  </main>
+  <script>
+    if (new URLSearchParams(location.search).get('lang') === 'en') {
+      document.documentElement.lang = 'en';
+      document.querySelectorAll('[data-en]').forEach(element => { element.textContent = element.dataset.en; });
+      document.querySelectorAll('[data-en-aria-label]').forEach(element => { element.setAttribute('aria-label', element.dataset.enAriaLabel); });
+      document.querySelector('iframe').src = '/src/popup/popup.html?lang=en';
+    }
+  </script>
+</body>
+</html>

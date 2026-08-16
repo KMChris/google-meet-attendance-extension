@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1400, initial-scale=1">
+  <title>Attendance Tracker · Marquee promo</title>
+  <link rel="stylesheet" href="/src/lib/ui.css">
+  <style>
+    *{box-sizing:border-box}
+    html,body{width:1400px;height:560px;margin:0;overflow:hidden;background:#08110d}
+    body{color:#edf4ef;font-family:var(--sans)}
+    .marquee{position:relative;width:100%;height:100%;display:grid;grid-template-columns:470px 1fr;align-items:center;gap:70px;padding:64px 92px;background:
+      radial-gradient(circle at 8% 14%,rgba(82,200,154,.19),transparent 38%),
+      radial-gradient(circle at 96% 80%,rgba(141,119,225,.15),transparent 42%),#08110d}
+    .marquee:before{content:"";position:absolute;inset:0;opacity:.20;background-image:linear-gradient(rgba(139,174,155,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(139,174,155,.12) 1px,transparent 1px);background-size:36px 36px;mask-image:linear-gradient(90deg,black,transparent 70%)}
+    .copy{position:relative;z-index:1}
+    .mark{width:82px;height:82px;margin-bottom:34px;filter:drop-shadow(0 18px 25px rgba(0,0,0,.35))}
+    .brand{font:700 43px/1.05 var(--disp);letter-spacing:-.035em}.brand .sep{color:#52c89a}
+    .signals{display:flex;gap:12px;margin-top:35px}
+    .signals span{display:flex;align-items:center;gap:8px;border:1px solid rgba(159,190,173,.22);background:rgba(15,27,20,.66);border-radius:999px;padding:10px 14px;font:500 10px var(--mono);letter-spacing:.08em;color:#adc2b7}
+    .signals i{width:7px;height:7px;border-radius:50%;background:#52c89a}.signals span:nth-child(2) i{background:#d7aa4b}.signals span:nth-child(3) i{background:#8d77e1}
+    .product{position:relative;z-index:1;height:420px;border:1px solid rgba(159,190,173,.24);border-radius:24px;background:#0d1712;box-shadow:0 40px 90px rgba(0,0,0,.42);padding:24px 26px;overflow:hidden}
+    .product:after{content:"";position:absolute;inset:auto -90px -130px auto;width:360px;height:360px;border-radius:50%;background:rgba(82,200,154,.09);filter:blur(4px)}
+    .top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(159,190,173,.16);padding-bottom:18px}
+    .mini-brand{font:700 17px var(--disp)}.mini-brand b{color:#52c89a}.readout{font:500 10px var(--mono);letter-spacing:.08em;color:#829b8d}
+    .tabs{display:flex;gap:27px;margin:18px 0 22px;font:500 9px var(--mono);letter-spacing:.14em;color:#708b7c}.tabs span:first-child{color:#d9e7df;border-bottom:2px solid #52c89a;padding-bottom:10px}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{border:1px solid rgba(159,190,173,.16);border-radius:13px;padding:14px;background:#111d17}.stat b{display:block;font:700 26px var(--disp)}.stat span{font:500 8px var(--mono);letter-spacing:.12em;color:#718d7e}
+    .timeline-card{margin-top:14px;border:1px solid rgba(159,190,173,.16);border-radius:15px;padding:16px;background:#101b15}
+    .timeline-head{display:flex;justify-content:space-between;margin-bottom:15px;font:500 8px var(--mono);letter-spacing:.12em;color:#789284}
+    .row{display:grid;grid-template-columns:105px 1fr 36px;align-items:center;gap:12px;margin:10px 0}.row label{font-size:10px;color:#bfd0c7;white-space:nowrap}.track{display:flex;height:10px;border-radius:4px;background:#17271f;overflow:hidden}.track i{background:#52c89a}.track i.gap{background:#1f3b2e}.row em{font:500 9px var(--mono);font-style:normal;color:#9bb0a5;text-align:right}
+  </style>
+</head>
+<body>
+  <main class="marquee">
+    <section class="copy">
+      <svg class="mark" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#111c16" stroke="#355344" stroke-width="1.5"/>
+        <rect x="7" y="8.5" width="16" height="3.4" rx="1.7" fill="#52c89a"/>
+        <rect x="7" y="13.4" width="10" height="3.4" rx="1.7" fill="#355344"/>
+        <rect x="7" y="18.3" width="13" height="3.4" rx="1.7" fill="#d7aa4b"/>
+      </svg>
+      <div class="brand">Attendance<span class="sep">·</span>Tracker</div>
+      <div class="signals"><span data-en="MEETINGS"><i></i>SPOTKANIA</span><span data-en="PEOPLE"><i></i>OSOBY</span><span data-en="ANALYTICS"><i></i>ANALITYKA</span></div>
+    </section>
+    <section class="product" aria-label="Ilustracja panelu frekwencji" data-en-aria-label="Attendance dashboard illustration">
+      <div class="top"><div class="mini-brand">Attendance<b>·</b>Tracker</div><div class="readout" data-en="12 MEETINGS · 22 PEOPLE · 91%">12 SPOTKAŃ · 22 OSOBY · 91%</div></div>
+      <div class="tabs"><span data-en="MEETINGS">SPOTKANIA</span><span data-en="SERIES">CYKLE</span><span data-en="PEOPLE">OSOBY</span><span data-en="ANALYTICS">ANALITYKA</span></div>
+      <div class="stats">
+        <div class="stat"><b>22</b><span data-en="PEOPLE">OSOBY</span></div>
+        <div class="stat"><b>91%</b><span data-en="PRESENCE">FREKWENCJA</span></div>
+        <div class="stat"><b>54h</b><span data-en="RECORDED">ZAPISANO</span></div>
+      </div>
+      <div class="timeline-card">
+        <div class="timeline-head"><span data-en="PRESENCE TIMELINE">OŚ CZASU OBECNOŚCI</span><span>09:00 — 17:00</span></div>
+        <div class="row"><label data-en="Emma Wilson">Anna Kowalska</label><div class="track"><i style="width:100%"></i></div><em>100%</em></div>
+        <div class="row"><label data-en="James Bennett">Piotr Nowak</label><div class="track"><i style="width:42%"></i><i class="gap" style="width:5%"></i><i style="width:49%"></i></div><em>91%</em></div>
+        <div class="row"><label data-en="Chloe Palmer">Joanna Woźniak</label><div class="track"><i class="gap" style="width:6%"></i><i style="width:90%"></i></div><em>90%</em></div>
+        <div class="row"><label data-en="Thomas Wright">Tomasz Lewandowski</label><div class="track"><i style="width:84%"></i><i class="gap" style="width:12%"></i></div><em>84%</em></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    if (new URLSearchParams(location.search).get('lang') === 'en') {
+      document.documentElement.lang = 'en';
+      document.querySelectorAll('[data-en]').forEach(element => {
+        const icon = element.querySelector(':scope > i');
+        element.textContent = element.dataset.en;
+        if (icon) element.prepend(icon);
+      });
+      document.querySelectorAll('[data-en-aria-label]').forEach(element => { element.setAttribute('aria-label', element.dataset.enAriaLabel); });
+    }
+  </script>
+</body>
+</html>

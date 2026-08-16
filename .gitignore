@@ -22,7 +22,7 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Screenshots
+# Screenshots — legacy output; the capture tool now writes to dist/assets/
 screenshots/
 
 # Secrets
