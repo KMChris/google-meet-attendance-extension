@@ -2,6 +2,16 @@
 
 All notable changes to this project. This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] 2026-08-16
+
+### Added
+- **Trackr (newbigtools.com) exports can be imported.** Trackr writes one CSV per meeting, a row
+  per participant with a join, a leave and a running total — nothing about what happened between —
+  so a person is read as present for the whole stretch, with the leave pinned at join +
+  "Time in call", the only figure Trackr keeps to the second. The meeting's day and code exist
+  only in the file's name (`Meet---abc-defg-hij-2026-08-16.csv`), so a renamed file that has lost
+  its day is refused rather than guessed at.
+
 ## [1.4.0] 2026-08-16
 
 ### Added
