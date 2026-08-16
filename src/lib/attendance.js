@@ -134,21 +134,40 @@ export function deriveAttendee(p) {
   return out;
 }
 
-/** Seconds a participant was present, open sessions clamped to `endMs`. */
-export function presenceSeconds(attendee, endMs) {
+/** Seconds one session overlaps the supplied attendance window. */
+export function boundedSessionSeconds(session, startMs = -Infinity, endMs = Date.now()) {
+  const joined = ms(session && session.joinedAt);
+  const left = session && session.leftAt ? ms(session.leftAt) : endMs;
+  const from = Math.max(joined, startMs);
+  const to = Math.min(left, endMs);
+  return Number.isFinite(from) && Number.isFinite(to) && to > from
+    ? Math.floor((to - from) / 1000)
+    : 0;
+}
+
+/** Seconds a participant was present inside `[startMs, endMs]`. */
+export function presenceSeconds(attendee, endMs, startMs = -Infinity) {
   if (!attendee) return 0;
   const sessions = attendee.sessions && attendee.sessions.length
     ? attendee.sessions
     : sessionsFromEvents(attendee.events);
   const cap = Number.isFinite(endMs) ? endMs : Date.now();
-  let total = 0;
-  for (const s of sessions) {
-    const start = ms(s.joinedAt);
-    if (Number.isNaN(start)) continue;
-    const end = s.leftAt ? ms(s.leftAt) : cap;
-    total += Math.max(0, end - start);
+  const floor = Number.isFinite(startMs) ? startMs : -Infinity;
+  return sessions.reduce((total, session) =>
+    total + boundedSessionSeconds(session, floor, cap), 0);
+}
+
+/** Position one session on a timeline, or null when it has no duration inside it. */
+export function timelineSegmentBox(sessionStartMs, sessionEndMs, startMs, endMs, span = endMs - startMs) {
+  const from = Math.max(sessionStartMs, startMs);
+  const to = Math.min(sessionEndMs, endMs);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(span) || span <= 0 || to <= from) {
+    return null;
   }
-  return Math.floor(total / 1000);
+  return {
+    left: (from - startMs) / span * 100,
+    width: Math.max(0.6, (to - from) / span * 100)
+  };
 }
 
 /* ============================ meeting-level ============================ */
@@ -323,9 +342,10 @@ export function meetingDurationSeconds(meeting) {
   return Math.floor((endMs - startMs) / 1000);
 }
 
-/** Seconds a participant was present in this meeting, clamped to its end. */
+/** Seconds a participant was present inside this meeting's measured bounds. */
 export function liveSecondsFor(attendee, meeting) {
-  return presenceSeconds(attendee, meetingEndMs(meeting));
+  const { startMs, endMs } = meetingBounds(meeting);
+  return presenceSeconds(attendee, endMs, startMs);
 }
 
 /** Attendance share (0–100) of the meeting duration. */

@@ -8,6 +8,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as attendance from '../src/lib/attendance.js';
 import {
   mergeRawParticipants, deriveAttendee, presenceSeconds, sessionsFromEvents,
   closeOpenEvents, closeOpenParticipants, lastActivityMs, hasEventsAfter,
@@ -250,6 +251,53 @@ test('a start pinned after the meeting ended does not leave it with no length', 
   };
 
   assert.equal(meetingDurationSeconds(meeting), 60 * 60, 'the hour it was actually seen to run');
+});
+
+test('presence is clipped to both sides of the scheduled meeting', () => {
+  const anna = deriveAttendee({ events: [join('09:00'), leave('11:00')] });
+  const meeting = {
+    date: at('09:00'), endedAt: at('11:00'),
+    scheduledStart: at('09:30'), scheduledEnd: at('10:30'),
+    attendance: { Anna: anna }
+  };
+
+  assert.equal(attendance.liveSecondsFor(anna, meeting), 60 * 60);
+  assert.equal(presenceSeconds(anna, Date.parse(at('10:30')), Date.parse(at('09:30'))), 60 * 60);
+  assert.equal(sharePct(anna, meeting), 100);
+});
+
+test('sessions wholly outside the meeting count as zero', () => {
+  const before = deriveAttendee({ events: [join('08:00'), leave('09:00')] });
+  const after = deriveAttendee({ events: [join('11:00'), leave('12:00')] });
+  const startMs = Date.parse(at('09:30'));
+  const endMs = Date.parse(at('10:30'));
+
+  assert.equal(attendance.boundedSessionSeconds(before.sessions[0], startMs, endMs), 0);
+  assert.equal(attendance.boundedSessionSeconds(after.sessions[0], startMs, endMs), 0);
+});
+
+test('an open session is clipped at both meeting bounds', () => {
+  const open = deriveAttendee({ events: [join('09:00')] });
+  const meeting = {
+    date: at('09:00'), endedAt: at('11:00'),
+    scheduledStart: at('09:30'), scheduledEnd: at('10:30'),
+    attendance: { Anna: open }
+  };
+
+  assert.equal(attendance.liveSecondsFor(open, meeting), 60 * 60);
+});
+
+test('a timeline boundary touch has no visible segment', () => {
+  const startMs = Date.parse(at('09:30'));
+  const endMs = Date.parse(at('10:30'));
+  const span = endMs - startMs;
+
+  assert.equal(attendance.timelineSegmentBox(Date.parse(at('09:00')), startMs, startMs, endMs, span), null);
+  assert.equal(attendance.timelineSegmentBox(endMs, Date.parse(at('11:00')), startMs, endMs, span), null);
+  assert.deepEqual(
+    attendance.timelineSegmentBox(startMs, startMs + 1000, startMs, endMs, span),
+    { left: 0, width: 0.6 }
+  );
 });
 
 test('a session id says when it began, and an id from anywhere else does not', () => {

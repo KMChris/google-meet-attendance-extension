@@ -816,27 +816,12 @@ $('#btn-end-now').addEventListener('click', async () => {
  * it ran. A session still open says so instead of naming an end; the meeting's end is only
  * where the block stops being drawn.
  */
-function segTip(title, s, joinedMs, endedMs) {
+function segTip(title, s, startMs, endMs) {
   const from = i18n.formatTime(s.joinedAt);
   const to = s.leftAt ? i18n.formatTime(s.leftAt) : t('stillInCall');
-  const secs = Math.max(0, Math.floor((endedMs - joinedMs) / 1000));
+  const secs = A.boundedSessionSeconds(s, startMs, endMs);
   return ` data-tip-title="${esc(title)}" data-tip-color="var(--present)"` +
     ` data-tip-value="${esc(from)} → ${esc(to)}" data-tip-label="${esc(fmtDur(secs))}"`;
-}
-
-/**
- * Where one presence block sits on a track spanning [startMs, endMs], in percent, or null when
- * the block is not on that track at all.
- *
- * A meeting's hours can be pinned, and a session can fall outside them: somebody joining after the
- * hour the calendar event was booked to end, or a schedule read off the wrong entry. Clamped to
- * the track such a block has nothing left of it, and drawing it anyway left a stray sliver past
- * the end of a lane, which the track does not clip.
- */
-function segBox(sMs, eMs, startMs, endMs, span) {
-  const from = Math.max(sMs, startMs), to = Math.min(eMs, endMs);
-  if (!(to >= from)) return null;
-  return { left: (from - startMs) / span * 100, width: Math.max(0.6, (to - from) / span * 100) };
 }
 
 function renderTimeline(m) {
@@ -864,9 +849,9 @@ function renderTimeline(m) {
     (a.sessions || []).forEach(s => {
       const sMs = Date.parse(s.joinedAt); if (Number.isNaN(sMs)) return;
       const eMs = s.leftAt ? Date.parse(s.leftAt) : endMs;
-      const box = segBox(sMs, eMs, startMs, endMs, span);
+      const box = A.timelineSegmentBox(sMs, eMs, startMs, endMs, span);
       if (!box) return;
-      segs += `<div class="seg"${segTip(name, s, sMs, eMs)} style="left:${box.left}%;width:${box.width}%"></div>`;
+      segs += `<div class="seg"${segTip(name, s, startMs, endMs)} style="left:${box.left}%;width:${box.width}%"></div>`;
     });
     lanes += `<div class="tl-lane"><div class="tl-name"><span class="dot" style="background:var(--present)"></span><span class="who">${esc(name)}</span></div><div class="tl-track">${segs}</div></div>`;
   });
@@ -1414,9 +1399,9 @@ function personSessionBlock(m, a) {
     const open = !s.leftAt;
     const eMs = open ? endMs : Date.parse(s.leftAt);
     // the block may sit outside the meeting's own hours; the interval underneath still reads
-    const box = segBox(sMs, eMs, startMs, endMs, span);
-    if (box) segs += `<div class="seg"${segTip(m.meetingTitle, s, sMs, eMs)} style="left:${box.left}%;width:${box.width}%"></div>`;
-    ranges += `<span class="pm-range"><i class="rdot ${open ? 'open' : ''}"></i>${i18n.formatTime(s.joinedAt)} → ${open ? esc(t('stillInCall')) : i18n.formatTime(s.leftAt)} <b>${fmtDur(Math.max(0, Math.floor((eMs - sMs) / 1000)))}</b></span>`;
+    const box = A.timelineSegmentBox(sMs, eMs, startMs, endMs, span);
+    if (box) segs += `<div class="seg"${segTip(m.meetingTitle, s, startMs, endMs)} style="left:${box.left}%;width:${box.width}%"></div>`;
+    ranges += `<span class="pm-range"><i class="rdot ${open ? 'open' : ''}"></i>${i18n.formatTime(s.joinedAt)} → ${open ? esc(t('stillInCall')) : i18n.formatTime(s.leftAt)} <b>${fmtDur(A.boundedSessionSeconds(s, startMs, endMs))}</b></span>`;
   });
 
   return `<div class="pm-sess${a ? '' : ' absent'}">

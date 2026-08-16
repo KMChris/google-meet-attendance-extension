@@ -12,6 +12,7 @@
 import * as store from '../src/lib/storage.js';
 import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
+import { calendarDayCount, presetBounds } from '../src/lib/date-ranges.js';
 import * as C from './charts.js';
 import { hideTip } from './tooltip.js';
 
@@ -19,7 +20,6 @@ const { t } = i18n;
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-const DAY_MS = 86400000;
 const FILTER_KEY = 'analyticsFilters';
 const PRESET_DAYS = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 };
 const UNGROUPED = '__none';
@@ -89,7 +89,8 @@ function resolveRange() {
     return { from, to };
   }
   const days = PRESET_DAYS[state.preset] || 30;
-  return { from: startOfDay(new Date(Date.now() - (days - 1) * DAY_MS)), to: endOfDay(now) };
+  const range = presetBounds(days, now);
+  return { from: range.from.getTime(), to: range.to.getTime() };
 }
 
 const titleOf = m => (m.meetingTitle || '—').trim() || '—';
@@ -110,7 +111,7 @@ function matches(m, from, to, skip) {
 /* ============================ buckets ============================ */
 
 function bucketUnit(from, to) {
-  const days = Math.round((to - from) / DAY_MS) + 1;
+  const days = calendarDayCount(from, to);
   if (days <= 31) return 'day';
   if (days <= 210) return 'week';
   return 'month';

@@ -28,13 +28,11 @@ function attendanceTable(m, roster) {
 }
 
 function eventLog(m) {
-  const endMs = A.meetingEndMs(m);
+  const { startMs, endMs } = A.meetingBounds(m);
   return `<div class="evlog">` + Object.entries(m.attendance).sort(([a], [b]) => a.localeCompare(b)).map(([name, a]) => {
     const lines = (a.sessions || []).map(s => {
-      const joinMs = Date.parse(s.joinedAt);
       const open = !s.leftAt;
-      const endS = open ? endMs : Date.parse(s.leftAt);
-      const dur = Math.max(0, Math.floor((endS - joinMs) / 1000));
+      const dur = A.boundedSessionSeconds(s, startMs, endMs);
       const out = open
         ? `<span class="io"><span class="ev-tag open"></span>${esc(t('stillInCall'))}</span>`
         : `<span class="io"><span class="ev-tag out"></span>${t('evLeft')} <span class="t">${time(s.leftAt)}</span></span>`;
