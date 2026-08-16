@@ -41,16 +41,18 @@ globalThis.chrome = {
   }
 };
 
-/** Every request the transport makes, answered; appends are what the test reads. */
+/** Every request the transport makes, answered; appended sheet IDs are what the test reads. */
 const appended = [];
 globalThis.fetch = async (url, opts = {}) => {
   const reply = (obj) => ({ ok: true, status: 200, json: async () => obj });
-  if (/:append\?/.test(url)) {
-    const range = decodeURIComponent(/values\/([^:]+):append/.exec(url)[1]);
+  if (/\/spreadsheets\/[^/:]+:batchUpdate$/.test(url)) {
+    const body = JSON.parse(opts.body);
     // a pass is not instant: a request is where two of them get the chance to overlap
     await new Promise(r => setTimeout(r, 50));
-    appended.push(range);
-    return reply({});
+    body.requests.forEach(request => {
+      if (request.appendCells) appended.push(request.appendCells.sheetId);
+    });
+    return reply({ replies: body.requests.map(() => ({})) });
   }
   if (/values:batchGet/.test(url)) return reply({ valueRanges: [] });
   if (/values:batchUpdate/.test(url)) return reply({});
@@ -82,7 +84,7 @@ function seed(extra = {}) {
   });
 }
 
-const meetingRows = () => appended.filter(r => r.startsWith('Meetings')).length;
+const meetingRows = () => appended.filter(sheetId => sheetId === 0).length;
 
 test('a pass that starts while another is running stands down', async () => {
   seed();

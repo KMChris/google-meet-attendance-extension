@@ -59,7 +59,7 @@ export function spreadsheetUrl(spreadsheetId) {
 /**
  * Get OAuth2 token using Chrome Identity API
  */
-export async function getAuthToken(interactive = true) {
+export async function getAuthToken(interactive = false) {
   const clientId = chrome.runtime.getManifest()?.oauth2?.client_id || '';
   if (!clientId || clientId.startsWith('YOUR_')) {
     throw new Error('Google OAuth client_id is not configured in manifest.json — see README.md → Google Cloud Console Setup');
@@ -81,8 +81,21 @@ export async function getAuthToken(interactive = true) {
  * Remove cached auth token (for logout or token refresh)
  */
 export async function removeCachedToken(token) {
-  return new Promise((resolve) => {
-    chrome.identity.removeCachedAuthToken({ token }, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.identity.removeCachedAuthToken({ token }, () => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
+    });
+  });
+}
+
+/** Remove the account grant state used by this extension. */
+export async function disconnect() {
+  return new Promise((resolve, reject) => {
+    chrome.identity.clearAllCachedAuthTokens(() => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
+    });
   });
 }
 
@@ -114,12 +127,12 @@ async function apiRequest(url, options = {}) {
     }
   });
 
-  const token = await getAuthToken();
+  const token = await getAuthToken(false);
   let response = await send(token);
 
   if (response.status === 401) {
     await removeCachedToken(token);
-    response = await send(await getAuthToken());
+    response = await send(await getAuthToken(false));
   }
 
   if (!response.ok) {
@@ -197,7 +210,8 @@ export async function ensureSheets(spreadsheetId) {
   const repaired = await repairHeaders(spreadsheetId, Object.keys(HEADERS)
     .filter(t => props.has(t)).map(t => props.get(t)));
 
-  return { spreadsheet: ss, added: missing, repaired, prepared: !!(missing.length + repaired.length) };
+  const spreadsheet = missing.length ? await getSpreadsheet(spreadsheetId) : ss;
+  return { spreadsheet, added: missing, repaired, prepared: !!(missing.length + repaired.length) };
 }
 
 /** Header rows of the tabs that were already there. Returns the ones it had to write. */
@@ -242,7 +256,7 @@ export async function getSpreadsheet(spreadsheetId) {
  * Append data to a sheet
  */
 export async function appendData(spreadsheetId, range, values) {
-  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
 
   return apiRequest(url, {
     method: 'POST',
@@ -284,22 +298,8 @@ async function getRanges(spreadsheetId, ranges) {
 
 /* ------------------------- what a meeting looks like in the sheet ------------------------- */
 
-/**
- * A cell that says what it holds instead of doing something.
- *
- * These rows are written with USER_ENTERED, which is what makes a duration arrive as a number and
- * an hour as an hour, and also what makes a value beginning with `=`, `+`, `-` or `@` arrive as a
- * formula. Half of what goes in here is other people's names, chosen by them and scraped off the
- * page, so a participant called `=IMAGE("http://…")` would be writing into the user's own
- * spreadsheet. A leading apostrophe is the sheet's own way of saying "this is text": it is not
- * shown and is not part of the value.
- *
- * The backup rows below are left alone. They hold JSON, which begins with a brace and is read
- * straight back out again.
- */
 function text(value) {
-  const s = String(value == null ? '' : value);
-  return /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return String(value == null ? '' : value);
 }
 
 /**
@@ -313,7 +313,7 @@ export function meetingRow(meeting) {
   const seconds = meetingDurationSeconds(meeting);
   return [text(meeting.id), text(meeting.meetingTitle),
     text(meetingStartIso(meeting)), text(meetingEndIso(meeting)),
-    seconds ? Math.round(seconds / 60).toString() : '', names.length, text(meeting.url)];
+    seconds ? Math.round(seconds / 60) : '', names.length, text(meeting.url)];
 }
 
 /** One row per raw Join/Leave event — a summary row only when a record carries no events. */
@@ -335,6 +335,27 @@ function backupRows(kind, id, obj) {
   return Array.from({ length: parts }, (_, i) => [kind, id, i, json.slice(i * CELL_CHUNK, (i + 1) * CELL_CHUNK)]);
 }
 
+/** A typed value cannot be reinterpreted as a formula by Sheets. */
+function cell(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return { userEnteredValue: { numberValue: value } };
+  }
+  if (typeof value === 'boolean') {
+    return { userEnteredValue: { boolValue: value } };
+  }
+  return { userEnteredValue: { stringValue: String(value == null ? '' : value) } };
+}
+
+function appendCells(sheetId, rows) {
+  return {
+    appendCells: {
+      sheetId,
+      rows: rows.map(values => ({ values: values.map(cell) })),
+      fields: 'userEnteredValue'
+    }
+  };
+}
+
 /**
  * Add records the sheet does not have yet: the readable rows plus the backup rows that make
  * them restorable. Rows already there are left alone, and however many records come in it is
@@ -342,24 +363,36 @@ function backupRows(kind, id, obj) {
  */
 export async function appendRecords(spreadsheetId, { meetings = [], groups = [] } = {}) {
   if (!meetings.length && !groups.length) return { meetings: 0, groups: 0 };
-  await ensureSheets(spreadsheetId);
+  const { spreadsheet } = await ensureSheets(spreadsheetId);
+  const sheetIds = new Map((spreadsheet.sheets || []).map(sheet => [
+    sheet.properties && sheet.properties.title,
+    sheet.properties && sheet.properties.sheetId
+  ]));
+  for (const title of Object.keys(HEADERS)) {
+    if (!Number.isInteger(sheetIds.get(title))) throw new Error(`Sheet is missing a numeric ID: ${title}`);
+  }
 
+  let meetingRows = [];
+  let peopleRows = [];
   if (meetings.length) {
     // The two readable tabs show a meeting the way the app does, with renames and merges folded
     // in: someone recorded under two Meet identities is one person here too, and the count beside
     // the meeting agrees with the dashboard. The backup rows below are the stored record itself,
     // participants still separate, which is what keeps a restored merge undoable.
     const readable = meetings.map(m => normalizeMeeting(m));
-    await appendData(spreadsheetId, `${SHEET_MEETINGS}!A:G`, readable.map(meetingRow));
-    const rows = readable.flatMap(participantRows);
-    if (rows.length) await appendData(spreadsheetId, `${SHEET_PARTICIPANTS}!A:E`, rows);
+    meetingRows = readable.map(meetingRow);
+    peopleRows = readable.flatMap(participantRows);
   }
 
   const backup = [
     ...groups.flatMap(g => backupRows('series', g.id, g)),
     ...meetings.flatMap(m => backupRows('meeting', m.id, m))
   ];
-  await appendData(spreadsheetId, `${SHEET_BACKUP}!A:D`, backup);
+  const requests = [];
+  if (meetingRows.length) requests.push(appendCells(sheetIds.get(SHEET_MEETINGS), meetingRows));
+  if (peopleRows.length) requests.push(appendCells(sheetIds.get(SHEET_PARTICIPANTS), peopleRows));
+  if (backup.length) requests.push(appendCells(sheetIds.get(SHEET_BACKUP), backup));
+  if (requests.length) await structureUpdate(spreadsheetId, requests);
 
   return { meetings: meetings.length, groups: groups.length };
 }
@@ -391,10 +424,8 @@ export function parseBackupRows(rows) {
 
 /** Every backup row, or none at all when the sheet has no Backup tab to read. */
 async function readBackup(spreadsheetId, range = `${SHEET_BACKUP}!A2:D`) {
-  try {
-    const data = await getData(spreadsheetId, range);
-    return data.values || [];
-  } catch { return []; }               // nothing was ever written there for restore
+  const data = await getData(spreadsheetId, range);
+  return data.values || [];
 }
 
 /** Read everything back out of the sheet. */

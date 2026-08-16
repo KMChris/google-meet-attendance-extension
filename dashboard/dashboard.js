@@ -3,6 +3,7 @@ import * as A from '../src/lib/attendance.js';
 import * as i18n from '../src/lib/i18n.js';
 import * as sheets from '../src/lib/sheets-api.js';
 import * as sheetsSync from '../src/lib/sheets-sync.js';
+import { disconnectSheetsAccount } from '../src/lib/sheets-account.js';
 import * as importers from '../src/lib/importers.js';
 import { esc, initials } from '../src/lib/html.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
@@ -2146,10 +2147,18 @@ $('#sheets-connect').addEventListener('click', async () => {
 });
 $('#sheets-disconnect').addEventListener('click', async () => {
   if (!confirm(t('confirmSheetsDisconnect'))) return;
-  try { const tok = await sheets.getAuthToken(false); if (tok) await sheets.removeCachedToken(tok); } catch {}
-  settings = await store.updateSettings({ spreadsheetId: null, spreadsheetName: null, autoSync: false });
-  sheetsNote();
-  toast(t('sheetsDisconnectedToast')); refreshSheets();
+  $('#sheets-disconnect').disabled = true;
+  try {
+    settings = await disconnectSheetsAccount();
+    sheetsNote();
+    toast(t('sheetsDisconnectedToast'));
+  } catch (error) {
+    console.error('[GM Attendance] disconnect failed:', (error && error.message) || error);
+    toast(t('sheetsDisconnectFailed'));
+  } finally {
+    $('#sheets-disconnect').disabled = false;
+    refreshSheets();
+  }
 });
 $('#sheets-create').addEventListener('click', async () => {
   $('#sheets-create').disabled = true;

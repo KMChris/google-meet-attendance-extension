@@ -1398,6 +1398,9 @@
   "sheetsDisconnectedToast": {
     "message": "Disconnected"
   },
+  "sheetsDisconnectFailed": {
+    "message": "Could not disconnect the Google account"
+  },
   "sheetsCreatedToast": {
     "message": "Spreadsheet created"
   },

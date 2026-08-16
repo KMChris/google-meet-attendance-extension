@@ -1398,6 +1398,9 @@
   "sheetsDisconnectedToast": {
     "message": "Rozłączono"
   },
+  "sheetsDisconnectFailed": {
+    "message": "Nie udało się rozłączyć konta Google"
+  },
   "sheetsCreatedToast": {
     "message": "Utworzono arkusz"
   },
